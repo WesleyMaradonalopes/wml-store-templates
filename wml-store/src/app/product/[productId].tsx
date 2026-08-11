@@ -1,17 +1,17 @@
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { CartIconButton } from '@/components/cart-icon-button';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
-import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { ProductCard } from '@/components/product-card';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
@@ -90,6 +90,8 @@ export default function ProductScreen() {
   const [quickViewVisible, setQuickViewVisible] = useState(false);
   const [colorsVisible, setColorsVisible] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
   const [detailsY, setDetailsY] = useState(0);
   const [buttonLayout, setButtonLayout] = useState<{ y: number; height: number } | null>(null);
   const [scrollY, setScrollY] = useState(0);
@@ -100,6 +102,7 @@ export default function ProductScreen() {
   const [shippingMessage, setShippingMessage] = useState('');
   const [descriptionOpen, setDescriptionOpen] = useState(true);
   const [compositionOpen, setCompositionOpen] = useState(false);
+  const galleryListRef = useRef<FlatList<string>>(null);
 
   const variantGroups = useMemo(() => buildVariationGroups(product), [product]);
   const variationNames = Object.keys(variantGroups);
@@ -126,6 +129,8 @@ export default function ProductScreen() {
     setQuickViewVisible(false);
     setColorsVisible(false);
     setImageIndex(0);
+    setImageViewerVisible(false);
+    setViewerIndex(0);
     setScrollY(0);
     setCartMessage(null);
     setShippingQuotes([]);
@@ -154,6 +159,7 @@ export default function ProductScreen() {
 
   useEffect(() => {
     setImageIndex(0);
+    setViewerIndex(0);
   }, [activeVariant?.itemId]);
 
   function optionAvailable(name: string, value: string) {
@@ -270,6 +276,7 @@ export default function ProductScreen() {
             {galleryImages.length > 0 && (
               <View style={[styles.galleryArea, { height: screenHeight }] }>
                 <FlatList
+                  ref={galleryListRef}
                   key={activeVariant?.itemId ?? product.id}
                   data={galleryImages}
                   horizontal
@@ -277,9 +284,25 @@ export default function ProductScreen() {
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(image, index) => `${image}-${index}`}
                   onMomentumScrollEnd={(event) => setImageIndex(Math.round(event.nativeEvent.contentOffset.x / screenWidth))}
-                  renderItem={({ item }) => <Image source={{ uri: item }} style={[styles.mainImage, { width: screenWidth, height: screenHeight }]} contentFit="cover" />}
+                  renderItem={({ item, index }) => (
+                    <Pressable
+                      accessibilityLabel={`Abrir imagem ${index + 1}`}
+                      onPress={() => {
+                        setViewerIndex(index);
+                        setImageViewerVisible(true);
+                      }}
+                      style={[styles.heroImagePressable, { width: screenWidth, height: screenHeight }]}
+                    >
+                      <Image source={{ uri: item }} style={[styles.mainImage, { width: screenWidth, height: screenHeight }]} contentFit="cover" />
+                    </Pressable>
+                  )}
                 />
-                <BlurView intensity={35} tint="dark" pointerEvents="none" style={styles.heroShade} />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.7)']}
+                  locations={[0, 0.46, 1]}
+                  style={styles.heroShade}
+                />
                 {galleryImages.length > 1 && <View pointerEvents="none" style={styles.heroDots}>{galleryImages.map((_, index) => <View key={index} style={[styles.dot, imageIndex === index && styles.activeDot]} />)}</View>}
                 <View style={styles.heroProductInfo}>
                   <View style={styles.heroProductCopy}>
@@ -398,9 +421,103 @@ export default function ProductScreen() {
             if (colorProduct.id !== product?.id) router.replace(`/product/${colorProduct.id}`);
           }}
         />
+        <ProductImageViewer
+          images={galleryImages}
+          visible={imageViewerVisible}
+          initialIndex={viewerIndex}
+          onClose={() => setImageViewerVisible(false)}
+          onIndexChange={(index) => {
+            setViewerIndex(index);
+            setImageIndex(index);
+            galleryListRef.current?.scrollToIndex({ index, animated: false });
+          }}
+        />
         <AddToCartFeedback message={cartMessage} />
       </SafeAreaView>
     </ThemedView>
+  );
+}
+
+function ProductImageViewer({
+  images,
+  visible,
+  initialIndex,
+  onClose,
+  onIndexChange,
+}: {
+  images: string[];
+  visible: boolean;
+  initialIndex: number;
+  onClose: () => void;
+  onIndexChange: (index: number) => void;
+}) {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const listRef = useRef<FlatList<string>>(null);
+  const [viewerSize, setViewerSize] = useState({ width, height });
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const safeInitialIndex = Math.min(Math.max(initialIndex, 0), Math.max(images.length - 1, 0));
+  const pageWidth = viewerSize.width || width;
+  const pageHeight = viewerSize.height || height;
+
+  useEffect(() => {
+    if (!visible || images.length === 0) return;
+    setCurrentIndex(safeInitialIndex);
+    const timeout = setTimeout(() => {
+      listRef.current?.scrollToIndex({ index: safeInitialIndex, animated: false });
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [images.length, pageWidth, safeInitialIndex, visible]);
+
+  if (images.length === 0) return null;
+
+  return (
+    <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
+      <View
+        style={styles.viewer}
+        onLayout={(event) => {
+          const nextSize = event.nativeEvent.layout;
+          setViewerSize((current) => current.width === nextSize.width && current.height === nextSize.height
+            ? current
+            : { width: nextSize.width, height: nextSize.height });
+        }}>
+        <FlatList
+          ref={listRef}
+          data={images}
+          style={styles.viewerList}
+          contentContainerStyle={styles.viewerListContent}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          initialScrollIndex={safeInitialIndex}
+          getItemLayout={(_, index) => ({ length: pageWidth, offset: pageWidth * index, index })}
+          keyExtractor={(image, index) => `${image}-${index}`}
+          onMomentumScrollEnd={(event) => {
+            const nextIndex = Math.min(Math.max(Math.round(event.nativeEvent.contentOffset.x / pageWidth), 0), images.length - 1);
+            setCurrentIndex(nextIndex);
+            onIndexChange(nextIndex);
+          }}
+          renderItem={({ item }) => (
+            <View style={[styles.viewerPage, { width: pageWidth, height: pageHeight }]}>
+              <Image source={{ uri: item }} style={[styles.viewerImage, { width: pageWidth, height: pageHeight }]} contentFit="cover" />
+            </View>
+          )}
+        />
+        <View style={[styles.viewerTopBar, { paddingTop: insets.top + 12 }]}>
+          <View style={styles.viewerCounter}>
+            <ThemedText style={styles.viewerText}>{currentIndex + 1}/{images.length}</ThemedText>
+          </View>
+          <Pressable accessibilityLabel="Fechar imagem" onPress={onClose} style={styles.viewerClose}>
+            <ThemedText style={styles.viewerCloseText}>×</ThemedText>
+          </Pressable>
+        </View>
+        {images.length > 1 && (
+          <View pointerEvents="none" style={[styles.viewerDots, { bottom: Math.max(insets.bottom, 20) + 20 }]}>
+            {images.map((_, index) => <View key={index} style={[styles.viewerDot, currentIndex === index && styles.viewerDotActive]} />)}
+          </View>
+        )}
+      </View>
+    </Modal>
   );
 }
 
@@ -599,15 +716,29 @@ const styles = StyleSheet.create({
   content: { paddingBottom: Spacing.five },
   contentWithFloating: { paddingBottom: 120 },
   galleryArea: { position: 'relative', backgroundColor: '#e8e8ea' },
+  heroImagePressable: { flex: 1 },
   mainImage: { backgroundColor: '#e8e8ea' },
-  heroShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 120, backgroundColor: 'rgba(0, 0, 0, 0.18)' },
+  heroShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 190 },
   heroDots: { position: 'absolute', left: Spacing.four, bottom: 92, flexDirection: 'row', alignItems: 'center', gap: 5 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.7)' },
   activeDot: { width: 28, backgroundColor: '#FFFFFF' },
-  heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 24 },
+  heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 35 },
   heroProductCopy: { gap: 3 },
   heroProductName: { color: '#FFFFFF', fontSize: 14, lineHeight: 18 },
   heroProductPrice: { color: '#FFFFFF', fontSize: 14 },
+  viewer: { flex: 1, backgroundColor: '#fff' },
+  viewerList: { flex: 1, backgroundColor: '#fff' },
+  viewerListContent: { backgroundColor: '#fff' },
+  viewerPage: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  viewerImage: { backgroundColor: '#fff' },
+  viewerTopBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 5 },
+  viewerCounter: { minWidth: 48, height: 36, paddingHorizontal: Spacing.three, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
+  viewerClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
+  viewerText: { color: '#FFFFFF', fontSize: 14, lineHeight: 18, fontWeight: '600' },
+  viewerCloseText: { color: '#FFFFFF', fontSize: 28, lineHeight: 30, fontWeight: '300' },
+  viewerDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 5 },
+  viewerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fff' },
+  viewerDotActive: { width: 20, backgroundColor: '#fff' },
   details: { gap: Spacing.four, padding: Spacing.four, backgroundColor: '#FFFFFF' },
   productHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
   headingText: { flex: 1, gap: 4 },

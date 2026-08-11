@@ -3,15 +3,15 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 import { CmsSection } from '@/services/cms';
 import { isFavorite } from '@/services/favorites';
-import { Spacing } from '@/constants/theme';
 
+import { ProductCard } from './product-card';
+import { FilterGlyph, ProductFilterModal } from './product-filter-modal';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-import { FilterGlyph, ProductFilterModal } from './product-filter-modal';
-import { ProductCard } from './product-card';
 
 type Props = { section: CmsSection };
 
@@ -457,9 +457,9 @@ const styles = StyleSheet.create({
   bannerImage: { width: '100%', height: 180 },
   heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },
   heroImage: { width: '100%', height: Dimensions.get('window').height },
-  heroDots: { position: 'absolute', left: 0, right: 0, bottom: 88, flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#c8c4be' },
-  activeDot: { width: 20, backgroundColor: '#1e120d' },
+  heroDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  activeDot: { width: 20, backgroundColor: '#fff' },
   overlay: {
     position: 'absolute',
     left: 16,
