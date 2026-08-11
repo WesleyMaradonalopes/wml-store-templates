@@ -1,0 +1,129 @@
+[
+  {
+    "name": "MultipleImageBanner",
+    "requiredScopes": [],
+    "schema": {
+      "title": "Banner e slider da home",
+      "type": "object",
+      "properties": {
+        "mainTitle": { "type": "string", "title": "Título" },
+        "mode": {
+          "type": "string",
+          "title": "Modo",
+          "enum": ["SliderHero", "FitOnScreen", "carousel", "scroll"],
+          "default": "SliderHero"
+        },
+        "images": {
+          "type": "array",
+          "title": "Imagens",
+          "items": {
+            "type": "object",
+            "properties": {
+              "imageUrl": { "type": "string", "title": "Imagem" },
+              "overlayTitle": { "type": "string", "title": "Título sobre a imagem" },
+              "overlaySubtitle": { "type": "string", "title": "Subtítulo" },
+              "action": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string", "enum": ["none", "product", "page", "search", "link"], "default": "none" },
+                  "value": { "type": "string", "title": "Destino" }
+                }
+              }
+            }
+          }
+        },
+        "autoPlay": { "type": "boolean", "default": true },
+        "showArrows": { "type": "boolean", "default": false },
+        "showDots": { "type": "boolean", "default": true },
+        "padding": { "type": "boolean", "default": false },
+        "borderRadius": { "type": "number", "default": 0 },
+        "aspectRatio": { "type": "number", "default": 0.7 },
+        "size": { "type": "string", "enum": ["small", "medium", "large", "full"] },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "remoteConfigKey": { "type": "string" }
+      }
+    }
+  },
+  {
+    "name": "ProductShelf",
+    "requiredScopes": [],
+    "schema": {
+      "title": "Prateleira de produtos",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "title": "Título" },
+        "term": { "type": "string", "title": "Busca" },
+        "sort": { "type": "string", "default": "score:desc" },
+        "facets": { "type": "array", "items": { "type": "object", "properties": { "key": { "type": "string" }, "value": { "type": "string" } } } },
+        "mode": { "type": "string", "enum": ["carousel", "scroll"], "default": "carousel" },
+        "numberOfItems": { "type": "integer", "default": 8 },
+        "tabs": { "type": "array", "items": { "type": "object", "properties": { "label": { "type": "string" }, "term": { "type": "string" }, "facets": { "type": "array" }, "sort": { "type": "string" } } } },
+        "defaultTabIndex": { "type": "integer", "default": 0 },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "remoteConfigKey": { "type": "string" }
+      }
+    }
+  },
+  {
+    "name": "HighlightedProductShelf",
+    "requiredScopes": [],
+    "schema": { "title": "Prateleira destacada", "type": "object", "properties": { "title": { "type": "string" }, "term": { "type": "string" }, "facets": { "type": "array" }, "sort": { "type": "string" }, "numberOfItems": { "type": "integer", "default": 8 }, "showTitle": { "type": "boolean", "default": true }, "backgroundColor": { "type": "string" }, "textColor": { "type": "string" }, "actionButtonColor": { "type": "string" }, "startDate": { "type": "string" }, "endDate": { "type": "string" }, "showTimer": { "type": "boolean" }, "remoteConfigKey": { "type": "string" } } }
+  },
+  {
+    "name": "CategoryListSwipe",
+    "requiredScopes": [],
+    "schema": { "title": "Categorias", "type": "object", "properties": { "title": { "type": "string" }, "content": { "type": "array", "items": { "type": "object", "properties": { "title": { "type": "string" }, "imageUrl": { "type": "string" }, "action": { "type": "object", "properties": { "type": { "type": "string", "enum": ["none", "product", "page", "search", "link"] }, "value": { "type": "string" } } } } } } } }
+  },
+  {
+    "name": "StreamShopBanner",
+    "requiredScopes": [],
+    "schema": { "title": "Banner de transmissão", "type": "object", "properties": { "content": { "type": "array", "items": { "type": "object" } } } }
+  },
+  {
+    "name": "ProductTiles",
+    "requiredScopes": [],
+    "schema": { "title": "Blocos de produtos", "type": "object", "properties": { "title": { "type": "string" }, "mode": { "type": "string", "enum": ["grid", "carousel"] }, "shelves": { "type": "array", "items": { "type": "object" } } } }
+  },
+  {
+    "name": "WordPressCardList",
+    "requiredScopes": [],
+    "schema": { "title": "Cards de blog", "type": "object", "properties": { "postUrl": { "type": "string" }, "numberOfItems": { "type": "integer", "default": 5 }, "title": { "type": "string" } } }
+  },
+  {
+    "name": "ScheduleCardShelf",
+    "requiredScopes": [],
+    "schema": { "title": "Cards de agenda", "type": "object", "properties": { "title": { "type": "string" }, "shelves": { "type": "array", "items": { "type": "object", "properties": { "date": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" }, "actionLink": { "type": "string" } } } } } }
+  },
+  {
+    "name": "CategoryTree",
+    "requiredScopes": [],
+    "schema": { "title": "Árvore de categorias", "type": "object", "properties": { "shelves": { "type": "array", "items": { "type": "object", "properties": { "title": { "type": "string" }, "showAsSimpleItem": { "type": "boolean" }, "content": { "type": "array", "items": { "type": "object" } } } } } } }
+  },
+  {
+    "name": "LastSeenProducts",
+    "requiredScopes": [],
+    "schema": { "title": "Produtos vistos", "type": "object", "properties": { "title": { "type": "string" }, "numberOfItems": { "type": "integer", "default": 8 }, "mode": { "type": "string", "enum": ["carousel", "horizontalScroll"] } } }
+  },
+  {
+    "name": "ProductInfiniteScroll",
+    "requiredScopes": [],
+    "schema": { "title": "Lista contínua de produtos", "type": "object", "properties": { "title": { "type": "string" }, "sort": { "type": "string" }, "query": { "type": "string" }, "facets": { "type": "array", "items": { "type": "object" } } } }
+  },
+  {
+    "name": "CategoryAccordeon",
+    "requiredScopes": [],
+    "schema": { "title": "Categorias expansíveis", "type": "object", "properties": { "title": { "type": "string" }, "isExpanded": { "type": "boolean", "default": true }, "content": { "type": "array", "items": { "type": "object" } } } }
+  },
+  {
+    "name": "CouponsList",
+    "requiredScopes": [],
+    "schema": { "title": "Lista de cupons", "type": "object", "properties": { "coupons": { "type": "array", "items": { "type": "object", "properties": { "title": { "type": "string" }, "description": { "type": "string" }, "code": { "type": "string" }, "expiresAt": { "type": "string" } } } } } }
+  },
+  {
+    "name": "RichText",
+    "requiredScopes": [],
+    "schema": { "title": "Texto livre", "type": "object", "properties": { "title": { "type": "string" }, "content": { "type": "string" } } }
+  }
+]

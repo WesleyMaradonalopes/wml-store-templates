@@ -1,0 +1,1415 @@
+[
+	{
+		"name": "MultipleImageBanner",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Banners",
+			"type": "object",
+			"description": "Componentes de banners multifunção",
+			"properties": {
+				"mainTitle": {
+					"title": "Título Principal(opcional)",
+					"type": "string"
+				},
+				"images": {
+					"type": "array",
+					"items": {
+						"title": "Mídia",
+						"type": "object",
+						"properties": {
+							"imageUrl": {
+								"title": "Imagem",
+								"type": "string",
+								"widget": {
+									"ui:widget": "media-gallery"
+								}
+							},
+							"imageText": {
+								"title": "Texto da imagem (opcional)",
+								"type": "string"
+							},
+							"overlayTitle": {
+								"title": "Título do overlay (opcional)",
+								"type": "string",
+								"description": "Texto sobreposto na imagem. Exemplo: Roupas tecnológicas"
+							},
+							"overlaySubtitle": {
+								"title": "Subtítulo do overlay (opcional)",
+								"type": "string",
+								"description": "Subtítulo sobreposto na imagem. Exemplo: A partir de R$ 69,90"
+							},
+							"videoUrl": {
+								"title": "Vídeo",
+								"type": "string",
+								"widget": {
+									"ui:widget": "media-gallery"
+								}
+							},
+							"action": {
+								"title": "Destino da ação",
+								"type": "object",
+								"properties": {
+									"type": {
+										"title": "Tipo de ação",
+										"enumNames": [
+											"Nenhum",
+											"Abrir Link Externo",
+											"Abrir Produto (id ou slug)",
+											"Abrir Coleção (Id da coleção)",
+											"Abrir Categoria (cate1/cat2/cat3...)",
+											"Abrir Busca (termo de busca)",
+											"Abrir Landing Page (nome da landing page)",
+											"Abrir Path do Site",
+											"Abrir Marca"
+										],
+										"enum": [
+											"none",
+											"link",
+											"product",
+											"collection",
+											"category",
+											"search",
+											"page",
+											"path",
+											"brand"
+										],
+										"default": "none"
+									},
+									"value": {
+										"title": "Valor",
+										"type": "string"
+									},
+									"sort": {
+										"title": "Sort",
+										"description": "Items order",
+										"default": "score:desc",
+										"enum": [
+											"discount:desc",
+											"name:asc",
+											"name:desc",
+											"orders:desc",
+											"price:asc",
+											"price:desc",
+											"release:desc",
+											"score:desc"
+										],
+										"enumNames": [
+											"Desconto: do maior para o menor",
+											"Nome: A-Z",
+											"Nome: Z-A",
+											"Pedidos: do maior para o menor",
+											"Preço: do menor para o maior",
+											"Preço: do maior para o menor",
+											"Lançamento: do mais novo para o mais antigo",
+											"Relevância: do maior para o menor"
+										]
+									},
+									"title": {
+										"title": "Título (opcional)",
+										"type": "string"
+									},
+									"banner": {
+										"title": "Banner na tela de destino (opcional)",
+										"type": "string",
+										"widget": {
+											"ui:widget": "media-gallery"
+										}
+									},
+									"highlightColor": {
+										"title": "Cor de destaque do texto (opcional)",
+										"type": "string",
+										"description": "Cor de destaque do texto abaixo do banner. Use um valor hexadecimal. Exemplo: #FF0000."
+									}
+								}
+							},
+							"mktTag": {
+								"title": "Tag de Marketing (nome do evento de clique)",
+								"type": "string"
+							},
+							"startDate": {
+								"title": "Exibição programada: Data de início",
+								"type": "string",
+								"widget": {
+									"ui:widget": "date-time"
+								}
+							},
+							"endDate": {
+								"title": "Exibição programada: Data de fim",
+								"type": "string",
+								"widget": {
+									"ui:widget": "date-time"
+								}
+							},
+							"remoteConfigKey": {
+								"title": "Chave de hiperpersonalização WML",
+								"type": "string",
+								"description": "Chave para hiperpersonalização WML"
+							}
+						}
+					}
+				},
+				"autoPlay": {
+					"title": "Rolar automaticamente",
+					"type": "boolean",
+					"default": true
+				},
+				"showArrows": {
+					"title": "Exibir setas de navegação (Somente no Slider Hero)",
+					"type": "boolean",
+					"default": false,
+					"description": "Exibe setas laterais para navegar entre os slides. Aplica-se ao modo Slider Hero."
+				},
+				"showDots": {
+					"title": "Exibir indicadores (dots) (Somente no Slider Hero)",
+					"type": "boolean",
+					"default": true,
+					"description": "Exibe os pontos de navegação na parte inferior do carrossel. Aplica-se ao modo Slider Hero."
+				},
+				"padding": {
+					"type": "integer",
+					"title": "Padding lateral",
+					"default": 0,
+					"description": "Valor do padding lateral (2 = 8px, 4 = 16px, etc.). Se não for informado, o padding lateral será de 0."
+				},
+				"borderRadius": {
+					"type": "integer",
+					"title": "Raio da borda (em px)",
+					"default": 0,
+					"description": "Valor do raio da borda (em px). Se não for informado, o raio da borda será de 0px."
+				},
+				"aspectRatio": {
+					"title": "Aspect Ratio da image (4:3)",
+					"type": "string",
+					"default": ""
+				},
+				"mode": {
+					"title": "Modo de exibição",
+					"enumNames": [
+						"Slider Hero (Carrossel)",
+						"Banner Único",
+						"Lista de banners",
+						"Lista de banners arredondados",
+						"Lista em Grade",
+						"Caber na tela"
+					],
+					"enum": [
+						"SliderHero",
+						"SingleBanner",
+						"BannerList",
+						"RoundedBannerList",
+						"GridList",
+						"FitOnScreen"
+					],
+					"default": "SliderHero"
+				},
+				"size": {
+					"title": "Dimensões (opcional)",
+					"type": "object",
+					"properties": {
+						"maxWidth": {
+							"type": "string",
+							"title": "Largura máxima"
+						},
+						"maxHeight": {
+							"type": "string",
+							"title": "Altura máxima"
+						}
+					}
+				},
+				"startDate": {
+					"title": "Exibição programada: Data de início",
+					"type": "string",
+					"widget": {
+						"ui:widget": "date-time"
+					}
+				},
+				"endDate": {
+					"title": "Exibição programada: Data de fim",
+					"type": "string",
+					"widget": {
+						"ui:widget": "date-time"
+					}
+				},
+				"remoteConfigKey": {
+					"title": "Chave de hiperpersonalização WML",
+					"type": "string",
+					"description": "Chave para hiperpersonalização WML"
+				}
+			}
+		}
+	},
+	{
+		"name": "ProductShelf",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Prateleira de Produtos",
+			"description": "Add custom shelves to your store",
+			"type": "object",
+			"properties": {
+				"title": {
+					"type": "string",
+					"title": "Title"
+				},
+				"term": {
+					"type": "string",
+					"title": "Termo de busca dos produtos (opcional)"
+				},
+				"facets": {
+					"title": "Facets",
+					"type": "array",
+					"items": {
+						"title": "Facet",
+						"type": "object",
+						"required": [
+							"key",
+							"value"
+						],
+						"properties": {
+							"key": {
+								"title": "Key",
+								"description": "Para coleção use: productClusterIds",
+								"type": "string",
+								"default": "productClusterIds"
+							},
+							"value": {
+								"title": "Value",
+								"type": "string",
+								"default": ""
+							}
+						}
+					}
+				},
+				"mode": {
+					"title": "Modo de exibição",
+					"enumNames": [
+						"Carrossel",
+						"Scroll Horizontal"
+					],
+					"enum": [
+						"carousel",
+						"scroll"
+					],
+					"default": "scroll"
+				},
+				"sort": {
+					"title": "Sort",
+					"description": "Items order",
+					"default": "score:desc",
+					"enum": [
+						"discount:desc",
+						"name:asc",
+						"name:desc",
+						"orders:desc",
+						"price:asc",
+						"price:desc",
+						"release:desc",
+						"score:desc"
+					],
+					"enumNames": [
+						"Desconto: do maior para o menor",
+						"Nome: A-Z",
+						"Nome: Z-A",
+						"Pedidos: do maior para o menor",
+						"Preço: do menor para o maior",
+						"Preço: do maior para o menor",
+						"Lançamento: mais recentes primeiro",
+						"Relevância: da maior para a menor"
+					]
+				},
+				"numberOfItems": {
+					"type": "integer",
+					"title": "Total number of items",
+					"default": 8,
+					"description": "Total number of items. The quantity may be smaller if the query returns fewer products."
+				},
+				"tabs": {
+					"title": "Tabs de categoria (opcional — deixa vazio para vitrine normal)",
+					"type": "array",
+					"items": {
+						"title": "Tab",
+						"type": "object",
+						"properties": {
+							"label": {
+								"type": "string",
+								"title": "Nome da Tab"
+							},
+							"term": {
+								"type": "string",
+								"title": "Termo de busca (opcional)"
+							},
+							"facets": {
+								"title": "Facets",
+								"type": "array",
+								"items": {
+									"title": "Facet",
+									"type": "object",
+									"required": [
+										"key",
+										"value"
+									],
+									"properties": {
+										"key": {
+											"title": "Key",
+											"description": "Para coleção use: productClusterIds",
+											"type": "string",
+											"default": "productClusterIds"
+										},
+										"value": {
+											"title": "Value",
+											"type": "string",
+											"default": ""
+										}
+									}
+								}
+							},
+							"sort": {
+								"title": "Ordenação",
+								"default": "score:desc",
+								"enum": [
+									"discount:desc",
+									"name:asc",
+									"name:desc",
+									"orders:desc",
+									"price:asc",
+									"price:desc",
+									"release:desc",
+									"score:desc"
+								],
+								"enumNames": [
+									"Desconto",
+									"Nome A-Z",
+									"Nome Z-A",
+									"Mais pedidos",
+									"Menor preço",
+									"Maior preço",
+									"Lançamentos",
+									"Relevância"
+								]
+							}
+						}
+					}
+				},
+				"defaultTabIndex": {
+					"type": "integer",
+					"title": "Índice da tab selecionada por padrão",
+					"default": 0
+				},
+				"startDate": {
+					"title": "Exibição programada: Data de início",
+					"type": "string",
+					"widget": {
+						"ui:widget": "date-time"
+					}
+				},
+				"endDate": {
+					"title": "Exibição programada: Data de fim",
+					"type": "string",
+					"widget": {
+						"ui:widget": "date-time"
+					}
+				},
+				"remoteConfigKey": {
+					"title": "Chave de hiperpersonalização WML",
+					"type": "string",
+					"description": "Chave para hiperpersonalização WML"
+				}
+			}
+		}
+	},
+	{
+		"name": "HighlightedProductShelf",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Mega oferta",
+			"description": "Prateleira de produtos mega oferta",
+			"type": "object",
+			"properties": {
+				"title": {
+					"type": "string",
+					"title": "Title"
+				},
+				"term": {
+					"type": "string",
+					"title": "Termo de busca dos produtos (opcional)"
+				},
+				"facets": {
+					"title": "Facets",
+					"type": "array",
+					"items": {
+						"title": "Facet",
+						"type": "object",
+						"required": [
+							"key",
+							"value"
+						],
+						"properties": {
+							"key": {
+								"title": "Key",
+								"description": "Para coleção use: productClusterIds",
+								"type": "string",
+								"default": "productClusterIds"
+							},
+							"value": {
+								"title": "Value",
+								"type": "string",
+								"default": ""
+							}
+						}
+					}
+				},
+				"sort": {
+					"title": "Ordenação",
+					"description": "Ordenação dos produtos.",
+					"default": "score:desc",
+					"enum": [
+						"discount:desc",
+						"name:asc",
+						"name:desc",
+						"orders:desc",
+						"price:asc",
+						"price:desc",
+						"release:desc",
+						"score:desc"
+					],
+					"enumNames": [
+						"Desconto: do maior para o menor",
+						"Nome: A-Z",
+						"Nome: Z-A",
+						"Mais pedidos",
+						"Preço: do menor para o maior",
+						"Preço: do maior para o menor",
+						"Lançamento: mais recentes primeiro",
+						"Relevância: da maior para a menor"
+					]
+				},
+				"numberOfItems": {
+					"type": "integer",
+					"title": "Quantidade de produtos exibidos.",
+					"default": 8,
+					"description": "Quantidade de produtos exibidos."
+				},
+				"showTitle": {
+					"title": "Exibir título",
+					"type": "boolean",
+					"default": true,
+					"widget": {
+						"ui:widget": "checkboxes"
+					}
+				},
+				"backgroundColor": {
+					"type": "string",
+					"title": "Cor de background"
+				},
+				"textColor": {
+					"type": "string",
+					"title": "Cor do texto"
+				},
+				"actionButtonColor": {
+					"type": "string",
+					"title": "Cor do botão do carrossel"
+				},
+				"startDate": {
+					"title": "Exibição programada: Data de início e fim",
+					"type": "string",
+					"widget": {
+						"ui:widget": "date-time"
+					}
+				},
+				"endDate": {
+					"title": "Exibição programada: Data de início e fim",
+					"type": "string",
+					"widget": {
+						"ui:widget": "date-time"
+					}
+				},
+				"showTimer": {
+					"title": "Exibir timer de cronometro",
+					"type": "boolean",
+					"default": true,
+					"widget": {
+						"ui:widget": "checkboxes"
+					}
+				},
+				"remoteConfigKey": {
+					"title": "Chave de hiperpersonalização WML",
+					"type": "string",
+					"description": "Chave para hiperpersonalização WML"
+				}
+			}
+		}
+	},
+	{
+		"name": "StreamShopBanner",
+		"requiredScopes": [],
+		"schema": {
+			"type": "object",
+			"title": "Banner da Stream Shop",
+			"properties": {
+				"content": {
+					"type": "array",
+					"title": "Banners da Stream Shop",
+					"items": {
+						"title": "Banner da Stream Shop",
+						"type": "object",
+						"properties": {
+							"title": {
+								"title": "Título",
+								"type": "string"
+							},
+							"subTitle": {
+								"title": "Subtítulo",
+								"type": "string"
+							},
+							"videoUrl": {
+								"title": "Video URL",
+								"type": "string"
+							},
+							"imageUrl": {
+								"title": "Imagem",
+								"type": "string",
+								"widget": {
+									"ui:widget": "media-gallery"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"name": "ProductTiles",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Prateleira de Produtos com Filtros",
+			"description": "Faça filtros pre-definidos para a prateleira de produtos",
+			"type": "object",
+			"properties": {
+				"title": {
+					"title": "Título da prateleira",
+					"type": "string"
+				},
+				"shelves": {
+					"title": "Prateleiras",
+					"type": "array",
+					"items": {
+						"title": "Prateleira",
+						"type": "object",
+						"properties": {
+							"title": {
+								"type": "string",
+								"title": "Title"
+							},
+							"term": {
+								"type": "string",
+								"title": "Termo de busca dos produtos (opcional)"
+							},
+							"facets": {
+								"title": "Facets",
+								"type": "array",
+								"items": {
+									"title": "Facet",
+									"type": "object",
+									"required": [
+										"key",
+										"value"
+									],
+									"properties": {
+										"key": {
+											"title": "Key",
+											"description": "Para coleção use: productClusterIds",
+											"type": "string",
+											"default": "productClusterIds"
+										},
+										"value": {
+											"title": "Value",
+											"type": "string",
+											"default": ""
+										}
+									}
+								}
+							},
+							"sort": {
+								"title": "Sort",
+								"description": "Items order",
+								"default": "score:desc",
+								"enum": [
+									"discount:desc",
+									"name:asc",
+									"name:desc",
+									"orders:desc",
+									"price:asc",
+									"price:desc",
+									"release:desc",
+									"score:desc"
+								],
+								"enumNames": [
+									"Desconto: do maior para o menor",
+									"Nome: A-Z",
+									"Nome: Z-A",
+									"Pedidos: do maior para o menor",
+									"Preço: do menor para o maior",
+									"Preço: do maior para o menor",
+									"Lançamento: mais recentes primeiro",
+									"Relevância: da maior para a menor"
+								]
+							},
+							"numberOfItems": {
+								"type": "integer",
+								"title": "Total number of items",
+								"default": 8,
+								"description": "Total number of items. The quantity may be smaller if the query returns fewer products."
+							},
+							"remoteConfigKey": {
+								"title": "Chave de hiperpersonalização WML",
+								"type": "string",
+								"description": "Chave para hiperpersonalização WML"
+							}
+						}
+					}
+				},
+				"mode": {
+					"title": "Modo de exibição",
+					"enumNames": [
+						"Carrossel",
+						"Scroll Horizontal"
+					],
+					"enum": [
+						"carousel",
+						"scroll"
+					],
+					"default": "scroll"
+				}
+			}
+		}
+	},
+	{
+		"name": "WordPressCardList",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Card de Blog WordPress",
+			"description": "Lista de cards de blog",
+			"type": "object",
+			"properties": {
+				"postUrl": {
+					"title": "Url de Posts do seu blog wordpress",
+					"description": "https://seusite.com/wp-json/wp/v2/posts?_embed",
+					"type": "string"
+				},
+				"numberOfItems": {
+					"title": "Número de Posts",
+					"type": "integer",
+					"default": 5
+				},
+				"title": {
+					"title": "Título",
+					"type": "string",
+					"default": "Confira nosso Blog"
+				}
+			}
+		}
+	},
+	{
+		"name": "ScheduleCardShelf",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Card de agenda",
+			"description": "Lista de cards de agenda",
+			"type": "object",
+			"properties": {
+				"title": {
+					"title": "Título",
+					"type": "string",
+					"default": "Agenda"
+				},
+				"shelves": {
+					"title": "Conteúdo",
+					"type": "array",
+					"items": {
+						"title": "Item",
+						"type": "object",
+						"properties": {
+							"date": {
+								"title": "Data",
+								"type": "string"
+							},
+							"title": {
+								"title": "Título",
+								"type": "string"
+							},
+							"description": {
+								"title": "Descrição",
+								"type": "string"
+							},
+							"actionLink": {
+								"title": "Link",
+								"type": "string"
+							},
+							"mode": {
+								"title": "Modo de exibição",
+								"enumNames": [
+									"Podcast",
+									"Live",
+									"Youtube"
+								],
+								"enum": [
+									"Podcast",
+									"Live",
+									"Youtube"
+								],
+								"default": "Card"
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"name": "CategoryTree",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Prateleira de Categorias com Filtros",
+			"description": "Faça filtros pre-definidos para a prateleira de categorias",
+			"type": "object",
+			"properties": {
+				"shelves": {
+					"title": "Prateleiras",
+					"type": "array",
+					"items": {
+						"title": "Prateleira",
+						"type": "object",
+						"properties": {
+							"title": {
+								"title": "Título",
+								"type": "string"
+							},
+							"showAsSimpleItem": {
+								"title": "Exibir como item simples (sem imagem e fundo colorido)",
+								"description": "Se marcado a imagem e o fundo colorido não serão exibidos",
+								"type": "boolean",
+								"default": false
+							},
+							"content": {
+								"title": "Categorias",
+								"type": "array",
+								"items": {
+									"title": "Categoria",
+									"type": "object",
+									"properties": {
+										"title": {
+											"title": "Título",
+											"type": "string"
+										},
+										"thumbnail": {
+											"title": "Mídia",
+											"type": "string",
+											"widget": {
+												"ui:widget": "media-gallery"
+											}
+										},
+										"color": {
+											"title": "Cor de fundo Tailwind (opcional)",
+											"type": "string",
+											"default": "primary"
+										},
+										"action": {
+											"title": "Destino da ação",
+											"type": "object",
+											"properties": {
+												"type": {
+													"title": "Tipo de ação",
+													"enumNames": [
+														"Nenhum",
+														"Abrir Link Externo",
+														"Abrir Produto (id ou slug)",
+														"Abrir Coleção (Id da coleção)",
+														"Abrir Categoria (cate1/cat2/cat3...)",
+														"Abrir Busca (termo de busca)",
+														"Abrir Landing Page (nome da landing page)",
+														"Abrir Path do Site",
+														"Abrir Marca"
+													],
+													"enum": [
+														"none",
+														"link",
+														"product",
+														"collection",
+														"category",
+														"search",
+														"page",
+														"path",
+														"brand"
+													],
+													"default": "none"
+												},
+												"value": {
+													"title": "Valor",
+													"type": "string"
+												},
+												"sort": {
+													"title": "Sort",
+													"description": "Items order",
+													"default": "score:desc",
+													"enum": [
+														"discount:desc",
+														"name:asc",
+														"name:desc",
+														"orders:desc",
+														"price:asc",
+														"price:desc",
+														"release:desc",
+														"score:desc"
+													],
+													"enumNames": [
+														"Desconto: do maior para o menor",
+														"Nome: A-Z",
+														"Nome: Z-A",
+														"Pedidos: do maior para o menor",
+														"Preço: do menor para o maior",
+														"Preço: do maior para o menor",
+														"Lançamento: do mais novo para o mais antigo",
+														"Relevância: do maior para o menor"
+													]
+												},
+												"title": {
+													"title": "Título (opcional)",
+													"type": "string"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"name": "CategoryListSwipe",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Lista de categorias com swipe",
+			"type": "object",
+			"properties": {
+				"content": {
+					"title": "Categorias",
+					"type": "array",
+					"items": {
+						"title": "Categoria",
+						"type": "object",
+						"properties": {
+							"title": {
+								"title": "Título",
+								"type": "string"
+							},
+							"icon": {
+								"title": "Ícone (opcional)",
+								"type": "string",
+								"widget": {
+									"ui:widget": "media-gallery"
+								}
+							},
+							"action": {
+								"title": "Destino da ação (Opcional)",
+								"type": "object",
+								"properties": {
+									"type": {
+										"title": "Tipo de ação",
+										"enumNames": [
+											"Nenhum",
+											"Abrir Link Externo",
+											"Abrir Produto (id ou slug)",
+											"Abrir Coleção (Id da coleção)",
+											"Abrir Categoria (cate1/cat2/cat3...)",
+											"Abrir Busca (termo de busca)",
+											"Abrir Landing Page (nome da landing page)",
+											"Abrir Path do Site",
+											"Abrir Marca"
+										],
+										"enum": [
+											"none",
+											"link",
+											"product",
+											"collection",
+											"category",
+											"search",
+											"page",
+											"path",
+											"brand"
+										],
+										"default": "none"
+									},
+									"value": {
+										"title": "Valor",
+										"type": "string"
+									},
+									"sort": {
+										"title": "Sort",
+										"description": "Items order",
+										"default": "score:desc",
+										"enum": [
+											"discount:desc",
+											"name:asc",
+											"name:desc",
+											"orders:desc",
+											"price:asc",
+											"price:desc",
+											"release:desc",
+											"score:desc"
+										],
+										"enumNames": [
+											"Desconto: do maior para o menor",
+											"Nome: A-Z",
+											"Nome: Z-A",
+											"Pedidos: do maior para o menor",
+											"Preço: do menor para o maior",
+											"Preço: do maior para o menor",
+											"Lançamento: do mais novo para o mais antigo",
+											"Relevância: do maior para o menor"
+										]
+									},
+									"title": {
+										"title": "Título (opcional)",
+										"type": "string"
+									},
+									"banner": {
+										"title": "Banner de destino (opcional)",
+										"type": "string",
+										"widget": {
+											"ui:widget": "media-gallery"
+										}
+									}
+								}
+							},
+							"subcategories": {
+								"title": "Subcategorias",
+								"type": "array",
+								"items": {
+									"title": "Subcategoria",
+									"type": "object",
+									"properties": {
+										"title": {
+											"title": "Título",
+											"type": "string"
+										},
+										"icon": {
+											"title": "Ícone (opcional)",
+											"type": "string",
+											"widget": {
+												"ui:widget": "media-gallery"
+											}
+										},
+										"action": {
+											"title": "Destino da ação",
+											"type": "object",
+											"properties": {
+												"type": {
+													"title": "Tipo de ação",
+													"enumNames": [
+														"Nenhum",
+														"Abrir Link",
+														"Abrir Produto",
+														"Abrir Coleção",
+														"Abrir Categoria",
+														"Abrir Busca",
+														"Abrir Página",
+														"Abrir WML App",
+														"Abrir Path",
+														"Abrir Marca"
+													],
+													"enum": [
+														"none",
+														"link",
+														"product",
+														"collection",
+														"category",
+														"search",
+														"page",
+									"path",
+														"path",
+														"brand"
+													],
+													"default": "none"
+												},
+												"value": {
+													"title": "Valor",
+													"type": "string"
+												},
+												"title": {
+													"title": "Título no header da tela de destino",
+													"description": "Apenas se diferente do nome da categoria",
+													"type": "string"
+												},
+												"banner": {
+													"title": "Banner de destino (opcional)",
+													"type": "string",
+													"widget": {
+														"ui:widget": "media-gallery"
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"name": "LastSeenProducts",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Prateleira de Produtos Vistos",
+			"description": "Prateleira de produtos vistos pelo usuário",
+			"type": "object",
+			"properties": {
+				"title": {
+					"title": "Título",
+					"type": "string"
+				},
+				"numberOfItems": {
+					"title": "Número de itens (máximo 14)",
+					"type": "integer",
+					"default": 8
+				},
+				"mode": {
+					"title": "Modo de exibição",
+					"enumNames": [
+						"Carrossel",
+						"Scroll horizontal"
+					],
+					"enum": [
+						"carousel",
+						"horizontalScroll"
+					],
+					"default": "carousel"
+				}
+			}
+		}
+	},
+	{
+		"name": "RichText",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Campo de texto livre",
+			"description": "Campo de texto livre",
+			"type": "object",
+			"properties": {
+				"title": {
+					"title": "Título",
+					"type": "string"
+				},
+				"content": {
+					"title": "Conteúdo",
+					"type": "string",
+					"widget": {
+						"ui:widget": "draftjs-rich-text"
+					}
+				}
+			}
+		}
+	},
+	{
+		"name": "ProductInfiniteScroll",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Scroll infinito de produtos",
+			"description": "Produtos em scroll infinito",
+			"type": "object",
+			"properties": {
+				"title": {
+					"type": "string",
+					"title": "Title"
+				},
+				"sort": {
+					"title": "Sort",
+					"description": "Items order",
+					"default": "score:desc",
+					"enum": [
+						"discount:desc",
+						"name:asc",
+						"name:desc",
+						"orders:desc",
+						"price:asc",
+						"price:desc",
+						"release:desc",
+						"score:desc"
+					],
+					"enumNames": [
+						"Desconto: do maior para o menor",
+						"Nome: A-Z",
+						"Nome: Z-A",
+						"Pedidos: do maior para o menor",
+						"Preço: do menor para o maior",
+						"Preço: do maior para o menor",
+						"Lançamento: mais recentes primeiro",
+						"Relevância: da maior para a menor"
+					]
+				},
+				"query": {
+					"type": "string",
+					"title": "Search term"
+				},
+				"facets": {
+					"title": "Facets",
+					"type": "array",
+					"items": {
+						"title": "Facet",
+						"type": "object",
+						"required": [
+							"key",
+							"value"
+						],
+						"properties": {
+							"key": {
+								"title": "Key",
+								"description": "For collections use: productClusterIds",
+								"type": "string",
+								"default": "productClusterIds"
+							},
+							"value": {
+								"title": "Value",
+								"description": "E.g. For 'Most Wanted' collection, use: 140. To consult your collection ids go to Collections page",
+								"type": "string",
+								"default": "140"
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"name": "CategoryAccordeon",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Lista de categorias com componente estilo accordeon",
+			"type": "object",
+			"properties": {
+				"title": {
+					"title": "Título (opcional)",
+					"type": "string"
+				},
+				"isExpanded": {
+					"title": "Iniciar aberto",
+					"type": "boolean",
+					"default": true
+				},
+				"content": {
+					"title": "Categorias",
+					"type": "array",
+					"items": {
+						"title": "Categoria",
+						"type": "object",
+						"properties": {
+							"title": {
+								"title": "Título",
+								"type": "string"
+							},
+							"flag": {
+								"title": "Flag (opcional)",
+								"type": "string",
+								"description": "Texto exibido em uma flag ao lado do nome da categoria"
+							},
+							"imageUrl": {
+								"title": "Mídia (opcional)",
+								"type": "string",
+								"widget": {
+									"ui:widget": "media-gallery"
+								}
+							},
+							"action": {
+								"title": "Destino da ação",
+								"type": "object",
+								"properties": {
+									"type": {
+										"title": "Tipo de ação",
+										"enumNames": [
+											"Nenhum",
+											"Abrir Link Externo",
+											"Abrir Produto (id ou slug)",
+											"Abrir Coleção (Id da coleção)",
+											"Abrir Categoria (cate1/cat2/cat3...)",
+											"Abrir Busca (termo de busca)",
+											"Abrir Landing Page (nome da landing page)",
+											"Abrir Path do Site",
+											"Abrir Marca"
+										],
+										"enum": [
+											"none",
+											"link",
+											"product",
+											"collection",
+											"category",
+											"search",
+											"page",
+											"path",
+											"brand"
+										],
+										"default": "none"
+									},
+									"value": {
+										"title": "Valor",
+										"type": "string"
+									},
+									"sort": {
+										"title": "Sort",
+										"description": "Items order",
+										"default": "score:desc",
+										"enum": [
+											"discount:desc",
+											"name:asc",
+											"name:desc",
+											"orders:desc",
+											"price:asc",
+											"price:desc",
+											"release:desc",
+											"score:desc"
+										],
+										"enumNames": [
+											"Desconto: do maior para o menor",
+											"Nome: A-Z",
+											"Nome: Z-A",
+											"Pedidos: do maior para o menor",
+											"Preço: do menor para o maior",
+											"Preço: do maior para o menor",
+											"Lançamento: do mais novo para o mais antigo",
+											"Relevância: do maior para o menor"
+										]
+									},
+									"title": {
+										"title": "Título (opcional)",
+										"type": "string"
+									}
+								}
+							},
+							"subcategories": {
+								"title": "Subcategorias",
+								"type": "array",
+								"items": {
+									"title": "Subcategoria",
+									"type": "object",
+									"properties": {
+										"title": {
+											"title": "Título",
+											"type": "string"
+										},
+										"action": {
+											"title": "Destino da ação",
+											"type": "object",
+											"properties": {
+												"type": {
+													"title": "Tipo de ação",
+													"enumNames": [
+														"Nenhum",
+														"Abrir Link Externo",
+														"Abrir Produto (id ou slug)",
+														"Abrir Coleção (Id da coleção)",
+														"Abrir Categoria (cate1/cat2/cat3...)",
+														"Abrir Busca (termo de busca)",
+														"Abrir Landing Page (nome da landing page)",
+														"Abrir Path do Site",
+														"Abrir Marca"
+													],
+													"enum": [
+														"none",
+														"link",
+														"product",
+														"collection",
+														"category",
+														"search",
+														"page",
+														"path",
+														"brand"
+													],
+													"default": "none"
+												},
+												"value": {
+													"title": "Valor",
+													"type": "string"
+												},
+												"sort": {
+													"title": "Sort",
+													"description": "Items order",
+													"default": "score:desc",
+													"enum": [
+														"discount:desc",
+														"name:asc",
+														"name:desc",
+														"orders:desc",
+														"price:asc",
+														"price:desc",
+														"release:desc",
+														"score:desc"
+													],
+													"enumNames": [
+														"Desconto: do maior para o menor",
+														"Nome: A-Z",
+														"Nome: Z-A",
+														"Pedidos: do maior para o menor",
+														"Preço: do menor para o maior",
+														"Preço: do maior para o menor",
+														"Lançamento: do mais novo para o mais antigo",
+														"Relevância: do maior para o menor"
+													]
+												},
+												"title": {
+													"title": "Título (opcional)",
+													"type": "string"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"name": "CouponsList",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Lista de Cupons",
+			"description": "Configura os cupons exibidos na página de cupons do app",
+			"type": "object",
+			"properties": {
+				"coupons": {
+					"title": "Cupons",
+					"type": "array",
+					"items": {
+						"title": "Cupom",
+						"type": "object",
+						"properties": {
+							"title": {
+								"title": "Título",
+								"type": "string"
+							},
+							"description": {
+								"title": "Descrição",
+								"type": "string"
+							},
+							"code": {
+								"title": "Código do cupom",
+								"type": "string"
+							},
+							"expiresAt": {
+								"title": "Válido até",
+								"type": "string",
+								"description": "Data de validade exibida para o usuário. Exemplo: 31/12/2026"
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+]
