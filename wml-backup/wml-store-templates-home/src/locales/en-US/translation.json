@@ -1,0 +1,60 @@
+{
+	"home": {
+		"offers": "Offers"
+	},
+	"categories": {
+		"title": "Categories"
+	},
+	"productCatalog": {
+		"title": "Catalog"
+	},
+	"categoryPageModal": {
+		"title": "Filters",
+		"clear": "Clear",
+		"button": "Filter"
+	},
+	"pristineView": {
+		"content": "Enter a search term"
+	},
+	"searchResults": {
+		"resultNotFound": "No results were found for your search"
+	},
+	"headerSearch": {
+		"labelSearch": "Search..."
+	},
+	"productCardVertical": {
+		"cart": "In cart",
+		"buy": "Buy"
+	},
+	"scheduleCard": {
+		"button": "Check it out"
+	},
+	"searchInput": {
+		"content": "Find your product..."
+	},
+	"shelfOfProducts": {
+		"loading": "Loading...",
+		"seeMore": "See more"
+	},
+	"productCardQuickAdd": {
+		"title": "Select your size",
+		"add": "Add to bag",
+		"cancel": "Cancel",
+		"loading": "Adding..."
+	},
+	"lists": {
+		"title": "Sort by",
+		"labelRelevance": "Relevance",
+		"labelBestSellers": "Best sellers",
+		"labelNewest": "Newest",
+		"labelDiscounts": "Discounts",
+		"labelHighestPrice": "Highest price",
+		"labelLowestPrice": "Lowest price",
+		"labelAToZ": "A to Z",
+		"labelZToA": "Z to A"
+	},
+	"facetsModal": {
+		"from": "From",
+		"to": "to"
+	}
+}

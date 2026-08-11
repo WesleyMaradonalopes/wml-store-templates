@@ -1,0 +1,28 @@
+[
+	{
+		"id": "home",
+		"name": "Home",
+		"scopes": ["home"],
+		"isSingleton": true,
+		"configurationSchemaSets": []
+	},
+	{
+		"id": "categories",
+		"name": "Página de Categorias",
+		"scopes": ["categories"],
+		"configurationSchemaSets": [],
+		"isSingleton": true
+	},
+	{
+		"id": "landingPage",
+		"name": "Landing Page",
+		"scopes": ["landing"],
+		"configurationSchemaSets": []
+	},
+	{
+		"id": "search",
+		"name": "Search",
+		"scopes": ["search"],
+		"configurationSchemaSets": []
+	}
+]

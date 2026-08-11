@@ -1,0 +1,146 @@
+{
+	"home": {
+		"title": "Checkout"
+	},
+	"orderCompleted": {
+		"title": "Order Confirmed",
+		"txtCongratulation": "Congratulations!",
+		"txtOrderSuccessful": "Order placed successfully.",
+		"txtOrderNumber": "Order No:",
+		"txtOrderFollow": "You will receive an email with all the details. You can also track your order in the 'My Orders' section.",
+		"labelSeeOrders": "See Orders",
+		"labelBack": "Back to Home"
+	},
+	"paymentData": {
+		"title": "Payment",
+		"txtTotalPayment": "Total Payment",
+		"labelButton": "Continue"
+	},
+	"personalData": {
+		"frmName": "First Name",
+		"placeholderName": "Enter your first name",
+		"frmLastName": "Last Name",
+		"placeholderLastName": "Enter your last name",
+		"frmTaxpayerId": "Taxpayer ID",
+		"placeholderTaxpayerId": "Enter your Taxpayer ID",
+		"frmPhone": "Phone",
+		"placeholderPhone": "Enter your phone number",
+		"title": "Personal Data",
+		"frmEmail": "Email",
+		"placeholderEmail": "Enter your email",
+		"errorInvalidDoc": "The entered Taxpayer ID is invalid",
+		"labelButton": "Continue",
+		"frmGender": "Gender",
+		"lbGenderPlaceholder": "Select your gender",
+		"lbGenderMale": "Male",
+		"lbGenderFemale": "Female",
+		"lbGenderOther": "Other",
+		"lbGenderNotInform": "Prefer not to say"
+	},
+	"pixOrder": {
+		"txtTimeRemaining": "Time Remaining",
+		"labelCopyCode": "Copy Code"
+	},
+	"finishCart": {
+		"errorOrder": "There was an error processing your order. Please review the products and payment details before trying again",
+		"title": "Checkout",
+		"errorItems": "Some items in your cart are no longer available.",
+		"txtProduct": "Product",
+		"txtProducts": "Products",
+		"txtTotal": "Total",
+		"txtItems": "Cart Items",
+		"txtNoItems": "No items in cart",
+		"txtSubtotal": "Subtotal",
+		"labelButton": "Complete Purchase"
+	},
+	"emptyCart": {
+		"title": "Checkout",
+		"txtEmptyCart": "Your cart is empty",
+		"txtAddItem": "Add products to your cart",
+		"labelBack": "Back"
+	},
+	"addNewShippingAddress": {
+		"title": "Delivery",
+		"errorAddress": "Invalid address, please check the details",
+		"errorDefault": "An unexpected error occurred, please try again",
+		"txtCalculate": "Calculate shipping and delivery time",
+		"txtPickupAddress": "Pickup Address",
+		"txtEdit": "Edit",
+		"txtZipCode": "Insert your zip code",
+		"frmNumber": "Number",
+		"frmComplement": "Complement",
+		"frmReference": "Reference",
+		"frmReceiveName": "Who will receive the order?",
+		"frmStreet": "Street / Avenue",
+		"frmNeighborhood": "Neighborhood",
+		"frmCity": "City",
+		"frmState": "State",
+		"labelButton": "Continue",
+		"ok": "OK",
+		"loading": "Please wait...",
+		"errorPostalCode": "Enter the zip code",
+		"errorStreet": "Enter the street/avenue",
+		"errorNeighborhood": "Enter the neighborhood",
+		"errorCity": "Enter the city",
+		"errorState": "Enter the state",
+		"errorReceiverName": "Enter the receiver's name",
+		"errorNumber": "Enter the number"
+	},
+	"simpleCard": {
+		"txtEdit": "EDIT"
+	},
+	"deliveryData": {
+		"txtWithdrawal": "PICKUP",
+		"txtDelivery": "DELIVERY",
+		"txtNoNumber": "no number",
+		"txtAlert": "Your address information is incomplete. Please click here to update it."
+	},
+	"selectedPaymentData": {
+		"txtPayment": "PAYMENT",
+		"txtFillCard": "Fill in the card details"
+	},
+	"userData": {
+		"txtPersonData": "PERSONAL DATA",
+		"txtMessageLeave": "Not you? Sign out"
+	},
+	"shippingMethods": {
+		"txtSelectDelivery": "How do you want to receive your product?"
+	},
+	"giftCardInput": {
+		"txtHideGiftCard": "Hide Gift Card",
+		"txtAddGiftCard": "Add Gift Card",
+		"labelGiftCard": "Gift Card",
+		"labelButtonOk": "OK",
+		"labelButtonRemove": "Remove"
+	},
+	"creditCard": {
+		"title": "Credit Card",
+		"labelCardNumber": "Card Number",
+		"labelName": "Cardholder Name",
+		"labelValidity": "Validity",
+		"labelCvv": "CVV",
+		"labelBrand": "Brand",
+		"labelInstallment": "Installment",
+		"labelBillingAddress": "Billing Address:",
+		"infoBillingAddress": "Your billing address is the same as the delivery address",
+		"labelZipCode": "Zip Code",
+		"labelAddress": "Street/Avenue",
+		"labelNumber": "Number",
+		"labelComplement": "Complement",
+		"labelNeighborhood": "Neighborhood",
+		"labelCity": "City",
+		"labelState": "State"
+	},
+	"addressSelector": {
+		"title": "Delivery Addresses",
+		"subtitle": "Select a delivery address",
+		"noAddresses": "No addresses registered",
+		"addFirstAddress": "Add First Address",
+		"addNewAddress": "Add New Address",
+		"default": "Default",
+		"noReceiver": "Name not provided",
+		"loading": "Loading addresses...",
+		"selectedAddress": "Selected Address",
+		"otherAddresses": "Other Addresses"
+	}
+}

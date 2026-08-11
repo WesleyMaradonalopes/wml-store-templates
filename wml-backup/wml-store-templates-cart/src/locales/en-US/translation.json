@@ -1,0 +1,74 @@
+{
+	"home": {
+		"title": "Cart"
+	},
+	"cart": {
+		"labelGiftWrapping": "Gift Wrapping",
+		"labelInstalmentUntil": "Installment up to"
+	},
+	"cartItem": {
+		"txtAdd": "Add",
+		"txtMessageUnavailable": "This product is not available!",
+		"txtRemoveCart": "Do you want to remove the product from the cart?",
+		"isGift": "Include gift wrapping for the order"
+	},
+	"cartItems": {
+		"giftMessage": "All items selected as gifts will be delivered in a single package. If you need more units, please contact our Customer Service."
+	},
+	"cartSummary": {
+		"txtSubtotal": "Subtotal",
+		"txtDiscount": "Discount",
+		"txtDelivery": "Delivery",
+		"txtTotal": "Total",
+		"txtFree": "Free",
+		"labelFinish": "Checkout"
+	},
+	"coupon": {
+		"txtAppliedCoupon": "Coupon applied!",
+		"txtInvalidCoupon": "Invalid coupon",
+		"txtExpiredCoupon": "Expired coupon",
+		"txtApplyFailed": "Unable to apply coupon",
+		"txtCoupon": "Discount coupon",
+		"txtAdd": "Add",
+		"labelInsertCode": "Insert code"
+	},
+	"emptyCart": {
+		"txtEmptyCart": "Your cart is empty",
+		"txtMessageList": "Add products to your cart and they will be listed here.",
+		"labelButton": "Buy now"
+	},
+	"freight": {
+		"errorCep": "Enter a valid Zip Code",
+		"errorCalcFreight": "Unable to calculate freight",
+		"errorEditFreight": "Unable to modify freight",
+		"txtDelivery": "Enter your postal code",
+		"txtCalculate": "Calculate",
+		"labelZipCode": "Zip Code",
+		"txtUnknow": "I don't know my Zip Code",
+		"tabDelivery": "Delivery Options",
+		"tabPickup": "Pickup Option",
+		"noDeliveryOptions": "No delivery options available",
+		"noPickupOptions": "No pickup options available"
+	},
+	"modalOfferingGender": {
+		"labelReceiverGift": "Who is the gift for?",
+		"labelSelectGender": "Select gender",
+		"txtBoy": "Boy",
+		"txtGirl": "Girl",
+		"txtConfirm": "Confirm",
+		"txtCancel": "Cancel"
+	},
+	"saveButton": {
+		"save": "Save",
+		"saved": "Saved"
+	},
+	"cartTemplate": {
+		"labelContinue": "Continue shopping"
+	},
+	"modal": {
+		"confirm": {
+			"delete": "Delete",
+			"cancel": "Cancel"
+		}
+	}
+}

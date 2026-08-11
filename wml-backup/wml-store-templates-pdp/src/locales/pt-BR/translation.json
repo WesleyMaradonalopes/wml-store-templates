@@ -1,0 +1,77 @@
+{
+	"home": {
+		"title": "Produto"
+	},
+	"description": {
+		"txtDescription": "Descrição",
+		"labelSeeLess": "Ver menos",
+		"labelSeeMore": "Ver mais"
+	},
+	"information": {
+		"txtInformation": "Informações",
+		"txtCompositionAndCare": "Composição e Cuidados"
+	},
+	"supplier": {
+		"txtSupplier": "Fornecedor"
+	},
+	"freight": {
+		"labelZipCode": "Digite seu CEP",
+		"labelCalculate": "Calcular",
+		"txtCalculate": "Calcular frete"
+	},
+	"mainDescription": {
+		"txtUntil": "ou em até",
+		"txtOf": "de"
+	},
+	"modalComponent": {
+		"txtProductAdded": "Produto adicionado",
+		"txtQuantity": "Quantidade:",
+		"txtGoToCart": "Ir para carrinho",
+		"txtAddToCart": "Adicionar à sacola",
+		"txtBuyTogether": "Aproveite e compre junto"
+	},
+	"product": {
+		"labelAddToCart": "Adicionar à sacola",
+		"labelGoToCart": "Ir para sacola",
+		"errorNoProduct": "Produto Indisponível",
+		"selectOption": "Selecione uma opção",
+		"selectSize": "Selecione seu tamanho"
+	},
+	"productBasicTemplate": {
+		"txtWhoSaw": "Quem viu isso, viu também"
+	},
+	"productCardVertical": {
+		"cart": "ver Carrinho",
+		"buy": "comprar"
+	},
+	"productCardQuickAdd": {
+		"title": "Selecione seu tamanho",
+		"add": "Adicionar à sacola",
+		"loading": "Adicionando à sacola..."
+	},
+	"review": {
+		"txtOpnion": "Cliente não escreveu uma avaliação, apenas deu a nota do produto.",
+		"seeMoreReviews": "Ver mais avaliações"
+	},
+	"skuSelector": {
+		"txtSelect": "Selecione o"
+	},
+	"tagsComponent": {
+		"labelOffer": "Oferta"
+	},
+	"sizebay": {
+		"labelVirtualFittingRoom": "Provador Virtual",
+		"labelMeasurementTable": "Tabela de medidas",
+		"feedbackRecommendedSizePrefix": "Recomendamos o tamanho"
+	},
+	"skuUnavailableModal": {
+		"titlePrefix": "O tamanho",
+		"titleSuffix": "está esgotado",
+		"description": "Informe seu contato para avisarmos quando o tamanho estiver disponível novamente.",
+		"nameLabel": "Nome",
+		"emailLabel": "E-mail",
+		"whatsappLabel": "Whatsapp",
+		"button": "Avise-me",
+		"successMessage": "Quando o tamanho voltar, vamos te avisar."
+	}
+}

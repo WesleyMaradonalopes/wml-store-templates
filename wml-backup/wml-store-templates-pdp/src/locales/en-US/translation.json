@@ -1,0 +1,77 @@
+{
+	"home": {
+		"title": "Product"
+	},
+	"description": {
+		"txtDescription": "Description",
+		"labelSeeLess": "See less",
+		"labelSeeMore": "See more"
+	},
+	"information": {
+		"txtInformation": "Information",
+		"txtCompositionAndCare": "Composition and Care"
+	},
+	"supplier": {
+		"txtSupplier": "Supplier"
+	},
+	"freight": {
+		"labelZipCode": "ZIP Code",
+		"labelCalculate": "Calculate",
+		"txtCalculate": "Calculate freight"
+	},
+	"mainDescription": {
+		"txtUntil": "or up to",
+		"txtOf": "of"
+	},
+	"modalComponent": {
+		"txtProductAdded": "Product added",
+		"txtQuantity": "Quantity:",
+		"txtGoToCart": "Go to shopping bag",
+		"txtAddToCart": "Add to shopping bag",
+		"txtBuyTogether": "Take advantage and buy together"
+	},
+	"product": {
+		"labelAddToCart": "Add to shopping bag",
+		"labelGoToCart": "Go to shopping bag",
+		"errorNoProduct": "Product Unavailable",
+		"selectOption": "Select an option",
+		"selectSize": "Select your size"
+	},
+	"productBasicTemplate": {
+		"txtWhoSaw": "Who saw this, also saw:"
+	},
+	"productCardVertical": {
+		"cart": "see Cart",
+		"buy": "buy"
+	},
+	"productCardQuickAdd": {
+		"title": "Select your size",
+		"add": "Add to bag",
+		"loading": "Adding to bag..."
+	},
+	"review": {
+		"txtOpnion": "Customer did not write a review, only rated the product.",
+		"seeMoreReviews": "See more reviews"
+	},
+	"skuSelector": {
+		"txtSelect": "Select"
+	},
+	"tagsComponent": {
+		"labelOffer": "Deal"
+	},
+	"sizebay": {
+		"labelVirtualFittingRoom": "Virtual Fitting Room",
+		"labelMeasurementTable": "Measurement Table",
+		"feedbackRecommendedSizePrefix": "We recommend size"
+	},
+	"skuUnavailableModal": {
+		"titlePrefix": "Size",
+		"titleSuffix": "is out of stock",
+		"description": "Leave your contact information so we can notify you when this size is available again.",
+		"nameLabel": "Name",
+		"emailLabel": "E-mail",
+		"whatsappLabel": "WhatsApp",
+		"button": "Notify me",
+		"successMessage": "We will notify you when this size is back."
+	}
+}

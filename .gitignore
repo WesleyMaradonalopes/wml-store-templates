@@ -93,6 +93,9 @@ wml-store-templates-checkout/
 wml-store-templates-home/
 wml-store-templates-pdp/
 wml-store-templates-shared/
+# The legacy folders above are included only under this explicit backup path.
+!/wml-backup/
+!/wml-backup/**
 .github/
 .vscode/
 .aiconfig

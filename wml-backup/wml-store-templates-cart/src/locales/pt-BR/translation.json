@@ -1,0 +1,76 @@
+{
+	"home": {
+		"title": "Carrinho"
+	},
+	"cart": {
+		"labelGiftWrapping": "Embalagem de presente",
+		"labelInstalmentUntil": "Parcelamento em até"
+	},
+	"cartItem": {
+		"txtAdd": "Adicionar",
+		"txtMessageUnavailable": "Este produto não está disponível!",
+		"txtRemoveCart": "Deseja excluir o produto do carrinho?",
+		"isGift": "Incluir uma embalagem de presente para o pedido"
+	},
+	"cartItems": {
+		"giftMessage": "Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC."
+	},
+	"cartSummary": {
+		"txtSubtotal": "Subtotal",
+		"txtDiscount": "Desconto",
+		"txtDelivery": "Entrega",
+		"txtTotal": "Total",
+		"txtFree": "Grátis",
+		"labelFinish": "Finalizar Compra"
+	},
+	"coupon": {
+		"txtAppliedCoupon": "Cupom aplicado!",
+		"txtInvalidCoupon": "Cupom inválido",
+		"txtExpiredCoupon": "Cupom Expirado",
+		"txtApplyFailed": "Não foi possível aplicar o cupom",
+		"txtCoupon": "Cupom de desconto",
+		"txtAdd": "Adicionar",
+		"labelInsertCode": "Insira o código"
+	},
+	"emptyCart": {
+		"txtEmptyCart": "Ops, sua sacola está vazia.",
+		"txtMessageList": "Encontre os produtos que precisa navegando pelas categorias ou utilizando a busca.",
+		"labelButton": "Encontrar produtos"
+	},
+	"freight": {
+		"errorCep": "Digite um CEP válido",
+		"errorCalcFreight": "Não foi possível calcular o frete",
+		"errorEditFreight": "Não foi possível modificar o frete",
+		"txtDelivery": "Entrega",
+		"txtCalculate": "Calcular",
+		"labelZipCode": "CEP",
+		"txtUnknow": "Não sei meu cep",
+		"tabDelivery": "Opções de Entrega",
+		"tabPickup": "Opções de Retirada",
+		"noDeliveryOptions": "Nenhuma opção de entrega disponível",
+		"noPickupOptions": "Nenhuma opção de retirada disponível",
+		"missingForFree": "Faltam só {{value}} para Frete Grátis",
+		"freeFreight": "Você ganhou Frete Grátis!"
+	},
+	"modalOfferingGender": {
+		"labelReceiverGift": "Para quem vai ser o presente?",
+		"labelSelectGender": "Selecione o gênero",
+		"txtBoy": "Menino",
+		"txtGirl": "Menina",
+		"txtConfirm": "Confirmar",
+		"txtCancel": "Cancelar"
+	},
+	"saveButton": {
+		"save": "Salvar",
+		"saved": "Salvo"
+	},
+	"cartTemplate": {
+		"labelContinue": "Continuar comprando"
+	},
+	"modal": {
+		"confirm": {
+			"delete": "Excluir",
+			"cancel": "Cancelar"
+		}
+	}
+}

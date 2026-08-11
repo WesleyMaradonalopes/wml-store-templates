@@ -1,0 +1,147 @@
+{
+	"home": {
+		"title": "Finalizar Pedido"
+	},
+	"orderCompleted": {
+		"title": "Pedido Confirmado",
+		"txtCongratulation": "Parabéns!",
+		"txtOrderSuccessful": "Pedido realizado com sucesso.",
+		"txtOrderNumber": "Nº do pedido:",
+		"txtOrderFollow": "Você receberá um email com todos os detalhes. Acompanhe também seu pedido na opção 'Meus pedidos'.",
+		"labelSeeOrders": "Ver pedidos",
+		"labelBack": "Voltar para a tela inicial"
+	},
+	"paymentData": {
+		"title": "Pagamento",
+		"txtTotalPayment": "Total a pagar",
+		"labelButton": "Continuar"
+	},
+	"personalData": {
+		"frmName": "Nome",
+		"placeholderName": "Digite seu nome",
+		"frmLastName": "Sobrenome",
+		"placeholderLastName": "Digite seu sobrenome",
+		"frmTaxpayerId": "CPF",
+		"placeholderTaxpayerId": "Digite seu CPF",
+		"frmPhone": "Telefone",
+		"placeholderPhone": "Digite seu telefone",
+		"title": "Dados pessoais",
+		"frmEmail": "Email",
+		"placeholderEmail": "Digite seu email",
+		"errorInvalidDoc": "O CPF digitado é inválido",
+		"labelButton": "Continuar",
+		"frmGender": "Gênero",
+		"lbGenderPlaceholder": "Selecione seu gênero",
+		"lbGenderMale": "Masculino",
+		"lbGenderFemale": "Feminino",
+		"lbGenderOther": "Outros",
+		"lbGenderNotInform": "Prefiro não informar"
+	},
+	"pixOrder": {
+		"txtTimeRemaining": "Tempo restante",
+		"labelCopyCode": "Copiar código",
+		"labelShareCode": "Compartilhar"
+	},
+	"finishCart": {
+		"errorOrder": "Houve um erro ao processar o seu pedido. Por favor revise os produtos e dados de pagamento antes de tentar novamente",
+		"title": "Checkout",
+		"errorItems": "Alguns itens do seu carrinho não estão mais disponíveis.",
+		"txtProduct": "Produto",
+		"txtProducts": "Produtos",
+		"txtTotal": "Total",
+		"txtItems": "Itens do Carrinho",
+		"txtNoItems": "Nenhum item no carrinho",
+		"txtSubtotal": "Subtotal",
+		"labelButton": "Finalizar Compra"
+	},
+	"emptyCart": {
+		"title": "Finalizar Pedido",
+		"txtEmptyCart": "Seu carrinho está vazio",
+		"txtAddItem": "Adicione produtos no seu carrinho",
+		"labelBack": "Voltar"
+	},
+	"addNewShippingAddress": {
+		"title": "Entrega",
+		"errorAddress": "Endereço inválido, por favor verifique os dados",
+		"errorDefault": "Ocorreu um erro inesperado, tente novamente",
+		"txtCalculate": "Calcule o frete e prazo",
+		"txtPickupAddress": "Endereço para retirada",
+		"txtEdit": "Editar",
+		"txtZipCode": "Insira seu CEP",
+		"frmNumber": "Número",
+		"frmComplement": "Complemento",
+		"frmReference": "Referência",
+		"frmReceiveName": "Quem irá receber o pedido?",
+		"frmStreet": "Rua / Avenida",
+		"frmNeighborhood": "Rua / Avenida",
+		"frmCity": "Cidade",
+		"frmState": "Estado",
+		"labelButton": "Continuar",
+		"ok": "OK",
+		"loading": "Aguarde...",
+		"errorPostalCode": "Informe o CEP",
+		"errorStreet": "Informe a rua/avenida",
+		"errorNeighborhood": "Informe o bairro",
+		"errorCity": "Informe a cidade",
+		"errorState": "Informe o estado",
+		"errorReceiverName": "Informe quem irá receber",
+		"errorNumber": "Informe o número"
+	},
+	"simpleCard": {
+		"txtEdit": "ALTERAR"
+	},
+	"deliveryData": {
+		"txtWithdrawal": "RETIRADA",
+		"txtDelivery": "ENTREGA",
+		"txtNoNumber": "sem número",
+		"txtAlert": "Suas informações de endereço estão incompletas. Por favor clique aqui para atualizá-las."
+	},
+	"selectedPaymentData": {
+		"txtPayment": "PAGAMENTO",
+		"txtFillCard": "Preencha os dados do cartão"
+	},
+	"userData": {
+		"txtPersonData": "DADOS PESSOAIS",
+		"txtMessageLeave": "Não é você? Sair"
+	},
+	"shippingMethods": {
+		"txtSelectDelivery": "Como deseja se receber seu produto?"
+	},
+	"giftCardInput": {
+		"txtHideGiftCard": "Ocultar Cartão-Presente",
+		"txtAddGiftCard": "Adicinar Cartão-Presente",
+		"labelGiftCard": "Cartão Presente",
+		"labelButtonOk": "OK",
+		"labelButtonRemove": "Remover"
+	},
+	"creditCard": {
+		"title": "Cartão de Crédito",
+		"labelCardNumber": "Número do cartão",
+		"labelName": "Nome do titular",
+		"labelValidity": "Validade",
+		"labelCvv": "CVV",
+		"labelBrand": "Bandeira",
+		"labelInstallment": "Parcelamento",
+		"labelBillingAddress": "Endereço de cobrança:",
+		"infoBillingAddress": "Seu endereço de fatura é o mesmo da entrega",
+		"labelZipCode": "CEP",
+		"labelAddress": "Rua/ Avenida",
+		"labelNumber": "Número",
+		"labelComplement": "Complemento",
+		"labelNeighborhood": "Bairro",
+		"labelCity": "Cidade",
+		"labelState": "Estado"
+	},
+	"addressSelector": {
+		"title": "Endereços de Entrega",
+		"subtitle": "Selecione um endereço para entrega",
+		"noAddresses": "Nenhum endereço cadastrado",
+		"addFirstAddress": "Adicionar Primeiro Endereço",
+		"addNewAddress": "Adicionar Novo Endereço",
+		"default": "Padrão",
+		"noReceiver": "Nome não informado",
+		"loading": "Carregando endereços...",
+		"selectedAddress": "Endereço Selecionado",
+		"otherAddresses": "Outros Endereços"
+	}
+}

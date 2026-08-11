@@ -1,0 +1,63 @@
+{
+	"home": {
+		"offers": "Ofertas"
+	},
+	"categories": {
+		"title": "Categorias"
+	},
+	"productCatalog": {
+		"title": "Catálogo"
+	},
+	"blogPostShelf": {
+		"seeMore": "Ver mais"
+	},
+	"categoryPageModal": {
+		"title": "Filtros",
+		"clear": "Limpar",
+		"button": "Filtrar"
+	},
+	"pristineView": {
+		"content": "Digite um termo para busca"
+	},
+	"searchResults": {
+		"resultNotFound": "Não foram encontrados resultados para a sua busca"
+	},
+	"headerSearch": {
+		"labelSearch": "Procurar..."
+	},
+	"productCardVertical": {
+		"cart": "No carrinho",
+		"buy": "Comprar"
+	},
+	"scheduleCard": {
+		"button": "Confira"
+	},
+	"searchInput": {
+		"content": "Encontre seu produto..."
+	},
+	"shelfOfProducts": {
+		"loading": "Carregando...",
+		"seeMore": "Ver mais"
+	},
+	"productCardQuickAdd": {
+		"title": "Selecione seu tamanho",
+		"add": "Adicionar à sacola",
+		"cancel": "Cancelar",
+		"loading": "Adicionando..."
+	},
+	"lists": {
+		"title": "Ordenar por",
+		"labelRelevance": "Mais relevantes",
+		"labelBestSellers": "Mais vendidos",
+		"labelNewest": "Novidades",
+		"labelDiscounts": "Maior desconto",
+		"labelHighestPrice": "Maior preço",
+		"labelLowestPrice": "Menor preço",
+		"labelAToZ": "De A a Z",
+		"labelZToA": "De Z a A"
+	},
+	"facetsModal": {
+		"from": "De",
+		"to": "à"
+	}
+}
