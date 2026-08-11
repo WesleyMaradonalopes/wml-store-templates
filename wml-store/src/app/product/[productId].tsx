@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartIconButton } from '@/components/cart-icon-button';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
@@ -70,8 +71,8 @@ function estimateLabel(value: string) {
 
 export default function ProductScreen() {
   const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { productId } = useLocalSearchParams<{ productId: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [colorProducts, setColorProducts] = useState<Product[]>([]);
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
@@ -112,7 +113,7 @@ export default function ProductScreen() {
   const hiddenColorCount = Math.max(0, colorProducts.length - visibleColorProducts.length);
 
   useEffect(() => {
-    if (!id) return;
+    if (!productId) return;
     let active = true;
     setLoading(true);
     setError(false);
@@ -125,10 +126,11 @@ export default function ProductScreen() {
     setQuickViewVisible(false);
     setColorsVisible(false);
     setImageIndex(0);
+    setScrollY(0);
     setCartMessage(null);
     setShippingQuotes([]);
     setShippingMessage('');
-    getProduct(id)
+    getProduct(productId)
       .then((value) => {
         if (!active) return;
         setProduct(value);
@@ -148,7 +150,7 @@ export default function ProductScreen() {
       .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [id]);
+  }, [productId]);
 
   useEffect(() => {
     setImageIndex(0);
@@ -256,8 +258,7 @@ export default function ProductScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <PdpHeader onBack={() => router.back()} onLogo={() => router.replace('/')} onSearch={() => router.push('/search')} onCart={() => router.push('/checkout')} />
+      <SafeAreaView edges={['bottom']} style={styles.safeArea}>
         {loading && <ActivityIndicator color="#000000" style={styles.loader} />}
         {error && <ThemedText style={styles.errorText}>Produto não encontrado.</ThemedText>}
         {product && (
@@ -267,7 +268,7 @@ export default function ProductScreen() {
             onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)}
             scrollEventThrottle={16}>
             {galleryImages.length > 0 && (
-              <View style={styles.galleryArea}>
+              <View style={[styles.galleryArea, { height: screenHeight }] }>
                 <FlatList
                   key={activeVariant?.itemId ?? product.id}
                   data={galleryImages}
@@ -276,9 +277,16 @@ export default function ProductScreen() {
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(image, index) => `${image}-${index}`}
                   onMomentumScrollEnd={(event) => setImageIndex(Math.round(event.nativeEvent.contentOffset.x / screenWidth))}
-                  renderItem={({ item }) => <Image source={{ uri: item }} style={[styles.mainImage, { width: screenWidth }]} contentFit="cover" />}
+                  renderItem={({ item }) => <Image source={{ uri: item }} style={[styles.mainImage, { width: screenWidth, height: screenHeight }]} contentFit="cover" />}
                 />
-                {galleryImages.length > 1 && <View style={styles.dots}>{galleryImages.map((_, index) => <View key={index} style={[styles.dot, imageIndex === index && styles.activeDot]} />)}</View>}
+                <BlurView intensity={35} tint="dark" pointerEvents="none" style={styles.heroShade} />
+                {galleryImages.length > 1 && <View pointerEvents="none" style={styles.heroDots}>{galleryImages.map((_, index) => <View key={index} style={[styles.dot, imageIndex === index && styles.activeDot]} />)}</View>}
+                <View style={styles.heroProductInfo}>
+                  <View style={styles.heroProductCopy}>
+                    <ThemedText numberOfLines={2} style={styles.heroProductName}>{product.name}</ThemedText>
+                    {currentPrice !== null && <ThemedText type="smallBold" style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
+                  </View>
+                </View>
               </View>
             )}
 
@@ -366,6 +374,7 @@ export default function ProductScreen() {
           </ScrollView>
         )}
 
+        <PdpHeader scrolled={!product || scrollY > 24} onBack={() => router.back()} onLogo={() => router.replace('/')} onSearch={() => router.push('/search')} onCart={() => router.push('/checkout')} />
         {showFloatingButton && product && (
           <View style={styles.floatingBar}>
             <View style={styles.floatingInfo}>
@@ -515,8 +524,25 @@ function CompleteLook({ products }: { products: Product[] }) {
   );
 }
 
-function PdpHeader({ onBack, onLogo, onSearch, onCart }: { onBack: () => void; onLogo: () => void; onSearch: () => void; onCart: () => void }) {
-  return <View style={styles.header}><View style={styles.headerSide}><Pressable accessibilityLabel="Voltar" onPress={onBack} style={styles.headerButton}><ArrowLeftIAIcon color="#231f20" size={21} /></Pressable></View><Pressable accessibilityLabel="Ir para o início" onPress={onLogo} style={styles.logoButton}><HopeLogoIcon color="#231f20" width={76} height={20} /></Pressable><View style={[styles.headerSide, styles.headerActions]}><Pressable accessibilityLabel="Buscar" onPress={onSearch} style={styles.headerButton}><SearchIcon size={21} color="#231f20" /></Pressable><CartIconButton onPress={onCart} style={styles.headerButton} /></View></View>;
+function PdpHeader({ scrolled, onBack, onLogo, onSearch, onCart }: { scrolled: boolean; onBack: () => void; onLogo: () => void; onSearch: () => void; onCart: () => void }) {
+  const insets = useSafeAreaInsets();
+  const heroMode = !scrolled;
+  return (
+    <View style={[styles.header, { paddingTop: insets.top, minHeight: 52 + insets.top }, heroMode ? styles.heroHeader : styles.scrolledHeader]}>
+      <View style={styles.headerSide}>
+        <Pressable accessibilityLabel="Voltar" onPress={onBack} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
+          <ArrowLeftIAIcon color="#231f20" size={21} />
+        </Pressable>
+      </View>
+      {heroMode ? <View style={styles.logoPlaceholder} /> : <Pressable accessibilityLabel="Ir para o início" onPress={onLogo} style={styles.logoButton}><HopeLogoIcon color="#231f20" width={76} height={20} /></Pressable>}
+      <View style={[styles.headerSide, styles.headerActions]}>
+        <Pressable accessibilityLabel="Buscar" onPress={onSearch} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
+          <SearchIcon size={21} color="#231f20" />
+        </Pressable>
+        <CartIconButton color="#231f20" onPress={onCart} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
+      </View>
+    </View>
+  );
 }
 
 function Accordion({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
@@ -558,21 +584,30 @@ function ColorOptionsModal({ products, visible, selectedProductId, onClose, onSe
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1 },
-  header: { minHeight: 52, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#ece8e2', backgroundColor: '#fbfaf7', zIndex: 2 },
+  safeArea: { flex: 1, position: 'relative' },
+  header: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 20, elevation: 0 },
+  heroHeader: { borderBottomWidth: 0, backgroundColor: 'transparent' },
+  scrolledHeader: { borderBottomWidth: 1, borderBottomColor: '#ece8e2', backgroundColor: '#fbfaf7' },
   headerSide: { width: 80, flexDirection: 'row', alignItems: 'center' },
-  headerActions: { justifyContent: 'flex-end' },
+  headerActions: { justifyContent: 'flex-end', gap: Spacing.one },
   headerButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  heroHeaderButton: { borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.62)' },
   logoButton: { minWidth: 90, minHeight: 38, alignItems: 'center', justifyContent: 'center' },
+  logoPlaceholder: { minWidth: 90, minHeight: 38 },
   loader: { marginTop: Spacing.five },
   errorText: { padding: Spacing.four },
   content: { paddingBottom: Spacing.five },
   contentWithFloating: { paddingBottom: 120 },
-  galleryArea: { backgroundColor: '#e8e8ea' },
-  mainImage: { height: 430, backgroundColor: '#e8e8ea' },
-  dots: { minHeight: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, backgroundColor: '#FFFFFF' },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#b8b4ae' },
-  activeDot: { width: 28, backgroundColor: '#5c5853' },
+  galleryArea: { position: 'relative', backgroundColor: '#e8e8ea' },
+  mainImage: { backgroundColor: '#e8e8ea' },
+  heroShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 120, backgroundColor: 'rgba(0, 0, 0, 0.18)' },
+  heroDots: { position: 'absolute', left: Spacing.four, bottom: 92, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.7)' },
+  activeDot: { width: 28, backgroundColor: '#FFFFFF' },
+  heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 24 },
+  heroProductCopy: { gap: 3 },
+  heroProductName: { color: '#FFFFFF', fontSize: 14, lineHeight: 18 },
+  heroProductPrice: { color: '#FFFFFF', fontSize: 14 },
   details: { gap: Spacing.four, padding: Spacing.four, backgroundColor: '#FFFFFF' },
   productHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
   headingText: { flex: 1, gap: 4 },

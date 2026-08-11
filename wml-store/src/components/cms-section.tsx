@@ -326,29 +326,32 @@ export function CmsSectionView({ section }: Props) {
       <View style={isHero ? styles.heroSection : styles.section}>
         {!!text(data.mainTitle) && <ThemedText type="subtitle">{text(data.mainTitle)}</ThemedText>}
         {isHero ? (
-          <ScrollView
-            ref={heroRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(event) => {
-              const page = Math.round(event.nativeEvent.contentOffset.x / Dimensions.get('window').width);
-              if (images.length > 1 && page === 0) {
-                heroRef.current?.scrollTo({ x: images.length * Dimensions.get('window').width, animated: false });
-                setHeroIndex(images.length - 1);
-              } else if (images.length > 1 && page === loopedBannerImages.length - 1) {
-                heroRef.current?.scrollTo({ x: Dimensions.get('window').width, animated: false });
-                setHeroIndex(0);
-              } else setHeroIndex(Math.max(0, page - 1));
-            }}>
-            {loopedBannerImages.map(renderBanner)}
-          </ScrollView>
-        ) : images.map(renderBanner)}
-        {isHero && images.length > 1 && (
-          <View style={styles.dots}>
-            {images.map((_, index) => <View key={index} style={[styles.dot, index === heroIndex && styles.activeDot]} />)}
+          <View style={styles.heroViewport}>
+            <ScrollView
+              ref={heroRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={styles.heroCarousel}
+              onMomentumScrollEnd={(event) => {
+                const page = Math.round(event.nativeEvent.contentOffset.x / Dimensions.get('window').width);
+                if (images.length > 1 && page === 0) {
+                  heroRef.current?.scrollTo({ x: images.length * Dimensions.get('window').width, animated: false });
+                  setHeroIndex(images.length - 1);
+                } else if (images.length > 1 && page === loopedBannerImages.length - 1) {
+                  heroRef.current?.scrollTo({ x: Dimensions.get('window').width, animated: false });
+                  setHeroIndex(0);
+                } else setHeroIndex(Math.max(0, page - 1));
+              }}>
+              {loopedBannerImages.map(renderBanner)}
+            </ScrollView>
+            {images.length > 1 && (
+              <View pointerEvents="none" style={styles.heroDots}>
+                {images.map((_, index) => <View key={index} style={[styles.dot, index === heroIndex && styles.activeDot]} />)}
+              </View>
+            )}
           </View>
-        )}
+        ) : images.map(renderBanner)}
       </View>
     );
   }
@@ -425,7 +428,9 @@ export function CmsSectionView({ section }: Props) {
 const styles = StyleSheet.create({
   section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#fcfaf5' },
   // O hero escapa do padding horizontal usado pelos demais blocos da home.
-  heroSection: { width: Dimensions.get('window').width, backgroundColor: '#fcfaf5' },
+  heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#fcfaf5' },
+  heroViewport: { position: 'relative', width: '100%', height: Dimensions.get('window').height },
+  heroCarousel: { flex: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   seeAll: { textDecorationLine: 'underline', fontSize: 13 },
   tabList: { gap: 8 },
@@ -450,9 +455,9 @@ const styles = StyleSheet.create({
   categoryImage: { width: 134, height: 110, borderRadius: 10 },
   banner: { overflow: 'hidden', borderRadius: 16, minHeight: 180 },
   bannerImage: { width: '100%', height: 180 },
-  heroBanner: { width: Dimensions.get('window').width, minHeight: Dimensions.get('window').width * 1.45, borderRadius: 0 },
-  heroImage: { width: '100%', height: Dimensions.get('window').width * 1.45 },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+  heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },
+  heroImage: { width: '100%', height: Dimensions.get('window').height },
+  heroDots: { position: 'absolute', left: 0, right: 0, bottom: 88, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#c8c4be' },
   activeDot: { width: 20, backgroundColor: '#1e120d' },
   overlay: {

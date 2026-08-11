@@ -15,7 +15,7 @@ export default function TabLayout() {
         <Stack.Screen name="search" options={{ headerShown: false }} />
         <Stack.Screen name="favorites" options={{ headerShown: false }} />
         <Stack.Screen name="account" options={{ headerShown: false }} />
-        <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="product/[productId]" options={{ headerShown: false }} />
         <Stack.Screen name="page/[slug]" options={{ headerShown: false }} />
         <Stack.Screen name="checkout" options={{ headerShown: false }} />
         <Stack.Screen name="stores" options={{ headerShown: false }} />
