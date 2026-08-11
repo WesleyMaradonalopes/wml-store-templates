@@ -31,6 +31,8 @@ export type OrderForm = {
     selectedAddresses?: Array<{ receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
     logisticsInfo: Array<{
       itemIndex: number;
+      selectedSla?: string;
+      selectedDeliveryChannel?: string;
       slas: Array<{
         id: string;
         name: string;
@@ -81,6 +83,8 @@ type VtexOrderForm = {
     selectedAddresses?: Array<{ receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
     logisticsInfo?: Array<{
       itemIndex?: number;
+      selectedSla?: string;
+      selectedDeliveryChannel?: string;
       slas?: Array<{
         id?: string;
         name?: string;
@@ -133,6 +137,8 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
       selectedAddresses: (orderForm.shippingData?.selectedAddresses ?? []).map((address) => ({ ...address })),
       logisticsInfo: (orderForm.shippingData?.logisticsInfo ?? []).map((info) => ({
         itemIndex: info.itemIndex ?? 0,
+        selectedSla: info.selectedSla,
+        selectedDeliveryChannel: info.selectedDeliveryChannel,
         slas: (info.slas ?? []).map((sla) => ({
           id: sla.id ?? '',
           name: sla.name ?? '',
@@ -256,7 +262,7 @@ export async function selectShippingOption({
         address: { ...address, country: address.country ?? 'BRA' },
         selectedAddresses: [{ ...address, country: address.country ?? 'BRA' }],
         logisticsInfo: logisticsInfo.map((info) => {
-          const selected = info.slas.find((sla) => sla.id === slaId) ?? info.slas[0];
+          const selected = info.slas.find((sla) => sla.id === slaId || sla.name === slaId) ?? info.slas[0];
           return {
             itemIndex: info.itemIndex,
             selectedSla: selected?.id ?? slaId,

@@ -1,1 +1,1 @@
-export { default } from './app-tabs';
+export { default } from './app-tabs.tsx';

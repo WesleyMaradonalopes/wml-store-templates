@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,9 +13,41 @@ import { addCouponToCart, getOrderForm, OrderForm, selectPaymentMethod, selectSh
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 
 type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'review';
+type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
+type ShippingOption = NonNullable<OrderForm['shippingData']>['logisticsInfo'][number]['slas'][number];
 
 function digits(value: string) { return value.replace(/\D/g, ''); }
 function validEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); }
+function isShippingStep(step: Step): boolean { return step === 'shipping'; }
+function shippingOptionKey(sla: ShippingOption) { return sla.id || sla.name || `${sla.shippingEstimate}-${sla.deliveryChannel || 'delivery'}`; }
+
+function getShippingOptions(orderForm: OrderForm): ShippingOption[] {
+  const options = new Map<string, ShippingOption>();
+  for (const info of orderForm.shippingData?.logisticsInfo ?? []) {
+    for (const sla of info.slas) {
+      const key = shippingOptionKey(sla);
+      const existing = options.get(key);
+      if (existing) {
+        existing.price += sla.price;
+        if (!existing.shippingEstimate && sla.shippingEstimate) existing.shippingEstimate = sla.shippingEstimate;
+      } else {
+        options.set(key, { ...sla });
+      }
+    }
+  }
+  return [...options.values()];
+}
+
+function getDefaultShippingOptionId(orderForm: OrderForm, options = getShippingOptions(orderForm)) {
+  const current = orderForm.shippingData?.logisticsInfo.find((info) => info.selectedSla)?.selectedSla;
+  if (current && options.some((option) => (option.id || option.name) === current)) return current;
+  return options[0]?.id || options[0]?.name || '';
+}
+
+function getShippingSelectionId(orderForm: OrderForm, options: ShippingOption[], selectedId?: string | null) {
+  if (selectedId && options.some((option) => (option.id || option.name) === selectedId)) return selectedId;
+  return getDefaultShippingOptionId(orderForm, options);
+}
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -55,6 +87,21 @@ export default function CheckoutScreen() {
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const genders = ['Feminino', 'Masculino', 'Prefiro não informar', 'Outro'];
 
+  const customerDataRequests = useRef(new Map<string, Promise<CustomerCheckoutData>>()).current;
+
+  function loadCustomerData(customerEmail: string) {
+    const key = customerEmail.trim().toLowerCase();
+    const existing = customerDataRequests.get(key);
+    if (existing) return existing;
+
+    const request = Promise.all([
+      getCustomerProfileFromMasterData(key).catch(() => null),
+      getCustomerAddressesFromMasterData(key).catch(() => []),
+    ]).then(([profile, addresses]) => ({ profile, addresses }));
+    customerDataRequests.set(key, request);
+    return request;
+  }
+
   useEffect(() => {
     let active = true;
     Promise.all([getOrderForm(), getAccountSession()]).then(async ([value, session]) => {
@@ -68,12 +115,10 @@ export default function CheckoutScreen() {
       setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setGender('');
       setCustomerExists(false); setEditingCustomer(false);
       setCustomerAddresses([]); setAddressSaved(false); setEditingAddress(false);
+      setLoading(false);
       if (!loggedEmail) return;
 
-      const [customer, addresses] = await Promise.all([
-        getCustomerProfileFromMasterData(loggedEmail).catch(() => null),
-        getCustomerAddressesFromMasterData(loggedEmail).catch(() => []),
-      ]);
+      const { profile: customer, addresses } = await loadCustomerData(loggedEmail);
       if (!active) return;
       setEmail(loggedEmail);
       if (customer) {
@@ -104,10 +149,9 @@ export default function CheckoutScreen() {
     if (!validEmail(email)) return setMessage('Informe um e-mail válido.');
     setSaving(true); setMessage('');
     try {
-      const profile = await getCustomerProfileFromMasterData(email);
+      const { profile, addresses } = await loadCustomerData(email);
       if (profile) {
         setCustomerExists(true); setEditingCustomer(false); applyProfile(profile, email);
-        const addresses = await getCustomerAddressesFromMasterData(email);
         setCustomerAddresses(addresses);
         const preferred = addresses.find((item) => item.postalCode && item.street);
         if (preferred) applyAddress(preferred);
@@ -126,6 +170,44 @@ export default function CheckoutScreen() {
     const id = String(('id' in address ? address.id : '') || `${address.postalCode || ''}-${address.street || ''}-${address.number || ''}`);
     setSelectedAddressId(id); setAddressSaved(true); setEditingAddress(false);
     setReceiverName(address.receiverName ?? ''); setPostalCode(address.postalCode ?? ''); setStreet(address.street ?? ''); setNumber(address.number ?? ''); setComplement(address.complement ?? ''); setNeighborhood(address.neighborhood ?? ''); setCity(address.city ?? ''); setState(address.state ?? '');
+  }
+
+  function openAddressSelection() {
+    const hasSavedAddresses = customerAddresses.length > 1;
+    setAddressSelectionOpen(hasSavedAddresses);
+    setEditingAddress(!hasSavedAddresses);
+    setStep('address');
+  }
+
+  async function continueWithSavedAddress() {
+    if (!orderForm || saving) return;
+    setSaving(true); setMessage('');
+    try {
+      const updated = await updateShippingAddress({ orderFormId: orderForm.orderFormId, address: { receiverName, postalCode: digits(postalCode), street, number, complement, neighborhood, city, state } });
+      setOrderForm(updated);
+      setSelectedSla(getDefaultShippingOptionId(updated));
+      setAddressSelectionOpen(false); setAddressSaved(true); setEditingAddress(false); setStep('shipping');
+    } catch {
+      setMessage('Não foi possível calcular a entrega.');
+    } finally { setSaving(false); }
+  }
+
+  function chooseShippingLocally(slaId: string) {
+    setSelectedSla(slaId);
+    setMessage('');
+  }
+
+  async function continueWithShipping() {
+    if (!orderForm || saving) return;
+    const slaId = getShippingSelectionId(orderForm, getShippingOptions(orderForm), selectedSla);
+    if (!slaId) return setMessage('Selecione uma forma de entrega.');
+    setSelectedSla(slaId); setSaving(true); setMessage('');
+    try {
+      setOrderForm(await selectShippingOption({ orderFormId: orderForm.orderFormId, address: { receiverName, postalCode: digits(postalCode), street, number, complement, neighborhood, city, state }, logisticsInfo: orderForm.shippingData?.logisticsInfo ?? [], slaId }));
+      setStep('payment');
+    } catch {
+      setMessage('Não foi possível selecionar esta entrega.');
+    } finally { setSaving(false); }
   }
 
   async function lookupCep(value: string) {
@@ -183,7 +265,30 @@ export default function CheckoutScreen() {
 
   if (orderForm.items.length === 0) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Carrinho" onBack={() => router.replace('/')} showSearch={false} showCart /><View style={styles.emptyState}><ThemedText type="subtitle">Seu carrinho está vazio</ThemedText><ThemedText themeColor="textSecondary">Encontre produtos para continuar sua compra.</ThemedText><Primary title="Encontrar produtos" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
 
-  const slas = orderForm.shippingData?.logisticsInfo.flatMap((info) => info.slas) ?? [];
+  const slas = getShippingOptions(orderForm);
+  if (step === 'address' && addressSelectionOpen && customerAddresses.length > 1) {
+    return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={() => setAddressSelectionOpen(false)} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
+      <ThemedText type="smallBold">Selecione um endereço para entrega</ThemedText>
+      <View style={styles.addressList}>{customerAddresses.map((address) => {
+        const addressId = String(address.id || `${address.postalCode || ''}-${address.street || ''}-${address.number || ''}`);
+        const selected = selectedAddressId === addressId;
+        return <Pressable key={addressId} onPress={() => { applyAddress(address); setAddressSelectionOpen(false); }} style={[styles.addressOption, selected && styles.addressOptionSelected]}><Radio selected={selected} /><View style={styles.addressDetails}><ThemedText type="smallBold">{address.addressName || `${address.street}, ${address.number}`}</ThemedText><ThemedText>{address.street}, {address.number}{address.complement ? ` - ${address.complement}` : ''}</ThemedText><ThemedText themeColor="textSecondary">{address.neighborhood} - {address.city}/{address.state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {address.postalCode}</ThemedText></View></Pressable>;
+      })}</View>
+    </ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithSavedAddress} /><Secondary title="Alterar endereço de entrega" onPress={() => { setAddressSelectionOpen(false); setEditingAddress(true); }} /></View></SafeAreaView></ThemedView>;
+  }
+
+  if (isShippingStep(step)) {
+    const selectedShippingId = getShippingSelectionId(orderForm, slas, selectedSla);
+    return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
+      <ThemedText type="smallBold">Como deseja receber seu produto?</ThemedText>
+      <ThemedView style={styles.shippingCard}><View style={styles.shippingAddressRow}><ThemedText style={styles.pinIcon}>⌖</ThemedText><ThemedText style={styles.shippingAddressText}>Envio para {street}{number ? `, ${number}` : ''}</ThemedText></View>{slas.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma forma de entrega disponível.</ThemedText>}{slas.map((sla) => { const optionId = sla.id || sla.name; const selected = selectedShippingId === optionId; return <Pressable key={shippingOptionKey(sla)} onPress={() => chooseShippingLocally(optionId)} disabled={saving} style={[styles.shippingOption, selected && styles.shippingOptionSelected]}><Radio selected={selected} /><View style={styles.shippingOptionDetails}><ThemedText type="smallBold">{sla.name}{sla.price === 0 ? ' - Grátis' : ''}</ThemedText><ThemedText themeColor="textSecondary">{sla.price === 0 ? 'Grátis' : `R$ ${sla.price.toFixed(2)}`} · {sla.shippingEstimate}</ThemedText></View></Pressable>; })}</ThemedView>
+    </ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithShipping} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
+  }
+
+  if (step === 'address' && addressSaved && !editingAddress) {
+    return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}><ThemedText type="smallBold">Endereço de entrega</ThemedText><ThemedView style={[styles.shippingCard, styles.selectedAddressCard]}><View style={styles.shippingAddressRow}><Radio selected /><View style={styles.addressDetails}><ThemedText type="smallBold">Enviar para {street}, {number}</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{neighborhood} - {city}/{state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {postalCode}</ThemedText></View></View><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></ThemedView></ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithSavedAddress} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
+  }
+
   const payments = orderForm.paymentData?.paymentSystems ?? [];
   const title: Record<Step, string> = { cart: 'Carrinho', email: 'Dados pessoais', customer: 'Dados pessoais', address: 'Entrega', shipping: 'Entrega', payment: 'Pagamento', card: 'Novo cartão', review: 'Revise e confirme' };
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
@@ -191,7 +296,7 @@ export default function CheckoutScreen() {
     {step === 'email' && <><Card><ThemedText type="smallBold">Informe seu e-mail para continuar</ThemedText><ThemedText themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="Digite seu e-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} /></Card></>}
     {step === 'customer' && (customerExists && !editingCustomer ? <><Card><ThemedText type="subtitle">Dados pessoais</ThemedText><ThemedText themeColor="textSecondary">E-mail</ThemedText><ThemedText>{email}</ThemedText><ThemedText themeColor="textSecondary">Nome</ThemedText><ThemedText>{firstName || 'Não informado'} {lastName}</ThemedText><ThemedText themeColor="textSecondary">CPF</ThemedText><ThemedText>{document || 'Não informado'}</ThemedText><ThemedText themeColor="textSecondary">Telefone</ThemedText><ThemedText>{phone || 'Não informado'}</ThemedText><ThemedText themeColor="textSecondary">Gênero</ThemedText><ThemedText>{gender || 'Não informado'}</ThemedText><Pressable onPress={() => setEditingCustomer(true)}><ThemedText style={styles.link}>Editar dados</ThemedText></Pressable></Card></> : <><Card><Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" /><Field label="Nome" value={firstName} setValue={setFirstName} /><Field label="Sobrenome" value={lastName} setValue={setLastName} /><Field label="Telefone" value={phone} setValue={setPhone} keyboardType="phone-pad" /><Field label="CPF" value={document} setValue={setDocument} keyboardType="numeric" /><ThemedText type="smallBold">Gênero (opcional)</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText>{gender || 'Selecione seu gênero'}</ThemedText><ThemedText>⌄</ThemedText></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText>{option}</ThemedText></Pressable>)}</View>}</Card></>)}
     {step === 'address' && (addressSaved && !editingAddress ? <Card><ThemedText type="smallBold">Endereço de entrega</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{street}, {number}{complement ? ` - ${complement}` : ''}</ThemedText><ThemedText>{neighborhood} - {city}/{state}</ThemedText><ThemedText>CEP: {postalCode}</ThemedText><Pressable onPress={() => customerAddresses.length > 1 ? setAddressSelectionOpen(true) : setEditingAddress(true)}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable>{addressSelectionOpen && customerAddresses.length > 1 && <View style={styles.addressList}>{customerAddresses.map((address) => { const addressId = String(address.id || `${address.postalCode || ''}-${address.street || ''}-${address.number || ''}`); return <Pressable key={addressId} onPress={() => { applyAddress(address); setAddressSelectionOpen(false); }} style={[styles.addressOption, selectedAddressId === addressId && styles.selected]}><ThemedText type="smallBold">{address.addressName || 'Enviar para este endereço'}</ThemedText><ThemedText>{address.street}, {address.number}</ThemedText><ThemedText themeColor="textSecondary">{address.neighborhood} - {address.city}/{address.state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {address.postalCode}</ThemedText></Pressable>; })}<Pressable onPress={() => { setAddressSelectionOpen(false); setEditingAddress(true); }}><ThemedText style={styles.link}>Cadastrar outro endereço</ThemedText></Pressable></View>}</Card> : <Card><Field label="CEP" value={postalCode} setValue={lookupCep} keyboardType="numeric" /><Field label="Endereço" value={street} setValue={setStreet} /><View style={styles.inline}><Field label="Número" value={number} setValue={setNumber} /><Field label="Complemento" value={complement} setValue={setComplement} /></View><Field label="Bairro" value={neighborhood} setValue={setNeighborhood} /><View style={styles.inline}><Field label="Cidade" value={city} setValue={setCity} /><Field label="Estado" value={state} setValue={setState} /></View><Field label="Quem irá receber?" value={receiverName} setValue={setReceiverName} /></Card>)}
-    {step === 'shipping' && <><ThemedText type="smallBold">Como deseja receber seu produto?</ThemedText>{slas.map((sla) => <Pressable key={sla.id} disabled={saving} onPress={() => chooseShipping(sla.id)} style={[styles.option, selectedSla === sla.id && styles.selected]}><ThemedText type="smallBold">{sla.name}</ThemedText><ThemedText themeColor="textSecondary">R$ {sla.price.toFixed(2)} · {sla.shippingEstimate}</ThemedText></Pressable>)}</>}
+    {step === 'shipping' && <><ThemedText type="smallBold">Como deseja receber seu produto?</ThemedText>{slas.map((sla) => <Pressable key={shippingOptionKey(sla)} disabled={saving} onPress={() => chooseShipping(sla.id || sla.name)} style={[styles.option, selectedSla === (sla.id || sla.name) && styles.selected]}><ThemedText type="smallBold">{sla.name}</ThemedText><ThemedText themeColor="textSecondary">R$ {sla.price.toFixed(2)} · {sla.shippingEstimate}</ThemedText></Pressable>)}</>}
     {step === 'payment' && <><ThemedText type="smallBold">Escolha como pagar</ThemedText>{payments.map((method) => <Pressable key={method.id} onPress={() => method.group.toLowerCase().includes('card') || method.name.toLowerCase().includes('cart') ? setStep('card') : choosePayment(method.id)} style={styles.option}><ThemedText type="smallBold">{method.name}</ThemedText><ThemedText themeColor="textSecondary">{method.group}</ThemedText></Pressable>)}<Card><ThemedText type="smallBold">Vale presente</ThemedText><View style={styles.inline}><TextInput value={voucher} onChangeText={setVoucher} placeholder="Código do vale" style={[styles.input, styles.flex]} /><Pressable style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View></Card><Pressable onPress={() => choosePayment(payments.find((item) => item.group.toLowerCase().includes('pix') || item.name.toLowerCase().includes('pix'))?.id ?? '6')} style={styles.option}><ThemedText type="smallBold">Pix</ThemedText><ThemedText themeColor="textSecondary">Pagamento instantâneo</ThemedText></Pressable></>}
     {step === 'card' && <><Card><Field label="Número do cartão" value="" setValue={() => undefined} placeholder="Insira o número do seu cartão" keyboardType="numeric" /><Field label="Nome impresso no cartão" value="" setValue={() => undefined} placeholder="Nome impresso no cartão" /><View style={styles.inline}><Field label="Validade" value="" setValue={() => undefined} placeholder="MM/AA" /><Field label="CVV" value="" setValue={() => undefined} placeholder="CVV" keyboardType="numeric" /></View><ThemedText themeColor="textSecondary">Os dados serão tokenizados pela VTEX antes do pagamento.</ThemedText></Card></>}
     {step === 'review' && <><ThemedText type="smallBold">Revise e confirme</ThemedText><Summary orderForm={orderForm} /><Card><ThemedText type="smallBold">DADOS PESSOAIS</ThemedText><ThemedText>{email}</ThemedText><ThemedText>{firstName} {lastName}</ThemedText><ThemedText>{phone}</ThemedText></Card><Card><ThemedText type="smallBold">ENTREGA</ThemedText><ThemedText>{street}, {number} - {city}/{state}</ThemedText><ThemedText>{selectedSla || 'Entrega selecionada'}</ThemedText></Card><Card><ThemedText type="smallBold">PAGAMENTO</ThemedText><ThemedText>{selectedPayment || 'Pagamento selecionado'}</ThemedText></Card>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}</>}
@@ -201,6 +306,8 @@ export default function CheckoutScreen() {
 function Card({ children }: { children: React.ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
 function Field({ label, value, setValue, placeholder, keyboardType }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address' }) { return <View style={styles.field}><ThemedText type="smallBold">{label}</ThemedText><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType} style={styles.input} /></View>; }
 function Primary({ title, onPress }: { title: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.primary}><ThemedText style={styles.buttonText}>{title}</ThemedText></Pressable>; }
+function Secondary({ title, onPress }: { title: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.secondary}><ThemedText style={styles.secondaryText}>{title}</ThemedText></Pressable>; }
+function Radio({ selected }: { selected: boolean }) { return <View style={[styles.radio, selected && styles.radioSelected]}>{selected && <View style={styles.radioDot} />}</View>; }
 function Summary({ orderForm }: { orderForm: OrderForm }) { return <Card><ThemedText type="smallBold">Resumo</ThemedText><View style={styles.summary}><ThemedText>Subtotal</ThemedText><ThemedText>R$ {orderForm.value.toFixed(2)}</ThemedText></View><View style={styles.summary}><ThemedText type="smallBold">Total</ThemedText><ThemedText type="smallBold">R$ {orderForm.value.toFixed(2)}</ThemedText></View></Card>; }
 function FreeShippingProgress({ value }: { value: number }) {
   const target = 249;
@@ -212,7 +319,7 @@ function FreeShippingProgress({ value }: { value: number }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1, padding: Spacing.four },
-  content: { gap: Spacing.three, paddingVertical: Spacing.three, paddingBottom: 110 },
+  content: { gap: Spacing.three, paddingVertical: Spacing.three, paddingBottom: 170 },
   flex: { flex: 1 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.three, padding: Spacing.five },
   card: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
@@ -241,14 +348,29 @@ const styles = StyleSheet.create({
   select: { padding: Spacing.three, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#d9d3cc', flexDirection: 'row', justifyContent: 'space-between' },
   dropdown: { borderWidth: 1, borderColor: '#d9d3cc', borderRadius: 10, backgroundColor: '#FFFFFF' },
   addressList: { gap: Spacing.two, marginTop: Spacing.two },
-  addressOption: { gap: 4, padding: Spacing.two, borderRadius: 12, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#fbfaf7' },
+  addressOption: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two, padding: Spacing.two, borderRadius: 12, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#fbfaf7' },
+  addressOptionSelected: { borderColor: '#1e120d', borderWidth: 2 },
+  addressDetails: { flex: 1, gap: 4 },
   link: { color: '#1e120d', textDecorationLine: 'underline' },
   primary: { padding: Spacing.four, borderRadius: 10, alignItems: 'center', backgroundColor: '#1e120d' },
-  fixedFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: Spacing.two, paddingBottom: Spacing.three, backgroundColor: '#fbfaf7' },
+  secondary: { minHeight: 48, padding: Spacing.three, borderRadius: 10, borderWidth: 1, borderColor: '#1e120d', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  secondaryText: { color: '#1e120d', fontWeight: '700' },
+  fixedFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, gap: Spacing.two, padding: Spacing.two, paddingBottom: Spacing.three, backgroundColor: '#fbfaf7' },
   smallButton: { padding: 12, borderRadius: 10, backgroundColor: '#1e120d' },
   buttonText: { color: '#FFFFFF', fontWeight: '700' },
   option: { gap: 4, padding: Spacing.three, borderRadius: 14, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF' },
   selected: { borderColor: '#1e120d', borderWidth: 2 },
+  selectedAddressCard: { gap: Spacing.three },
+  shippingCard: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
+  shippingAddressRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  pinIcon: { fontSize: 22, color: '#1e120d' },
+  shippingAddressText: { flex: 1 },
+  shippingOption: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.two, borderRadius: 10, borderWidth: 1, borderColor: '#b0a69b', backgroundColor: '#FFFFFF' },
+  shippingOptionSelected: { borderColor: '#1e120d', borderWidth: 2 },
+  shippingOptionDetails: { flex: 1, gap: 4 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#b0a69b', alignItems: 'center', justifyContent: 'center' },
+  radioSelected: { borderColor: '#1e120d' },
+  radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#1e120d' },
   summary: { flexDirection: 'row', justifyContent: 'space-between' },
   progressCard: { gap: 8, padding: Spacing.two, borderRadius: 10, backgroundColor: '#f4f0e9' },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#e3ded5' },

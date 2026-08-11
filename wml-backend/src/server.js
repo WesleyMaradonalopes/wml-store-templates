@@ -131,23 +131,22 @@ async function searchCustomerAddressesByEmail(email) {
   const profile = await searchCustomerByEmail(email).catch(() => null);
   const identities = [...new Set([profile?.userId, profile?.id, email].map((value) => String(value || '').trim()).filter(Boolean))];
   const fields = 'id,addressId,userId,email,userEmail,addressName,addressType,receiverName,street,number,complement,neighborhood,city,state,country,postalCode,reference';
-  const documents = [];
   const whereClauses = identities.flatMap((identity) => [
     `userId=${identity}`, `userId="${identity}"`,
     `email=${identity}`, `email="${identity}"`,
     `userEmail=${identity}`, `userEmail="${identity}"`,
   ]);
 
-  for (const where of whereClauses) {
+  const documents = (await Promise.all(whereClauses.map(async (where) => {
     const url = new URL(`${vtexBaseUrl}/api/dataentities/AD/search`);
     url.searchParams.set('_fields', fields);
     url.searchParams.set('_where', where);
     url.searchParams.set('_size', '100');
     const result = await fetch(url, { headers: vtexHeaders() }).catch(() => null);
-    if (!result?.ok) continue;
+    if (!result?.ok) return [];
     const body = await result.json().catch(() => []);
-    if (Array.isArray(body)) documents.push(...body);
-  }
+    return Array.isArray(body) ? body : [];
+  }))).flat();
 
   return [...new Map(documents.map((document) => {
     const address = normalizeCustomerAddress(document);
