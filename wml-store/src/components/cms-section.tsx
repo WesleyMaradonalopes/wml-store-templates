@@ -43,7 +43,6 @@ function ProductShelf({ data }: { data: Record<string, unknown> }) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cartMessage, setCartMessage] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState(0);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const tabs = Array.isArray(data.tabs)
@@ -116,7 +115,6 @@ function ProductShelf({ data }: { data: Record<string, unknown> }) {
       {!loading && products.length === 0 && (
         <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>
       )}
-      {!!cartMessage && <ThemedText themeColor="textSecondary">{cartMessage}</ThemedText>}
       <FlatList
         data={products}
         horizontal
@@ -132,7 +130,6 @@ function ProductShelf({ data }: { data: Record<string, unknown> }) {
             style={{ width: PRODUCT_CARD_WIDTH }}
             favorite={favoriteIds.includes(item.id)}
             onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))}
-            onAdded={() => setCartMessage('Produto adicionado à sacola.')}
           />
         )}
       />
@@ -164,7 +161,6 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [cartMessage, setCartMessage] = useState('');
   const selectedSignature = JSON.stringify(selectedFacets);
   const activeFacets = [...baseFacets, ...selectedFacets];
 
@@ -212,7 +208,6 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
         </View>
         <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
       </View>
-      {!!cartMessage && <ThemedText style={styles.cartSuccess}>{cartMessage}</ThemedText>}
       {loading && <ActivityIndicator color="#000000" />}
       {!loading && products.length === 0 && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
       <View style={styles.productGrid}>
@@ -223,7 +218,6 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
             style={styles.gridProductCard}
             favorite={favoriteIds.includes(product.id)}
             onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id))}
-            onAdded={() => setCartMessage('Produto adicionado à sacola.')}
           />
         ))}
       </View>
@@ -448,7 +442,6 @@ const styles = StyleSheet.create({
   filterButtonText: { fontSize: 12 },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   gridProductCard: { width: '48.7%', marginBottom: Spacing.three },
-  cartSuccess: { color: '#26734d', fontWeight: '600' },
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },

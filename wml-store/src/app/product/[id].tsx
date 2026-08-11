@@ -10,6 +10,7 @@ import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
+import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { ProductCard } from '@/components/product-card';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
@@ -165,15 +166,21 @@ export default function ProductScreen() {
     if (!product) return;
     if (variationNames.some((name) => !selectedOptions[name])) {
       const hasSize = variationNames.some((name) => normalizeText(name).includes('tamanho'));
-      setSelectionMessage(hasSize ? 'Por favor, selecione um tamanho.' : 'Por favor, selecione uma opção.');
+      const selectionError = hasSize ? 'Por favor, selecione um tamanho.' : 'Por favor, selecione uma opção.';
+      setSelectionMessage(selectionError);
+      setCartMessage(null);
       return;
     }
     if (!activeVariant) {
-      setSelectionMessage('Por favor, selecione uma opção disponível.');
+      const selectionError = 'Por favor, selecione uma opção disponível.';
+      setSelectionMessage(selectionError);
+      setCartMessage(null);
       return;
     }
     if (!activeVariant.available) {
-      setSelectionMessage('Este tamanho está indisponível.');
+      const selectionError = 'Este tamanho está indisponível.';
+      setSelectionMessage(selectionError);
+      setCartMessage(null);
       return;
     }
     setAdding(true);
@@ -184,7 +191,8 @@ export default function ProductScreen() {
       await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: activeVariant.itemId, sellerId: activeVariant.sellerId });
       setCartMessage('Produto adicionado à sacola.');
     } catch {
-      setCartMessage('Não foi possível adicionar o produto.');
+      setSelectionMessage('Não foi possível adicionar o produto.');
+      setCartMessage(null);
     } finally {
       setAdding(false);
     }
@@ -229,6 +237,14 @@ export default function ProductScreen() {
     } finally {
       setShippingLoading(false);
     }
+  }
+
+  function handleFloatingAdd() {
+    if (variationNames.some((name) => !selectedOptions[name])) {
+      setQuickViewVisible(true);
+      return;
+    }
+    void addProduct();
   }
 
   const buttonVisible = buttonLayout
@@ -303,7 +319,7 @@ export default function ProductScreen() {
                     {values.map((value) => {
                       const available = optionAvailable(name, value);
                       const selected = selectedOptions[name] === value;
-                      return <Pressable key={value} disabled={!available} accessibilityState={{ disabled: !available, selected }} onPress={() => { setSelectionMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }} style={[styles.variantOption, selected && styles.selectedVariant, !available && styles.unavailableVariant]}><ThemedText style={[selected && styles.selectedVariantText, !available && styles.unavailableVariantText]}>{value}</ThemedText></Pressable>;
+                      return <Pressable key={value} disabled={!available} accessibilityState={{ disabled: !available, selected }} onPress={() => { setSelectionMessage(''); setCartMessage(null); setSelectedOptions((current) => ({ ...current, [name]: value })); }} style={[styles.variantOption, selected && styles.selectedVariant, !available && styles.unavailableVariant]}><ThemedText style={[selected && styles.selectedVariantText, !available && styles.unavailableVariantText]}>{value}</ThemedText></Pressable>;
                     })}
                   </View>
                 </View>
@@ -314,8 +330,6 @@ export default function ProductScreen() {
                 <ShoppingBagIcon size={18} color="#FFFFFF" />
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
-              {!!cartMessage && <ThemedText style={cartMessage.includes('adicionado') ? styles.successText : styles.messageText}>{cartMessage}</ThemedText>}
-
               <View style={styles.helperButtons}>
                 <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><ThemedText>♧</ThemedText><ThemedText type="smallBold">Provador Virtual</ThemedText></Pressable>
                 <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><ThemedText>↔</ThemedText><ThemedText type="smallBold">Tabela de medidas</ThemedText></Pressable>
@@ -359,7 +373,9 @@ export default function ProductScreen() {
               <ThemedText themeColor="textSecondary" numberOfLines={1}>{product.color}{selectedOptions.Tamanho ? ` · ${selectedOptions.Tamanho}` : ''}</ThemedText>
               {currentPrice !== null && <ThemedText type="smallBold">{money(currentPrice)}</ThemedText>}
             </View>
-            <Pressable onPress={() => setQuickViewVisible(true)} style={styles.floatingButton}><ShoppingBagIcon size={17} color="#1e120d" /><ThemedText type="smallBold">Adicionar</ThemedText></Pressable>
+            <Pressable disabled={adding} onPress={handleFloatingAdd} style={[styles.floatingButton, adding && styles.disabled]}>
+              {adding ? <ActivityIndicator size="small" color="#1e120d" /> : <><ShoppingBagIcon size={17} color="#1e120d" /><ThemedText type="smallBold">Adicionar</ThemedText></>}
+            </Pressable>
           </View>
         )}
         {product && <ProductQuickView product={product} visible={quickViewVisible} onClose={() => setQuickViewVisible(false)} />}
@@ -373,6 +389,7 @@ export default function ProductScreen() {
             if (colorProduct.id !== product?.id) router.replace(`/product/${colorProduct.id}`);
           }}
         />
+        <AddToCartFeedback message={cartMessage} />
       </SafeAreaView>
     </ThemedView>
   );

@@ -8,6 +8,7 @@ import { Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm } from '@/services/cart';
 import { getProduct, type Product, type ProductVariant } from '@/services/catalog';
 
+import { AddToCartFeedback } from './add-to-cart-feedback';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -167,7 +168,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
                           key={value}
                           disabled={!available}
                           accessibilityState={{ disabled: !available, selected }}
-                          onPress={() => setSelectedOptions((current) => ({ ...current, [name]: value }))}
+                          onPress={() => { setMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }}
                           style={[styles.option, selected && styles.selectedOption, !available && styles.unavailableOption]}>
                           <ThemedText style={[selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
                         </Pressable>
@@ -176,7 +177,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
                   </View>
                 </View>
               ))}
-              {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
+              {!!message && !message.toLowerCase().includes('adicionad') && <ThemedText style={styles.messageText}>{message}</ThemedText>}
               <Pressable onPress={openProduct} style={styles.productButton}>
                 <ThemedText type="smallBold">Ir para o produto</ThemedText>
               </Pressable>
@@ -184,6 +185,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>}
               </Pressable>
             </ScrollView>
+            <AddToCartFeedback message={message} />
           </SafeAreaView>
         </ThemedView>
       </View>
@@ -226,8 +228,7 @@ const styles = StyleSheet.create({
   selectedOptionText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableOption: { opacity: 0.35, backgroundColor: '#eeeae4' },
   unavailableText: { textDecorationLine: 'line-through' },
-  messageText: { color: '#B42318' },
-  successText: { color: '#26734d', fontWeight: '600' },
+  messageText: { color: '#B42318', fontWeight: '600' },
   productButton: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#1e120d', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   addButton: { minHeight: 50, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
   addButtonText: { color: '#FFFFFF', fontWeight: '700' },

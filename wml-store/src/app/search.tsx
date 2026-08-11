@@ -162,7 +162,6 @@ export default function SearchScreen() {
               style={styles.card}
               favorite={favoriteIds.includes(item.id)}
               onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))}
-              onAdded={() => setMessage('Produto adicionado à sacola.')}
             />
           )}
           />
