@@ -9,7 +9,7 @@ import { ProductCard } from '@/components/product-card';
 import { FilterGlyph, ProductFilterModal } from '@/components/product-filter-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { getProductFacets, searchProductListing, type CatalogFacet, type Product, type SelectedFacet } from '@/services/catalog';
 import { isFavorite } from '@/services/favorites';
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   searchHeader: { minHeight: 58, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#e7e3de', backgroundColor: '#FFFFFF' },
   backButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   searchInputWrap: { flex: 1, minHeight: 42, borderRadius: 22, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, backgroundColor: '#f1f1f3' },
-  searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#3c3936' },
+  searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#3c3936', fontFamily: Fonts.sans },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 32, lineHeight: 34, color: '#55514d' },
   body: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.three },

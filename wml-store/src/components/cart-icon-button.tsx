@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
+import { Fonts } from '@/constants/theme';
 import { getOrderForm, subscribeToCartChanges, type OrderForm } from '@/services/cart';
 
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
@@ -36,9 +37,15 @@ export function useCartItemCount() {
   return count;
 }
 
-export function CartCountBadge({ count }: { count: number }) {
+type CartCountBadgeProps = {
+  count: number;
+  variant?: 'top' | 'bottomTab';
+};
+
+export function CartCountBadge({ count, variant = 'top' }: CartCountBadgeProps) {
   if (count <= 0) return null;
-  return <View style={styles.badge}><Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text></View>;
+  const bottomTab = variant === 'bottomTab';
+  return <View style={[styles.topBadge, bottomTab && styles.bottomTabBadge]}><Text style={[styles.topBadgeText, bottomTab && styles.bottomTabBadgeText]}>{count > 99 ? '99+' : count}</Text></View>;
 }
 
 export function CartIconButton({ onPress, color = '#231f20', size = 20, style }: Props) {
@@ -58,6 +65,8 @@ export function CartIconButton({ onPress, color = '#231f20', size = 20, style }:
 
 const styles = StyleSheet.create({
   button: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  badge: { position: 'absolute', top: -2, right: -3, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
-  badgeText: { color: '#FFFFFF', fontSize: 10, lineHeight: 12, fontWeight: '700' },
+  topBadge: { position: 'absolute', top: 0, right: -1, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
+  topBadgeText: { color: '#FFFFFF', fontSize: 10, lineHeight: 12, fontWeight: '700', fontFamily: Fonts.bold },
+  bottomTabBadge: { top: -4, right: -5, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: '#FFFFFF' },
+  bottomTabBadgeText: { color: '#000000', fontSize: 10, lineHeight: 12, fontFamily: Fonts.bold },
 });

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
 import { addCouponToCart, getOrderForm, OrderForm, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, type CustomerAddress, type CustomerProfile } from '@/services/customer';
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   giftCheck: { color: '#FFFFFF', fontSize: 13, lineHeight: 15, fontWeight: '700' },
   giftText: { flex: 1, fontSize: 13 },
   field: { flex: 1, gap: 4 },
-  input: { minHeight: 46, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF' },
+  input: { minHeight: 46, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
   inline: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
   select: { padding: Spacing.three, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#d9d3cc', flexDirection: 'row', justifyContent: 'space-between' },
   dropdown: { borderWidth: 1, borderColor: '#d9d3cc', borderRadius: 10, backgroundColor: '#FFFFFF' },

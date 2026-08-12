@@ -284,6 +284,15 @@ export function CmsSectionView({ section }: Props) {
     return () => clearTimeout(timer);
   }, [isHeroBanner, bannerImages.length]);
 
+  useEffect(() => {
+    if (!isHeroBanner || bannerImages.length < 2) return;
+    const timer = setInterval(() => {
+      const nextPage = heroIndex + 2;
+      heroRef.current?.scrollTo({ x: nextPage * Dimensions.get('window').width, animated: true });
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [bannerImages.length, heroIndex, isHeroBanner]);
+
   if (section.name === 'RichText') {
     const title = text(data.title).trim();
     const blocks = richTextBlocks(data.content);

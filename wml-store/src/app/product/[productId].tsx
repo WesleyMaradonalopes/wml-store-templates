@@ -16,7 +16,7 @@ import { ProductCard } from '@/components/product-card';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
 import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductVariant } from '@/services/catalog';
 import { isFavorite, toggleFavorite } from '@/services/favorites';
@@ -161,6 +161,16 @@ export default function ProductScreen() {
     setImageIndex(0);
     setViewerIndex(0);
   }, [activeVariant?.itemId]);
+
+  useEffect(() => {
+    if (galleryImages.length < 2 || imageViewerVisible) return;
+    const timer = setInterval(() => {
+      const nextIndex = (imageIndex + 1) % galleryImages.length;
+      galleryListRef.current?.scrollToOffset({ offset: nextIndex * screenWidth, animated: true });
+      setImageIndex(nextIndex);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [galleryImages.length, imageIndex, imageViewerVisible, screenWidth]);
 
   function optionAvailable(name: string, value: string) {
     return product?.variants.some((variant) => (
@@ -358,7 +368,7 @@ export default function ProductScreen() {
               {!!selectionMessage && <ThemedText style={styles.selectionMessage}>{selectionMessage}</ThemedText>}
 
               <Pressable disabled={adding} onLayout={(event) => setButtonLayout({ y: event.nativeEvent.layout.y, height: event.nativeEvent.layout.height })} onPress={addProduct} style={styles.mainAddButton}>
-                <ShoppingBagIcon size={18} color="#FFFFFF" />
+                {/*<ShoppingBagIcon size={18} color="#FFFFFF" />*/}
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
               <View style={styles.helperButtons}>
@@ -402,11 +412,11 @@ export default function ProductScreen() {
           <View style={styles.floatingBar}>
             <View style={styles.floatingInfo}>
               <ThemedText numberOfLines={1} style={styles.floatingName}>{product.name}</ThemedText>
-              <ThemedText themeColor="textSecondary" numberOfLines={1}>{product.color}{selectedOptions.Tamanho ? ` · ${selectedOptions.Tamanho}` : ''}</ThemedText>
+              {selectedOptions.Tamanho && <ThemedText themeColor="textSecondary" numberOfLines={1}>{selectedOptions.Tamanho}</ThemedText>}
               {currentPrice !== null && <ThemedText type="smallBold">{money(currentPrice)}</ThemedText>}
             </View>
             <Pressable disabled={adding} onPress={handleFloatingAdd} style={[styles.floatingButton, adding && styles.disabled]}>
-              {adding ? <ActivityIndicator size="small" color="#1e120d" /> : <><ShoppingBagIcon size={17} color="#1e120d" /><ThemedText type="smallBold">Adicionar</ThemedText></>}
+              {adding ? <ActivityIndicator size="small" color="#fff" /> : <><ShoppingBagIcon size={18} color="#fff" /><ThemedText type="smallBold" style={styles.floatingButtonText}>Adicionar</ThemedText></>}
             </Pressable>
           </View>
         )}
@@ -719,7 +729,7 @@ const styles = StyleSheet.create({
   heroImagePressable: { flex: 1 },
   mainImage: { backgroundColor: '#e8e8ea' },
   heroShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 190 },
-  heroDots: { position: 'absolute', left: Spacing.four, bottom: 92, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroDots: { position: 'absolute', left: Spacing.four, bottom: 110, flexDirection: 'row', alignItems: 'center', gap: 5 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.7)' },
   activeDot: { width: 28, backgroundColor: '#FFFFFF' },
   heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 35 },
@@ -769,7 +779,7 @@ const styles = StyleSheet.create({
   shippingSection: { gap: Spacing.three, paddingTop: Spacing.two },
   sectionTitle: { fontSize: 17, lineHeight: 23 },
   shippingRow: { minHeight: 48, flexDirection: 'row' },
-  shippingInput: { flex: 1, paddingHorizontal: Spacing.three, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF' },
+  shippingInput: { flex: 1, paddingHorizontal: Spacing.three, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
   shippingButton: { minWidth: 108, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#1e120d' },
   shippingButtonText: { color: '#FFFFFF', fontWeight: '700' },
   shippingQuote: { padding: Spacing.three, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#f7f4ef' },
@@ -778,12 +788,13 @@ const styles = StyleSheet.create({
   accordionContent: { gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
   accordionText: { color: '#625d57', lineHeight: 21 },
   chevron: { fontSize: 20, color: '#625d57' },
-  floatingBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 92, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: 'rgba(211, 211, 211, 0.96)', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
+  floatingBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 92, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
   floatingInfo: { flex: 1, gap: 2 },
   floatingName: { fontSize: 12 },
-  floatingButton: { minWidth: 122, minHeight: 46, paddingHorizontal: Spacing.three, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  floatingButton: { minWidth: 122, minHeight: 46, paddingHorizontal: Spacing.three, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
+  floatingButtonText: { color: '#FFFFFF' },
   lookSection: { gap: Spacing.three, paddingTop: Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
-  lookTitle: { fontSize: 25, lineHeight: 31, fontFamily: 'serif' },
+  lookTitle: { fontSize: 25, lineHeight: 31, fontFamily: Fonts.semibold },
   lookSubtitle: { fontSize: 16 },
   lookRow: { flexDirection: 'row', gap: Spacing.three, alignItems: 'flex-start' },
   lookRowOpen: { zIndex: 20 },

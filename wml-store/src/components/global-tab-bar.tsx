@@ -40,11 +40,11 @@ export default function GlobalTabBar() {
           return (
             <Pressable key={item.path} onPress={() => router.push(item.path)} style={styles.tabButton}>
               <View style={[styles.tabButtonView, active && styles.selected]}>
-                {item.icon === 'home' && <HomeIcon color="#FFFFFF" size={18} />}
-                {item.icon === 'category' && <MenuIcon color="#FFFFFF" size={18} />}
-                {item.icon === 'favorite' && <HeartIcon color="#FFFFFF" size={18} />}
-                {item.icon === 'bag' && <View style={styles.bagIcon}><ShoppingBagIcon color="#FFFFFF" size={22} /><CartCountBadge count={cartCount} /></View>}
-                {item.icon === 'account' && <UserIcon color="#FFFFFF" size={18} />}
+                {item.icon === 'home' && <HomeIcon color="#FFFFFF" size={20} />}
+                {item.icon === 'category' && <MenuIcon color="#FFFFFF" size={20} />}
+                {item.icon === 'favorite' && <HeartIcon color="#FFFFFF" size={20} />}
+                {item.icon === 'bag' && <View style={styles.bagIcon}><ShoppingBagIcon color="#FFFFFF" size={20} /><CartCountBadge count={cartCount} variant="bottomTab" /></View>}
+                {item.icon === 'account' && <UserIcon color="#FFFFFF" size={20} />}
                 <ThemedText style={styles.label}>{item.label}</ThemedText>
               </View>
             </Pressable>
@@ -56,8 +56,8 @@ export default function GlobalTabBar() {
 }
 
 const styles = StyleSheet.create({
-  outer: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: Spacing.three },
-  inner: { width: '100%', maxWidth: 520, flexDirection: 'row', padding: 5, borderRadius: 30, backgroundColor: 'rgba(125, 125, 125, 0.78)', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  outer: { position: 'absolute', left:0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: Spacing.three },
+  inner: { width: '100%', maxWidth: 520, flexDirection: 'row', padding: 6, borderRadius: 50, backgroundColor: 'rgba(125, 125, 125, 0.78)', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   tabButton: { flex: 1 },
   tabButtonView: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   selected: { backgroundColor: 'rgba(255, 255, 255, 0.16)', borderRadius: 22 },

@@ -1,16 +1,16 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { CartIconButton } from '@/components/cart-icon-button';
 import { CmsSectionView } from '@/components/cms-section';
+import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
+import SearchIcon from '@/components/icons/SearchIcon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { CmsPage, getCmsPage } from '@/services/cms';
 import { TabBarContext } from '@/context/tab-bar-context';
-import { CartIconButton } from '@/components/cart-icon-button';
-import SearchIcon from '@/components/icons/SearchIcon';
-import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
+import { CmsPage, getCmsPage } from '@/services/cms';
+import { useRouter } from 'expo-router';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   const router = useRouter();
