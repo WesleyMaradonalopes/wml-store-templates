@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   tabButton: { flex: 1 },
   tabButtonView: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   selected: { backgroundColor: 'rgba(255, 255, 255, 0.16)', borderRadius: 22 },
-  label: { color: '#FFFFFF', fontSize: 9, lineHeight: 11, marginTop: 1 },
+  label: { color: '#FFFFFF', fontSize: 10, lineHeight: 11, marginTop: 1 },
   bagIcon: { width: 22, height: 22, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   hidden: { display: 'none' },
 });
