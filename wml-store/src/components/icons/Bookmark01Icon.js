@@ -1,0 +1,10 @@
+import React from 'react';
+import { SvgXml } from 'react-native-svg';
+
+const SVG = "<svg width=\"16\" height=\"17\" viewBox=\"0 0 16 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\r\n<path d=\"M2.66675 12.4871V6.97161C2.66675 4.54936 2.66675 3.33824 3.44779 2.58575C4.22885 1.83325 5.48592 1.83325 8.00008 1.83325C10.5142 1.83325 11.7713 1.83325 12.5523 2.58575C13.3334 3.33824 13.3334 4.54936 13.3334 6.97161V12.4871C13.3334 14.0244 13.3334 14.793 12.8182 15.0681C11.8204 15.6009 9.94888 13.8234 9.06008 13.2882C8.54461 12.9778 8.28688 12.8226 8.00008 12.8226C7.71328 12.8226 7.45555 12.9778 6.94008 13.2882C6.05128 13.8234 4.17973 15.6009 3.18198 15.0681C2.66675 14.793 2.66675 14.0244 2.66675 12.4871Z\" stroke=\"__ICON_COLOR__\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\r\n</svg>\r\n";
+
+/** Reusable component generated from bookmark-01.svg. viewBox 0 0 16 17 */
+export default function Bookmark01Icon({ color = '#313235', size = 24 }) {
+  const xml = SVG.replace(/__ICON_COLOR__/g, color);
+  return <SvgXml xml={xml} width={size * 0.9411764705882353} height={size} />;
+}
