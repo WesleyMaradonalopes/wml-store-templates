@@ -6,17 +6,63 @@ import { ActivityIndicator, Dimensions, FlatList, Linking, Pressable, ScrollView
 import { Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 import { CmsSection } from '@/services/cms';
+import { buildCmsActionRoute, readCmsAction, type CmsAction } from '@/services/cms-actions';
 import { isFavorite } from '@/services/favorites';
 
+import ArrowLeftIAIcon from './icons/ArrowLeftIAicon';
+import ArrowRightAIcon from './icons/ArrowRightAicon';
+import ChevronRightIcon from './icons/ChevronRightIcon';
 import { ProductCard } from './product-card';
 import { FilterGlyph, ProductFilterModal } from './product-filter-modal';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-type Props = { section: CmsSection };
+type Props = { section: CmsSection; categoryPageSlug?: string };
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
+}
+
+function slugPart(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function isGenericCategoryTitle(value: string) {
+  return /^(categorias|todas categorias|category|categories)$/i.test(value.trim());
+}
+
+function categoryTitleFromSlug(value: string) {
+  const slug = value.replace(/^categ-/i, '').replace(/[-_]+/g, ' ').trim();
+  if (!slug) return '';
+  return slug.split(' ').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function openCmsAction(router: ReturnType<typeof useRouter>, value: unknown, fallbackTitle?: string) {
+  const action = readCmsAction(value);
+  const effectiveAction: CmsAction = action.type && action.type !== 'none'
+    ? action
+    : fallbackTitle
+      ? { ...action, type: 'category', value: action.value || fallbackTitle }
+      : action;
+  const target = effectiveAction.value?.trim() ?? '';
+  if (!target || !effectiveAction.type || effectiveAction.type === 'none') return;
+
+  const route = buildCmsActionRoute(effectiveAction);
+  if (route) {
+    router.push(route as never);
+    return;
+  }
+
+  if (effectiveAction.type === 'link') {
+    if (/^https?:\/\//i.test(target)) Linking.openURL(target);
+    else router.push((target.startsWith('/') ? target : `/${target}`) as never);
+  }
 }
 
 function richTextBlocks(value: unknown): string[] {
@@ -269,7 +315,99 @@ function CouponsList({ data }: { data: Record<string, unknown> }) {
   return <ThemedView style={styles.section}><ThemedText type="subtitle">Cupons</ThemedText>{coupons.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ThemedView key={index} style={styles.couponCard}><ThemedText type="smallBold">{text(value.title) || 'Cupom'}</ThemedText><ThemedText themeColor="textSecondary">{text(value.description)}</ThemedText><ThemedText style={styles.couponCode}>{text(value.code)}</ThemedText>{!!text(value.expiresAt) && <ThemedText themeColor="textSecondary">Válido até {text(value.expiresAt)}</ThemedText>}</ThemedView>; })}</ThemedView>;
 }
 
-export function CmsSectionView({ section }: Props) {
+function CategoryRow({ category, router }: { category: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
+  const title = text(category.title) || 'Categoria';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => openCmsAction(router, category.action, title)}
+      style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}>
+      <ThemedText style={styles.categoryRowTitle}>{title}</ThemedText>
+      <ArrowRightAIcon color="#1e120d" size={20} />
+    </Pressable>
+  );
+}
+
+function CategoryGroup({
+  category,
+  router,
+  initiallyExpanded,
+  subcategoryHeading,
+  showBack,
+}: {
+  category: Record<string, unknown>;
+  router: ReturnType<typeof useRouter>;
+  initiallyExpanded: boolean;
+  subcategoryHeading?: string;
+  showBack?: boolean;
+}) {
+  const title = text(category.title) || 'Categoria';
+  const action = readCmsAction(category.action);
+  const subcategories = Array.isArray(category.subcategories)
+    ? category.subcategories.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    : [];
+  const [expanded, setExpanded] = useState(initiallyExpanded);
+
+  return (
+    <ThemedView style={styles.categoryGroup}>
+      <View style={styles.categoryGroupHeader}>
+        {showBack && (
+          <Pressable
+            accessibilityLabel="Voltar para categorias"
+            onPress={() => router.back()}
+            style={styles.categoryGroupBack}>
+            <ArrowLeftIAIcon color="#1e120d" size={20} />
+          </Pressable>
+        )}
+        <ThemedText style={styles.categoryGroupTitle}>{title}</ThemedText>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => openCmsAction(router, action, title)}
+          style={styles.seeAllButton}>
+          <ThemedText style={styles.seeAllButtonText}>Ver tudo</ThemedText>
+        </Pressable>
+      </View>
+      {subcategories.length > 0 && (
+        <View style={styles.subcategoryBlock}>
+          {!!subcategoryHeading && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              onPress={() => setExpanded((current) => !current)}
+              style={styles.subcategoryHeader}>
+              <ThemedText style={styles.subcategoryHeading}>{subcategoryHeading}</ThemedText>
+              <View style={[styles.subcategoryChevron, expanded && styles.subcategoryChevronExpanded]}>
+                <ChevronRightIcon color="#1e120d" size={18} />
+              </View>
+            </Pressable>
+          )}
+          {expanded && (
+            <View style={styles.subcategoryList}>
+              {subcategories.map((subcategory, index) => {
+                const subcategoryTitle = text(subcategory.title) || `Modelo ${index + 1}`;
+                const subcategoryAction = readCmsAction(subcategory.action);
+                const fallbackTarget = action.value
+                  ? `${action.value.replace(/\/$/, '')}/${slugPart(subcategoryTitle)}`
+                  : subcategoryTitle;
+                return (
+                  <Pressable
+                    key={`${subcategoryTitle}-${index}`}
+                    accessibilityRole="button"
+                    onPress={() => openCmsAction(router, subcategoryAction, fallbackTarget)}
+                    style={({ pressed }) => [styles.subcategoryRow, pressed && styles.pressed]}>
+                    <ThemedText style={styles.subcategoryText}>{subcategoryTitle}</ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
+    </ThemedView>
+  );
+}
+
+export function CmsSectionView({ section, categoryPageSlug }: Props) {
   const router = useRouter();
   const [heroIndex, setHeroIndex] = useState(0);
   const heroRef = useRef<ScrollView | null>(null);
@@ -311,16 +449,7 @@ export function CmsSectionView({ section }: Props) {
       const image = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
       const imageUrl = text(image.imageUrl);
       if (!imageUrl) return null;
-      const action = image.action && typeof image.action === 'object'
-        ? (image.action as { type?: string; value?: string })
-        : undefined;
-      const openBanner = () => {
-        if (!action?.value) return;
-        if (action.type === 'product') router.push(`/product/${action.value}`);
-        if (action.type === 'page') router.push(`/page/${action.value}`);
-        if (action.type === 'search') router.push(`/search?q=${encodeURIComponent(action.value)}` as never);
-        if (action.type === 'link') Linking.openURL(action.value);
-      };
+      const openBanner = () => openCmsAction(router, image.action);
       return (
         <Pressable key={`${imageUrl}-${index}`} onPress={openBanner} style={[styles.banner, isHero && styles.heroBanner]}>
           <Image source={{ uri: imageUrl }} style={[styles.bannerImage, isHero && styles.heroImage]} contentFit="cover" />
@@ -383,7 +512,6 @@ export function CmsSectionView({ section }: Props) {
   }
 
   if (section.name === 'CategoryListSwipe' || section.name === 'CategoryAccordeon' || section.name === 'CategoryTree') {
-    const router = useRouter();
     const content = Array.isArray(data.content) ? data.content : [];
     const shelves = Array.isArray(data.shelves) ? data.shelves : [];
     const categories = content.length > 0 ? content : shelves.flatMap((shelf) => {
@@ -391,36 +519,44 @@ export function CmsSectionView({ section }: Props) {
       const items = (shelf as Record<string, unknown>).content;
       return Array.isArray(items) ? items : [];
     });
+    const categoryItems = categories.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
+    const hasSubcategories = categoryItems.some((category) => Array.isArray(category.subcategories) && category.subcategories.length > 0);
+    const sectionTitle = text(data.title).trim();
+    const slugTitle = categoryPageSlug ? categoryTitleFromSlug(categoryPageSlug) : '';
+    const configuredParentTitle = text(data.parentTitle) || text(data.categoryTitle);
+    const parentTitle = configuredParentTitle || slugTitle || (section.name === 'CategoryListSwipe' ? sectionTitle : '');
+    const isDetailSection = Boolean(categoryItems.length > 0 && !hasSubcategories && section.name !== 'CategoryTree' && (
+      section.name === 'CategoryAccordeon' || sectionTitle && !isGenericCategoryTitle(sectionTitle)
+    ));
+    const detailAction = readCmsAction(data.action);
+    const detailTitle = parentTitle || sectionTitle || 'Categoria';
+    const detailCategory = isDetailSection
+      ? {
+          title: detailTitle,
+          action: detailAction.value
+            ? detailAction
+            : { type: 'category', value: text(data.categoryPath) || text(data.path) || `/${slugPart(detailTitle)}` },
+          subcategories: categoryItems,
+        }
+      : null;
+    const displayedCategories = detailCategory ? [detailCategory] : categoryItems;
+    const initiallyExpanded = data.isExpanded !== false;
+    const configuredSubcategoryHeading = section.name === 'CategoryAccordeon'
+      ? sectionTitle
+      : text(data.subcategoryTitle);
+    const sectionHeading = !isDetailSection && section.name === 'CategoryListSwipe'
+      ? sectionTitle || 'Todas categorias'
+      : !isDetailSection && section.name === 'CategoryTree'
+        ? sectionTitle
+        : '';
 
     return (
       <ThemedView style={styles.section}>
-        {!!text(data.title) && <ThemedText type="subtitle">{text(data.title)}</ThemedText>}
-        <View style={styles.categoryList}>
-          {categories.map((item, index) => {
-            const category = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
-            return (
-              <Pressable
-                key={`${text(category.title)}-${index}`}
-                onPress={() => {
-                  const action = category.action as { type?: string; value?: string } | undefined;
-                  if (action?.type === 'page' && action.value) router.push(`/page/${action.value}`);
-                  if (action?.type === 'product' && action.value) router.push(`/product/${action.value}`);
-                  if (action?.type === 'search' && action.value) router.push(`/search?q=${encodeURIComponent(action.value)}` as never);
-                  if (action?.type === 'link' && action.value) Linking.openURL(action.value);
-                }}>
-                <ThemedView style={styles.categoryCard}>
-                  {!!(text(category.imageUrl) || text(category.image)) && (
-                    <Image
-                      source={{ uri: text(category.imageUrl) || text(category.image) }}
-                      style={styles.categoryImage}
-                      contentFit="cover"
-                    />
-                  )}
-                  <ThemedText type="smallBold">{text(category.title) || 'Categoria'}</ThemedText>
-                </ThemedView>
-              </Pressable>
-            );
-          })}
+        {!!sectionHeading && <ThemedText type="subtitle">{sectionHeading}</ThemedText>}
+        <View style={[styles.categoryList, (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon') && styles.categoryGroupsList]}>
+          {displayedCategories.map((category, index) => (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon')
+            ? <CategoryGroup key={`${text(category.title)}-${index}`} category={category} router={router} initiallyExpanded={initiallyExpanded} subcategoryHeading={configuredSubcategoryHeading} showBack={Boolean(categoryPageSlug && isDetailSection)} />
+            : <CategoryRow key={`${text(category.title)}-${index}`} category={category} router={router} />)}
         </View>
       </ThemedView>
     );
@@ -459,9 +595,24 @@ const styles = StyleSheet.create({
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
-  categoryList: { gap: 8 },
-  categoryCard: { width: 150, padding: 8, gap: 8, borderRadius: 6, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOpacity: 0.12, shadowRadius: 5, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  categoryImage: { width: 134, height: 110, borderRadius: 10 },
+  categoryList: { gap: 0, overflow: 'hidden', borderRadius: 24, backgroundColor: '#FFFFFF' },
+  categoryGroupsList: { gap: 12, overflow: 'visible', backgroundColor: 'transparent' },
+  categoryRow: { minHeight: 72, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
+  categoryRowTitle: { fontSize: 22, lineHeight: 28, color: '#1e120d', fontWeight: '500' },
+  categoryGroup: { gap: 14, padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF' },
+  categoryGroupHeader: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  categoryGroupBack: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
+  categoryGroupTitle: { flex: 1, fontSize: 24, lineHeight: 30, color: '#1e120d' },
+  seeAllButton: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: '#6d6862', alignItems: 'center', justifyContent: 'center' },
+  seeAllButtonText: { fontSize: 13, lineHeight: 18, color: '#1e120d' },
+  subcategoryBlock: { borderTopWidth: 1, borderTopColor: '#eeeae5' },
+  subcategoryHeader: { minHeight: 52, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  subcategoryHeading: { fontSize: 16, lineHeight: 22, color: '#1e120d', fontWeight: '700' },
+  subcategoryChevron: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  subcategoryChevronExpanded: { transform: [{ rotate: '90deg' }] },
+  subcategoryList: { gap: 10 },
+  subcategoryRow: { minHeight: 46, paddingHorizontal: 12, justifyContent: 'center', borderLeftWidth: 2, borderLeftColor: '#e2ded8' },
+  subcategoryText: { fontSize: 16, lineHeight: 22, color: '#625d57' },
   banner: { overflow: 'hidden', borderRadius: 16, minHeight: 180 },
   bannerImage: { width: '100%', height: 180 },
   heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },

@@ -16,7 +16,6 @@ export default function CategoriesScreen() {
   const onScroll = useTabBarScroll();
   useEffect(() => { getCmsPage('categories', 'categorias').then(setCmsPage).catch(() => setError(true)).finally(() => setLoading(false)); }, []);
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader back={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-    <ThemedText type="subtitle">Categorias</ThemedText>
     {loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
     {error && <ThemedText themeColor="textSecondary">Nao foi possivel carregar as categorias.</ThemedText>}
     {!loading && !error && cmsPage?.sections.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>}

@@ -11,59 +11,86 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
-import { getProductFacets, searchProductListing, type CatalogFacet, type Product, type SelectedFacet } from '@/services/catalog';
+import { parseCmsRouteFacets } from '@/services/cms-actions';
+import { getProductFacets, resolveCategoryFacets, searchProductListing, type CatalogFacet, type Product, type SelectedFacet } from '@/services/catalog';
 import { isFavorite } from '@/services/favorites';
+
+function paramText(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? '' : value ?? '';
+}
 
 export default function SearchScreen() {
   const router = useRouter();
   const onScroll = useTabBarScroll();
-  const { q } = useLocalSearchParams<{ q?: string }>();
-  const initialQuery = typeof q === 'string' ? q.trim() : '';
+  const { q, facets: facetsParam, sort: sortParam, title: titleParam } = useLocalSearchParams<{ q?: string; facets?: string; sort?: string; title?: string }>();
+  const initialQuery = paramText(q).trim();
+  const initialFacets = parseCmsRouteFacets(paramText(facetsParam));
+  const initialSort = paramText(sortParam) || 'score:desc';
+  const initialTitle = paramText(titleParam);
   const [term, setTerm] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
   const [products, setProducts] = useState<Product[]>([]);
   const [facets, setFacets] = useState<CatalogFacet[]>([]);
   const [selectedFacets, setSelectedFacets] = useState<SelectedFacet[]>([]);
   const [resultCount, setResultCount] = useState(0);
-  const [loading, setLoading] = useState(Boolean(initialQuery));
+  const [loading, setLoading] = useState(Boolean(initialQuery || initialFacets.length));
   const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [sort, setSort] = useState('score:desc');
+  const [sort, setSort] = useState(initialSort);
+  const [listingTitle, setListingTitle] = useState(initialTitle);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const popularTerms = ['Sutiã', 'Naked', 'Calcinha Renda', 'Calcinhas Algodão', 'Pijama', 'Pantufa', 'Calcinha Microfibra', 'Top', 'Camisola', 'Algodão'];
   const facetSignature = JSON.stringify(selectedFacets);
 
   useEffect(() => {
-    if (typeof q !== 'string') return;
-    setTerm(q);
-    setActiveQuery(q.trim());
-    setSelectedFacets([]);
-    setSort('score:desc');
-  }, [q]);
+    const nextQuery = paramText(q).trim();
+    setTerm(nextQuery);
+    setActiveQuery(nextQuery);
+    setSelectedFacets(parseCmsRouteFacets(paramText(facetsParam)));
+    setSort(paramText(sortParam) || 'score:desc');
+    setListingTitle(paramText(titleParam));
+  }, [facetsParam, q, sortParam, titleParam]);
 
   useEffect(() => {
-    if (!activeQuery) {
+    if (!activeQuery && selectedFacets.length === 0) {
       setProducts([]);
       setFacets([]);
       setResultCount(0);
+      setLoading(false);
       return;
     }
     let active = true;
     setLoading(true);
     setMessage(null);
-    Promise.all([
-      searchProductListing({ query: activeQuery, facets: selectedFacets, count: 48, sort }),
-      getProductFacets({ query: activeQuery, facets: selectedFacets }),
-    ])
-      .then(async ([listing, availableFacets]) => {
-        if (!active) return;
-        setProducts(listing.products);
-        setResultCount(listing.recordsFiltered);
-        setFacets(availableFacets);
-        const saved = await Promise.all(listing.products.map(async (product) => (await isFavorite(product.id) ? product.id : null)));
-        if (active) setFavoriteIds(saved.filter((id): id is string => Boolean(id)));
-      })
+    async function loadListing() {
+      let requestFacets = selectedFacets;
+      let [listing, availableFacets] = await Promise.all([
+        searchProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort }),
+        getProductFacets({ query: activeQuery, facets: requestFacets }),
+      ]);
+
+      if (listing.recordsFiltered === 0 && listing.products.length === 0) {
+        const resolvedFacets = await resolveCategoryFacets(requestFacets);
+        if (JSON.stringify(resolvedFacets) !== JSON.stringify(requestFacets)) {
+          requestFacets = resolvedFacets;
+          [listing, availableFacets] = await Promise.all([
+            searchProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort }),
+            getProductFacets({ query: activeQuery, facets: requestFacets }),
+          ]);
+          if (active) setSelectedFacets(resolvedFacets);
+        }
+      }
+
+      if (!active) return;
+      setProducts(listing.products);
+      setResultCount(listing.recordsFiltered);
+      setFacets(availableFacets);
+      const saved = await Promise.all(listing.products.map(async (product) => (await isFavorite(product.id) ? product.id : null)));
+      if (active) setFavoriteIds(saved.filter((id): id is string => Boolean(id)));
+    }
+
+    loadListing()
       .catch(() => {
         if (!active) return;
         setMessage('Não foi possível consultar os produtos agora.');
@@ -79,6 +106,7 @@ export default function SearchScreen() {
     if (!value) return;
     setSelectedFacets([]);
     setSort('score:desc');
+    setListingTitle('');
     setActiveQuery(value);
   }
 
@@ -86,6 +114,7 @@ export default function SearchScreen() {
     setTerm(value);
     setSelectedFacets([]);
     setSort('score:desc');
+    setListingTitle('');
     setActiveQuery(value);
   }
 
@@ -121,7 +150,7 @@ export default function SearchScreen() {
         </View>
         <View style={styles.body}>
 
-        {!activeQuery && (
+        {!activeQuery && selectedFacets.length === 0 && (
           <ThemedView style={styles.trending}>
             <ThemedText type="smallBold">Em alta</ThemedText>
             <View style={styles.chips}>
@@ -130,10 +159,10 @@ export default function SearchScreen() {
           </ThemedView>
         )}
 
-        {!!activeQuery && (
+        {(!!activeQuery || selectedFacets.length > 0) && (
           <View style={styles.listingHeader}>
             <View style={styles.listingHeading}>
-              <ThemedText style={styles.listingTitle}>{activeQuery}</ThemedText>
+              <ThemedText style={styles.listingTitle}>{listingTitle || activeQuery || 'Produtos'}</ThemedText>
               <ThemedText themeColor="textSecondary" style={styles.resultCount}>{resultCount} {resultCount === 1 ? 'peça' : 'peças'}</ThemedText>
             </View>
             <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterText}>Filtrar e Ordenar</ThemedText></Pressable>
@@ -142,7 +171,7 @@ export default function SearchScreen() {
 
         {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
         {loading && <ActivityIndicator color="#000000" style={styles.loader} />}
-        {!loading && activeQuery && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
+        {!loading && (activeQuery || selectedFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
 
         <FlatList
           data={products}

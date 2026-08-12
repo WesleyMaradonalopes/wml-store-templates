@@ -117,6 +117,135 @@ export type SearchParams = {
   fq?: string[];
 };
 
+type CategoryTreeNode = {
+  name?: unknown;
+  url?: unknown;
+  children?: unknown;
+};
+
+let categoryPathsRequest: Promise<string[][]> | null = null;
+
+function categoryPathSegments(value: string) {
+  const withoutQuery = value.split('?')[0].replace(/^https?:\/\/[^/]+/i, '');
+  return withoutQuery
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    });
+}
+
+function normalizedCategorySegment(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function categoryDistance(left: string, right: string) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row += 1) {
+    const current = [row];
+    for (let column = 1; column <= right.length; column += 1) {
+      current[column] = Math.min(
+        current[column - 1] + 1,
+        previous[column] + 1,
+        previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1),
+      );
+    }
+    for (let column = 0; column <= right.length; column += 1) previous[column] = current[column];
+  }
+  return previous[right.length];
+}
+
+function collectCategoryPaths(payload: unknown) {
+  const paths: string[][] = [];
+
+  function visit(node: unknown, parentPath: string[]) {
+    if (!node || typeof node !== 'object') return;
+    const candidate = node as CategoryTreeNode;
+    const url = typeof candidate.url === 'string' ? candidate.url : '';
+    const name = typeof candidate.name === 'string' ? candidate.name : '';
+    const path = url ? categoryPathSegments(url) : name ? [...parentPath, name] : parentPath;
+    if (path.length > 0) paths.push(path);
+
+    if (Array.isArray(candidate.children)) {
+      candidate.children.forEach((child) => visit(child, path));
+    }
+  }
+
+  if (Array.isArray(payload)) payload.forEach((item) => visit(item, []));
+  return paths;
+}
+
+function loadCategoryPaths() {
+  if (!categoryPathsRequest) {
+    categoryPathsRequest = getJson<unknown>(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/category/tree/3`)
+      .then(collectCategoryPaths)
+      .catch((error) => {
+        categoryPathsRequest = null;
+        throw error;
+      });
+  }
+  return categoryPathsRequest;
+}
+
+function closestCategoryPath(values: string[], paths: string[][]) {
+  let best: { path: string[]; score: number } | null = null;
+
+  for (const path of paths) {
+    if (path.length !== values.length) continue;
+    let score = 0;
+    let valid = true;
+
+    for (let index = 0; index < values.length; index += 1) {
+      const input = normalizedCategorySegment(values[index]);
+      const candidate = normalizedCategorySegment(path[index]);
+      const distance = categoryDistance(input, candidate);
+      const allowedDistance = Math.max(1, Math.floor(Math.min(input.length, candidate.length) * 0.35));
+      if (distance > allowedDistance) {
+        valid = false;
+        break;
+      }
+      score += distance;
+    }
+
+    if (valid && (!best || score < best.score)) best = { path, score };
+  }
+
+  return best?.path ?? null;
+}
+
+/**
+ * Corrects a category slug only after an empty catalog response, using the
+ * category tree published by VTEX as the source of truth.
+ */
+export async function resolveCategoryFacets(facets: SelectedFacet[]) {
+  const categoryFacets = facets.filter((facet) => facet.key === 'c' || /^category-\d+$/i.test(facet.key));
+  if (categoryFacets.length === 0) return facets;
+
+  try {
+    const paths = await loadCategoryPaths();
+    const resolvedPath = closestCategoryPath(categoryFacets.map((facet) => facet.value), paths);
+    if (!resolvedPath) return facets;
+
+    let categoryIndex = 0;
+    return facets.map((facet) => {
+      if (facet.key !== 'c' && !/^category-\d+$/i.test(facet.key)) return facet;
+      const value = resolvedPath[categoryIndex] ?? facet.value;
+      categoryIndex += 1;
+      return { ...facet, value };
+    });
+  } catch {
+    return facets;
+  }
+}
+
 function facetPath(facets: SelectedFacet[]) {
   return facets
     .filter((facet) => facet.key && facet.value)

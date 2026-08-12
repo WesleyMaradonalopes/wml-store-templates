@@ -18,6 +18,7 @@ export default function CmsPageScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const onScroll = useTabBarScroll();
+  const isCategoryPage = typeof slug === 'string' && /^categ-/i.test(slug);
 
   useEffect(() => {
     if (!slug) return;
@@ -30,19 +31,19 @@ export default function CmsPageScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader />
+        <ScreenHeader back={!isCategoryPage} />
         <Pressable onPress={() => router.back()} style={styles.hiddenBack}>
           <ThemedText type="link">← Voltar</ThemedText>
         </Pressable>
         <ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-          <ThemedText type="subtitle">{page?.name ?? slug}</ThemedText>
+          {!isCategoryPage && <ThemedText type="subtitle">{page?.name ?? slug}</ThemedText>}
           {loading && <ActivityIndicator color="#000000" />}
           {error && <ThemedText themeColor="textSecondary">Não foi possível carregar esta página.</ThemedText>}
           {!loading && !error && page?.sections.length === 0 && (
             <ThemedText themeColor="textSecondary">Nenhuma seção publicada nesta página.</ThemedText>
           )}
           {page?.sections.map((section, index) => (
-            <CmsSectionView key={`${section.name}-${index}`} section={section} />
+            <CmsSectionView key={`${section.name}-${index}`} section={section} categoryPageSlug={isCategoryPage ? slug : undefined} />
           ))}
         </ScrollView>
       </SafeAreaView>
