@@ -17,10 +17,12 @@ import { ProductCard } from '@/components/product-card';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
 import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
+import { buildVariationGroups } from '@/utils/product-variations';
 
 function money(value: number | null) {
   return value === null ? '' : `R$ ${value.toFixed(2).replace('.', ',')}`;
@@ -47,15 +49,6 @@ function colorValue(name: string) {
   if (color.includes('cinza') || color.includes('mescla')) return '#999999';
   if (color.includes('laranja')) return '#D86F4E';
   return '#C9C1B7';
-}
-
-function buildVariationGroups(product: Product | null) {
-  return product?.variants.reduce<Record<string, string[]>>((groups, variant) => {
-    Object.entries(variant.variations).forEach(([name, value]) => {
-      groups[name] = groups[name] ? Array.from(new Set([...groups[name], value])) : [value];
-    });
-    return groups;
-  }, {}) ?? {};
 }
 
 function matchesSelection(variant: ProductVariant, selected: Record<string, string>, ignoredName?: string) {
@@ -185,7 +178,7 @@ export default function ProductScreen() {
   async function addProduct() {
     if (!product) return;
     if (variationNames.some((name) => !selectedOptions[name])) {
-      const hasSize = variationNames.some((name) => normalizeText(name).includes('tamanho'));
+      const hasSize = variationNames.some(isSizeVariationName);
       const selectionError = hasSize ? 'Por favor, selecione um tamanho.' : 'Por favor, selecione uma opção.';
       setSelectionMessage(selectionError);
       setCartMessage(null);
@@ -557,9 +550,9 @@ function ProductImageViewer({
 
 function lookSizeInfo(product: Product) {
   const variationNames = Array.from(new Set(product.variants.flatMap((variant) => Object.keys(variant.variations))));
-  const name = variationNames.find((key) => normalizeText(key).includes('tamanho') || normalizeText(key).includes('size'));
+  const name = variationNames.find(isSizeVariationName);
   if (!name) return { name: '', options: [] as Array<{ value: string; available: boolean }> };
-  const values = Array.from(new Set(product.variants.map((variant) => variant.variations[name]).filter(Boolean)));
+  const values = sortVariationValues(name, Array.from(new Set(product.variants.map((variant) => variant.variations[name]).filter(Boolean))));
   return {
     name,
     options: values.map((value) => ({ value, available: product.variants.some((variant) => variant.available && variant.variations[name] === value) })),

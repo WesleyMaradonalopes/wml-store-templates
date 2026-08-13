@@ -1,4 +1,5 @@
 import { storeConfig } from '@/config/store';
+import { compareSizes, isSizeVariationName } from '@/constants/sizes';
 
 import { getJson } from './http';
 
@@ -464,13 +465,17 @@ export async function getProductFacets({ query = '', facets = [], hideUnavailabl
         selected: Boolean(value.selected),
       }];
     });
+    const name = facet.name ?? key;
+    const orderedValues = isSizeVariationName(name) || isSizeVariationName(key)
+      ? values.sort((left, right) => compareSizes(left.name, right.name))
+      : values;
     return {
-      name: facet.name ?? key,
+      name,
       type: facet.type ?? 'TEXT',
       key,
       hidden: Boolean(facet.hidden),
-      quantity: facet.quantity ?? values.length,
-      values,
+      quantity: facet.quantity ?? orderedValues.length,
+      values: orderedValues,
     };
   }).filter((facet) => facet.key && facet.values.length > 0 && !facet.hidden);
 }

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm } from '@/services/cart';
 import { getProduct, type Product, type ProductVariant } from '@/services/catalog';
+import { buildVariationGroups } from '@/utils/product-variations';
 
 import { AddToCartFeedback } from './add-to-cart-feedback';
 import { ThemedText } from './themed-text';
@@ -31,15 +32,6 @@ type QuickViewButtonProps = {
 
 function money(value: number | null) {
   return value === null ? '' : `R$ ${value.toFixed(2).replace('.', ',')}`;
-}
-
-function buildVariationGroups(product: Product) {
-  return product.variants.reduce<Record<string, string[]>>((groups, variant) => {
-    Object.entries(variant.variations).forEach(([name, value]) => {
-      groups[name] = groups[name] ? Array.from(new Set([...groups[name], value])) : [value];
-    });
-    return groups;
-  }, {});
 }
 
 function matchesSelection(variant: ProductVariant, selected: Record<string, string>, ignoredName?: string) {
