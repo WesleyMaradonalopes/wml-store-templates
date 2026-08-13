@@ -1,5 +1,5 @@
 import { Product, getProduct } from './catalog';
-import { getAccountSession, getVtexUserToken } from './auth';
+import { getAccountSession, getCachedAccountSession, getCachedVtexUserToken, getVtexUserToken } from './auth';
 import { getStoredJson, setStoredJson } from './storage';
 import { storeConfig } from '@/config/store';
 
@@ -62,6 +62,21 @@ export async function getCachedFavorites(): Promise<Product[]> {
   return productsFromIds(await getCachedIds(session.email));
 }
 
+export async function canSaveFavorites() {
+  const [session, token] = await Promise.all([getAccountSession(), getVtexUserToken()]);
+  return Boolean(session?.email && token);
+}
+
+export type FavoriteAuthState = 'authenticated' | 'anonymous' | 'unknown';
+
+export function getKnownFavoriteAuthState(): FavoriteAuthState {
+  const session = getCachedAccountSession();
+  const token = getCachedVtexUserToken();
+  if (session === null || token === null) return 'anonymous';
+  if (session?.email && token) return 'authenticated';
+  return 'unknown';
+}
+
 export async function isFavorite(productId: string) {
   const session = await getAccountSession();
   const token = await getVtexUserToken();
@@ -71,7 +86,7 @@ export async function isFavorite(productId: string) {
   return (await getFavorites()).some((product) => product.id === productId);
 }
 
-export async function toggleFavorite(product: Product) {
+export async function toggleFavorite(product: Product, options: { hydrate?: boolean } = {}) {
   const session = await getAccountSession();
   const token = await getVtexUserToken();
   if (!session?.email || !token) throw new Error('Entre na sua conta para salvar favoritos.');
@@ -81,5 +96,8 @@ export async function toggleFavorite(product: Product) {
   const cachedIds = await getCachedIds(session.email);
   const ids = payload.wishlist ?? (payload.favorite ? [...cachedIds, product.id] : cachedIds.filter((id) => id !== product.id));
   await saveCachedIds(session.email, ids);
-  return { favorite: Boolean(payload.favorite), favorites: await productsFromIds(ids) };
+  return {
+    favorite: Boolean(payload.favorite),
+    favorites: options.hydrate === false ? [] : await productsFromIds(ids),
+  };
 }

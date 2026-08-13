@@ -7,16 +7,47 @@ export type AccountSession = { email: string; loggedAt: string };
 const SESSION_KEY = 'lojabl:account-session';
 const AUTH_TOKEN_KEY = 'lojabl_vtex_user_token';
 
+let accountSessionCache: AccountSession | null | undefined;
+let accountSessionRequest: Promise<AccountSession | null> | null = null;
+let vtexTokenCache: string | null | undefined;
+let vtexTokenRequest: Promise<string | null> | null = null;
+
 export function getAccountSession() {
-  return getStoredJson<AccountSession>(SESSION_KEY);
+  if (accountSessionCache !== undefined) return Promise.resolve(accountSessionCache);
+  if (!accountSessionRequest) {
+    accountSessionRequest = getStoredJson<AccountSession>(SESSION_KEY)
+      .then((session) => {
+        accountSessionCache = session;
+        return session;
+      })
+      .finally(() => { accountSessionRequest = null; });
+  }
+  return accountSessionRequest;
 }
 
 export function saveAccountSession(email: string) {
-  return setStoredJson<AccountSession>(SESSION_KEY, { email, loggedAt: new Date().toISOString() });
+  const session = { email, loggedAt: new Date().toISOString() };
+  accountSessionCache = session;
+  return setStoredJson<AccountSession>(SESSION_KEY, session);
 }
 
 export function clearAccountSession() {
+  accountSessionCache = null;
+  vtexTokenCache = null;
   return Promise.all([removeStoredValue(SESSION_KEY), SecureStore.deleteItemAsync(AUTH_TOKEN_KEY)]).then(() => undefined);
+}
+
+export function getCachedAccountSession() {
+  return accountSessionCache;
+}
+
+export function getCachedVtexUserToken() {
+  return vtexTokenCache;
+}
+
+async function saveVtexUserToken(token: string) {
+  vtexTokenCache = token;
+  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 }
 
 type StartAuthResponse = { authenticationToken?: string };
@@ -48,7 +79,7 @@ export async function validateVtexAccessKey(email: string, accessKey: string, au
   }).catch(() => null);
   if (backendResponse?.ok) {
     const data = await backendResponse.json() as ValidateAuthResponse;
-    if (data.authCookie?.Value) await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.authCookie.Value);
+    if (data.authCookie?.Value) await saveVtexUserToken(data.authCookie.Value);
     return data;
   }
   const form = new FormData();
@@ -58,7 +89,7 @@ export async function validateVtexAccessKey(email: string, accessKey: string, au
   if (!response.ok) throw new Error('Código de acesso inválido.');
   const data = await response.json() as ValidateAuthResponse;
   if (data.authStatus !== 'Success' || !data.authCookie?.Value) throw new Error('Não foi possível validar o código.');
-  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.authCookie.Value);
+  await saveVtexUserToken(data.authCookie.Value);
   return data;
 }
 
@@ -70,7 +101,7 @@ export async function loginVtexPassword(email: string, password: string) {
   }).catch(() => null);
   if (backendResponse?.ok) {
     const data = await backendResponse.json() as ValidateAuthResponse;
-    if (data.authCookie?.Value) await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.authCookie.Value);
+    if (data.authCookie?.Value) await saveVtexUserToken(data.authCookie.Value);
     return data;
   }
   const authenticationToken = await startVtexAuthentication();
@@ -87,10 +118,19 @@ export async function loginVtexPassword(email: string, password: string) {
   if (!response.ok || data.authStatus !== 'Success' || !data.authCookie?.Value) {
     throw new Error(data.message || data.error || 'E-mail ou senha inválidos.');
   }
-  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.authCookie.Value);
+  await saveVtexUserToken(data.authCookie.Value);
   return data;
 }
 
 export function getVtexUserToken() {
-  return SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  if (vtexTokenCache !== undefined) return Promise.resolve(vtexTokenCache);
+  if (!vtexTokenRequest) {
+    vtexTokenRequest = SecureStore.getItemAsync(AUTH_TOKEN_KEY)
+      .then((token) => {
+        vtexTokenCache = token;
+        return token;
+      })
+      .finally(() => { vtexTokenRequest = null; });
+  }
+  return vtexTokenRequest;
 }

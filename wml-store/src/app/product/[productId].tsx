@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { CartIconButton } from '@/components/cart-icon-button';
+import { LoginRequiredModal } from '@/components/login-required-modal';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
@@ -19,7 +20,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
 import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductVariant } from '@/services/catalog';
-import { isFavorite, toggleFavorite } from '@/services/favorites';
+import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 
 function money(value: number | null) {
   return value === null ? '' : `R$ ${value.toFixed(2).replace('.', ',')}`;
@@ -85,6 +86,7 @@ export default function ProductScreen() {
   const [cartMessage, setCartMessage] = useState<string | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [selectionMessage, setSelectionMessage] = useState('');
   const [quickViewVisible, setQuickViewVisible] = useState(false);
@@ -219,10 +221,24 @@ export default function ProductScreen() {
   async function changeFavorite() {
     if (!product || favoriteLoading) return;
     const previous = favorite;
-    setFavorite(!previous);
+    const authState = getKnownFavoriteAuthState();
+    if (authState === 'anonymous') {
+      setLoginModalVisible(true);
+      return;
+    }
+
+    const nextFavorite = !previous;
+    if (authState === 'authenticated') setFavorite(nextFavorite);
     setFavoriteLoading(true);
     try {
-      const result = await toggleFavorite(product);
+      if (authState !== 'authenticated') {
+        if (!(await canSaveFavorites())) {
+          setLoginModalVisible(true);
+          return;
+        }
+        setFavorite(nextFavorite);
+      }
+      const result = await toggleFavorite(product, { hydrate: false });
       setFavorite(result.favorite);
     } catch (favoriteError) {
       setFavorite(previous);
@@ -440,6 +456,14 @@ export default function ProductScreen() {
             setViewerIndex(index);
             setImageIndex(index);
             galleryListRef.current?.scrollToIndex({ index, animated: false });
+          }}
+        />
+        <LoginRequiredModal
+          visible={loginModalVisible}
+          onClose={() => setLoginModalVisible(false)}
+          onLogin={() => {
+            setLoginModalVisible(false);
+            router.push('/account?view=access' as never);
           }}
         />
         <AddToCartFeedback message={cartMessage} />

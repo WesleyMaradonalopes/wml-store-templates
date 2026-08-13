@@ -5,9 +5,10 @@ import { Alert, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-
 
 import { Spacing } from '@/constants/theme';
 import { type Product } from '@/services/catalog';
-import { isFavorite, toggleFavorite } from '@/services/favorites';
+import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 
 import HeartIcon from './icons/HeartIcon';
+import { LoginRequiredModal } from './login-required-modal';
 import { ProductQuickViewButton } from './product-quick-view';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -28,6 +29,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
   const router = useRouter();
   const [localFavorite, setLocalFavorite] = useState(Boolean(controlledFavorite));
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [loginModalVisible, setLoginModalVisible] = useState(false);
   const favorite = controlledFavorite ?? localFavorite;
 
   useEffect(() => {
@@ -40,18 +42,32 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
     return () => { active = false; };
   }, [controlledFavorite, product.id]);
 
-  function updateFavorite(value: boolean) {
+  function updateFavorite(value: boolean, notify = true) {
     setLocalFavorite(value);
-    onFavoriteChange?.(value);
+    if (notify) onFavoriteChange?.(value);
   }
 
   async function changeFavorite() {
     if (favoriteLoading) return;
     const previous = favorite;
-    updateFavorite(!previous);
+    const authState = getKnownFavoriteAuthState();
+    if (authState === 'anonymous') {
+      setLoginModalVisible(true);
+      return;
+    }
+
+    const nextFavorite = !previous;
+    if (authState === 'authenticated') updateFavorite(nextFavorite);
     setFavoriteLoading(true);
     try {
-      const result = await toggleFavorite(product);
+      if (authState !== 'authenticated') {
+        if (!(await canSaveFavorites())) {
+          setLoginModalVisible(true);
+          return;
+        }
+        updateFavorite(nextFavorite);
+      }
+      const result = await toggleFavorite(product, { hydrate: false });
       updateFavorite(result.favorite);
     } catch (error) {
       updateFavorite(previous);
@@ -92,6 +108,14 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
           {product.price !== null && <ThemedText type="smallBold" style={styles.price}>{money(product.price)}</ThemedText>}
         </View>
       </Pressable>
+      <LoginRequiredModal
+        visible={loginModalVisible}
+        onClose={() => setLoginModalVisible(false)}
+        onLogin={() => {
+          setLoginModalVisible(false);
+          router.push('/account?view=access' as never);
+        }}
+      />
     </ThemedView>
   );
 }

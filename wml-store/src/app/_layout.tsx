@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { Platform, useColorScheme } from 'react-native';
 import { TabBarContext } from '@/context/tab-bar-context';
+import { getAccountSession, getVtexUserToken } from '@/services/auth';
 import GlobalTabBar from '@/components/global-tab-bar';
 import { useEffect, useState } from 'react';
 
@@ -22,6 +23,10 @@ export default function TabLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) void SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    void Promise.all([getAccountSession(), getVtexUserToken()]);
+  }, []);
 
   if (!fontsLoaded && !fontError && Platform.OS !== 'web') return null;
 

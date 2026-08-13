@@ -54,8 +54,7 @@ export default function FavoritesScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader showSearch={false} />
-        <ThemedText type="subtitle">Favoritos</ThemedText>
+        <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} />
         {loadingFavorites && <ActivityIndicator color="#000000" />}
         <FlatList
           data={favorites}
@@ -66,6 +65,12 @@ export default function FavoritesScreen() {
           keyExtractor={(item) => item.id}
           columnWrapperStyle={styles.columns}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={(
+            <View style={styles.productsHeader}>
+              <ThemedText style={styles.productsCount}>({favorites.length})</ThemedText>
+              <ThemedText style={styles.productsTitle}>Produtos</ThemedText>
+            </View>
+          )}
           ListEmptyComponent={!loadingFavorites ? (
             <View style={styles.emptyState}>
               <ThemedText themeColor="textSecondary" style={styles.emptyMessage}>Você ainda não favoritou produtos.</ThemedText>
@@ -94,6 +99,9 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: Spacing.three, gap: Spacing.three },
+  productsHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  productsCount: { fontSize: 14, color: '#8f8f8f' },
+  productsTitle: { fontSize: 14 },
   list: { paddingBottom: 120, gap: Spacing.three },
   columns: { gap: Spacing.two },
   card: { width: '48.7%' },

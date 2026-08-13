@@ -12,6 +12,7 @@ const wishlistEntity = process.env.VTEX_WISHLIST_ENTITY || 'wishlist';
 const wishlistSchema = process.env.VTEX_WISHLIST_SCHEMA || 'wishlist';
 const wishlistEntities = [...new Set([wishlistEntity, 'wishlist', 'WL', 'wl', 'WI', 'wi'])];
 const customerVtexSessions = new Map();
+const wishlistIoStrategyByEmail = new Map();
 
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
 app.use(express.json({ limit: '1mb' }));
@@ -225,6 +226,7 @@ function wishlistSessionHeaders(email, token) {
 
 async function readVtexIoWishlist(email, token) {
   if (!token) return null;
+  if (wishlistIoStrategyByEmail.get(email) === 'master-data') return { wishlist: [], source: 'master-data' };
   const endpoints = [
     '/api/io/wishlist/private/list',
     '/api/io/wishlist/private/products',
@@ -234,17 +236,36 @@ async function readVtexIoWishlist(email, token) {
     '/api/io/wishlist/pub/products',
   ];
   const bases = [...new Set([vtexBaseUrl, 'https://www.lojabl.com.br'])];
-  for (const base of bases) for (const endpoint of endpoints) {
+  const candidates = bases.flatMap((base) => endpoints.map((endpoint) => ({ base, endpoint })));
+  const results = await Promise.all(candidates.map(async ({ base, endpoint }) => {
     const url = new URL(`${base}${endpoint}`);
     url.searchParams.set('_nc', String(Date.now()));
     url.searchParams.set('email', email);
     const result = await fetch(url, { headers: wishlistSessionHeaders(email, token), redirect: 'manual' }).catch(() => null);
-    console.log(`[WISHLIST] io ${new URL(base).host}${endpoint} -> HTTP ${result?.status || 0}`);
-    if (!result?.ok) continue;
+    const status = result?.status || 0;
+    const source = `${new URL(base).host}${endpoint}`;
+    console.log(`[WISHLIST] io ${source} -> HTTP ${status}`);
+    if (!result?.ok) return { status, source, wishlist: [] };
     const body = await result.json().catch(() => null);
     const ids = normalizeWishlistIds(body?.products ?? body?.items ?? body?.wishlist ?? body?.list ?? body);
-    console.log(`[WISHLIST] io ${new URL(base).host}${endpoint} -> items=${ids.length}`);
-    if (ids.length) return { wishlist: [...new Set(ids)], source: `${new URL(base).host}${endpoint}` };
+    console.log(`[WISHLIST] io ${source} -> items=${ids.length}`);
+    return { status, source, wishlist: [...new Set(ids)] };
+  }));
+
+  const withItems = results.find((result) => result.wishlist.length > 0);
+  if (withItems) {
+    wishlistIoStrategyByEmail.set(email, 'vtex-io');
+    return { wishlist: withItems.wishlist, source: withItems.source };
+  }
+
+  const accessible = results.find((result) => result.status >= 200 && result.status < 300);
+  if (accessible) {
+    wishlistIoStrategyByEmail.set(email, 'vtex-io');
+    return { wishlist: [], source: accessible.source };
+  }
+
+  if (results.length > 0 && results.every((result) => [0, 401, 403, 404].includes(result.status))) {
+    wishlistIoStrategyByEmail.set(email, 'master-data');
   }
   return null;
 }
@@ -313,15 +334,15 @@ async function getWishlistByEmail(email, token = '') {
   return { id: '', entity: ioWishlist?.wishlist?.length ? 'vtex-io' : wishlistEntity, wishlist: ioWishlist?.wishlist || [], source: ioWishlist?.source || 'master-data' };
 }
 
-async function saveWishlistByEmail(email, items, token = '') {
-  const current = await getWishlistByEmail(email, token);
-  const entity = current.entity || wishlistEntity;
-  const url = current.id
-    ? `${vtexBaseUrl}/api/dataentities/${entity}/documents/${encodeURIComponent(current.id)}`
+async function saveWishlistByEmail(email, items, token = '', current = null) {
+  const resolvedCurrent = current || await getWishlistByEmail(email, token);
+  const entity = resolvedCurrent.entity || wishlistEntity;
+  const url = resolvedCurrent.id
+    ? `${vtexBaseUrl}/api/dataentities/${entity}/documents/${encodeURIComponent(resolvedCurrent.id)}`
     : `${vtexBaseUrl}/api/dataentities/${entity}/documents`;
   const listItems = items.map((productId, index) => ({ Id: index, ProductId: String(productId) }));
   const payload = { email, wishlist: items, ListItemsWrapper: [{ ListItems: listItems, IsPublic: false, Name: 'Wishlist' }] };
-  const response = await fetch(url, { method: current.id ? 'PATCH' : 'POST', headers: { ...vtexHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const response = await fetch(url, { method: resolvedCurrent.id ? 'PATCH' : 'POST', headers: { ...vtexHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   if (!response.ok) throw new Error(`VTEX Wishlist (${entity}) retornou HTTP ${response.status} ao salvar.`);
   return { wishlist: items };
 }
@@ -467,8 +488,9 @@ app.post('/customer/wishlist/toggle', async (request, response) => {
     const current = await getWishlistByEmail(email, token);
     const favorite = !current.wishlist.includes(productId);
     const wishlist = favorite ? [...current.wishlist, productId] : current.wishlist.filter((id) => id !== productId);
-    const ioUpdated = await mutateVtexIoWishlist(productId, favorite ? 'add' : 'remove', token, email);
-    if (!ioUpdated) await saveWishlistByEmail(email, wishlist, token);
+    const usesVtexIo = String(current.source || '').includes('/api/io/');
+    const ioUpdated = usesVtexIo ? await mutateVtexIoWishlist(productId, favorite ? 'add' : 'remove', token, email) : false;
+    if (!ioUpdated) await saveWishlistByEmail(email, wishlist, token, current);
     const source = ioUpdated ? 'vtex-io' : 'master-data';
     console.log(`[WISHLIST] ${email} -> ${favorite ? 'added' : 'removed'} source=${source} count=${wishlist.length}`);
     return response.json({ ok: true, favorite, wishlist, source });
