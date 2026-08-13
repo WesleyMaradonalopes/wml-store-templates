@@ -15,6 +15,7 @@ import { clearAccountSession, getAccountSession, getGoogleEmailFromIdToken, getV
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
 
+import AppleLogoIcon from '@/components/icons/AppleLogoIcon';
 import EyeIcon from '@/components/icons/EyeIcon';
 import GoogleGIcon from '@/components/icons/GoogleGIcon';
 
@@ -165,6 +166,10 @@ export default function AccountScreen() {
     }
   }
 
+  function loginWithApple() {
+    setAuthMessage('O login com Apple será ativado após a configuração das credenciais da Apple.');
+  }
+
   if (view === 'home') {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader back={false} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
       {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={logout} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} /> : <GuestAccount onEnter={() => setView('access')} onRegister={() => setView('register')} />}
@@ -181,7 +186,7 @@ export default function AccountScreen() {
   };
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={view === 'register' ? 'Registrar' : 'Acesse sua conta'} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-    {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
+    {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
     {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} />}
     {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} onRegister={() => setView('register')} message={authMessage} />}
     {view === 'code' && <CodeView code={accessCode} setCode={setAccessCode} onValidate={validateAccessCode} onBack={() => setView('email')} message={authMessage} />}
@@ -199,7 +204,7 @@ function LoggedAccount({ email, notifications, setNotifications, onLogout, onPer
 
 function UtilityGrid({ onRegister }: { onRegister: () => void }) { return <View style={styles.tileGrid}>{['Cupons de desconto', 'Trocas e devoluções', 'Política de privacidade', 'Nossas lojas'].map((label) => <Pressable key={label} onPress={label === 'Nossas lojas' ? onRegister : undefined} style={styles.tile}><ThemedText>{label}</ThemedText><ThemedText>›</ThemedText></Pressable>)}</View>; }
 function Preference({ value = false, onChange }: { value?: boolean; onChange?: (value: boolean) => void }) { return <View style={styles.preference}><ThemedText>Notificações</ThemedText><Switch value={value} onValueChange={onChange} trackColor={{ false: '#dedbd5', true: '#1e120d' }} /></View>; }
-function AccessView({ onPassword, onEmail, onGoogle, googleLoading, message, onRegister }: { onPassword: () => void; onEmail: () => void; onGoogle: () => void; googleLoading: boolean; message: string | null; onRegister: () => void }) {
+function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, message, onRegister }: { onPassword: () => void; onEmail: () => void; onGoogle: () => void; onApple: () => void; googleLoading: boolean; message: string | null; onRegister: () => void }) {
   return (
     <ThemedView style={styles.card}>
       <ThemedText type="subtitle">Acesse sua conta</ThemedText>
@@ -212,9 +217,13 @@ function AccessView({ onPassword, onEmail, onGoogle, googleLoading, message, onR
       <Pressable onPress={onPassword} style={styles.outlineButton}>
         <ThemedText type="smallBold">Entrar com e-mail e senha</ThemedText>
       </Pressable>
-			<Pressable disabled={googleLoading} onPress={onGoogle} style={[styles.outlineButton, styles.googleButton, googleLoading && styles.disabled]}>
-        <GoogleGIcon size={20} />
+      <Pressable disabled={googleLoading} onPress={onGoogle} style={[styles.outlineButton, styles.googleButton, googleLoading && styles.disabled]}>
+        <GoogleGIcon size={18} />
         <ThemedText type="smallBold">{googleLoading ? 'Entrando...' : 'Entrar com Google'}</ThemedText>
+      </Pressable>
+      <Pressable onPress={onApple} style={[styles.outlineButton, styles.googleButton]}>
+        <AppleLogoIcon size={22} />
+        <ThemedText type="smallBold">Entrar com Apple</ThemedText>
       </Pressable>
       <View style={styles.divider} />
       <ThemedText style={styles.centerText}>Ainda não possui uma conta?</ThemedText>
