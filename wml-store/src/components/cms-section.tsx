@@ -85,7 +85,7 @@ function richTextBlocks(value: unknown): string[] {
 
 const PRODUCT_CARD_WIDTH = 220;
 
-function ProductShelf({ data }: { data: Record<string, unknown> }) {
+export function ProductShelf({ data }: { data: Record<string, unknown> }) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,9 +139,11 @@ function ProductShelf({ data }: { data: Record<string, unknown> }) {
     <ThemedView style={styles.section}>
       <View style={styles.sectionHeader}>
         <ThemedText type="subtitle">{text(data.title) || 'Produtos'}</ThemedText>
-        <Pressable onPress={() => router.push(`/search?q=${encodeURIComponent(text(activeConfig.term) || text(activeConfig.query))}` as never)}>
-          <ThemedText style={styles.seeAll}>Ver tudo</ThemedText>
-        </Pressable>
+        {data.showSeeAll !== false && (
+          <Pressable onPress={() => router.push(`/search?q=${encodeURIComponent(text(activeConfig.term) || text(activeConfig.query))}` as never)}>
+            <ThemedText style={styles.seeAll}>Ver tudo</ThemedText>
+          </Pressable>
+        )}
       </View>
       {tabs.length > 1 && (
         <FlatList

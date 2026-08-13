@@ -1,8 +1,10 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { Pressable, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ProductShelf } from '@/components/cms-section';
 import { ProductCard } from '@/components/product-card';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -12,7 +14,18 @@ import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { type Product } from '@/services/catalog';
 import { getCachedFavorites, getFavorites } from '@/services/favorites';
 
+const EMPTY_FAVORITES_SHELF: Record<string, unknown> = {
+  title: 'Você pode gostar',
+  showSeeAll: false,
+  sort: 'orders:desc',
+  facets: [
+    { key: 'category-1', value: 'calcinhas' },
+    { key: 'category-2', value: 'biquini' },
+  ],
+};
+
 export default function FavoritesScreen() {
+  const router = useRouter();
   const onScroll = useTabBarScroll();
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
@@ -44,7 +57,6 @@ export default function FavoritesScreen() {
         <ScreenHeader showSearch={false} />
         <ThemedText type="subtitle">Favoritos</ThemedText>
         {loadingFavorites && <ActivityIndicator color="#000000" />}
-        {!loadingFavorites && favorites.length === 0 && <ThemedText themeColor="textSecondary">Você ainda não salvou produtos.</ThemedText>}
         <FlatList
           data={favorites}
           numColumns={2}
@@ -54,6 +66,15 @@ export default function FavoritesScreen() {
           keyExtractor={(item) => item.id}
           columnWrapperStyle={styles.columns}
           contentContainerStyle={styles.list}
+          ListEmptyComponent={!loadingFavorites ? (
+            <View style={styles.emptyState}>
+              <ThemedText themeColor="textSecondary" style={styles.emptyMessage}>Você ainda não favoritou produtos.</ThemedText>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.homeButton}>
+                <ThemedText style={styles.homeButtonText}>Ir para Home</ThemedText>
+              </Pressable>
+              <ProductShelf data={EMPTY_FAVORITES_SHELF} />
+            </View>
+          ) : null}
           renderItem={({ item }) => (
             <ProductCard
               product={item}
@@ -76,4 +97,8 @@ const styles = StyleSheet.create({
   list: { paddingBottom: 120, gap: Spacing.three },
   columns: { gap: Spacing.two },
   card: { width: '48.7%' },
+  emptyState: { gap: Spacing.three, paddingVertical: Spacing.two },
+  emptyMessage: { fontSize: 14 },
+  homeButton: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  homeButtonText: { color: '#FFFFFF', fontWeight: '700' },
 });
