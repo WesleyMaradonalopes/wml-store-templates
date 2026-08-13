@@ -2,8 +2,8 @@ import { makeRedirectUri, ResponseType } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { type ReactNode, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -16,8 +16,18 @@ import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
 
 import AppleLogoIcon from '@/components/icons/AppleLogoIcon';
+import Box01Icon from '@/components/icons/Box01Icon';
+import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
+import HeartIcon from '@/components/icons/HeartIcon';
+import HomeNotificationsIcon from '@/components/icons/HomeNotificationsIcon';
+import HomeUtilityDiscountIcon from '@/components/icons/HomeUtilityDiscountIcon';
+import HomeUtilityPrivacyIcon from '@/components/icons/HomeUtilityPrivacyIcon';
+import HomeUtilityReturnsIcon from '@/components/icons/HomeUtilityReturnsIcon';
+import HomeUtilityStoresIcon from '@/components/icons/HomeUtilityStoresIcon';
 import EyeIcon from '@/components/icons/EyeIcon';
 import GoogleGIcon from '@/components/icons/GoogleGIcon';
+import LockIcon from '@/components/icons/LockIcon';
+import UserIcon from '@/components/icons/UserIcon';
 
 type AccountView = 'home' | 'access' | 'password' | 'email' | 'code' | 'register' | 'personal';
 type CustomerProfile = NonNullable<OrderForm['clientProfileData']> & { gender?: string; birthDate?: string; homePhone?: string };
@@ -41,6 +51,9 @@ export default function AccountScreen() {
   const [accessCode, setAccessCode] = useState('');
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [accessCodeLoading, setAccessCodeLoading] = useState(false);
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [profile, setProfile] = useState<CustomerProfile>({});
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const configuredGoogleClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
@@ -113,28 +126,40 @@ export default function AccountScreen() {
     }
   }
 
-  function logout() {
-    clearAccountSession().finally(() => { setLoggedIn(false); setPassword(''); setView('home'); });
+  async function logout() {
+    setLogoutLoading(true);
+    try {
+      await clearAccountSession();
+      setLoggedIn(false);
+      setPassword('');
+      setView('home');
+    } finally {
+      setLogoutLoading(false);
+    }
   }
 
   async function requestAccessCode() {
     try {
       setAuthMessage(null);
+      setAccessCodeLoading(true);
       const token = await startVtexAuthentication();
       await sendVtexAccessKey(email.trim(), token);
       setAuthToken(token);
       setView('code');
     } catch (error) { setAuthMessage(error instanceof Error ? error.message : 'Não foi possível enviar o código.'); }
+    finally { setAccessCodeLoading(false); }
   }
 
   async function validateAccessCode() {
     try {
       setAuthMessage(null);
+      setCodeLoading(true);
       await validateVtexAccessKey(email.trim(), accessCode.trim(), authToken);
       await saveAccountSession(email.trim());
       setLoggedIn(true);
       setView('home');
     } catch (error) { setAuthMessage(error instanceof Error ? error.message : 'Código inválido.'); }
+    finally { setCodeLoading(false); }
   }
 
   async function loginWithGoogle() {
@@ -172,7 +197,7 @@ export default function AccountScreen() {
 
   if (view === 'home') {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader back={false} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-      {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={logout} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} /> : <GuestAccount onEnter={() => setView('access')} onRegister={() => setView('register')} />}
+      {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} /> : <GuestAccount onEnter={() => setView('access')} onRegister={() => setView('register')} />}
     </ScrollView></SafeAreaView></ThemedView>;
   }
 
@@ -188,8 +213,8 @@ export default function AccountScreen() {
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={view === 'register' ? 'Registrar' : 'Acesse sua conta'} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
     {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
     {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} />}
-    {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} onRegister={() => setView('register')} message={authMessage} />}
-    {view === 'code' && <CodeView code={accessCode} setCode={setAccessCode} onValidate={validateAccessCode} onBack={() => setView('email')} message={authMessage} />}
+    {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} loading={accessCodeLoading} onRegister={() => setView('register')} message={authMessage} />}
+    {view === 'code' && <CodeView code={accessCode} setCode={setAccessCode} onValidate={validateAccessCode} loading={codeLoading} onBack={() => setView('email')} message={authMessage} />}
     {view === 'register' && <RegisterView email={email} setEmail={setEmail} accepted={accepted} setAccepted={setAccepted} onBack={() => setView('access')} />}
   </ScrollView></SafeAreaView></ThemedView>;
 }
@@ -198,12 +223,47 @@ function GuestAccount({ onEnter, onRegister }: { onEnter: () => void; onRegister
   return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} /><Preference /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by LojaBL</ThemedText></>;
 }
 
-function LoggedAccount({ email, notifications, setNotifications, onLogout, onPersonal, onOrders, onFavorites }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; onPersonal: () => void; onOrders: () => void; onFavorites: () => void }) {
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><Pressable onPress={onLogout} style={styles.logout}><ThemedText style={styles.logoutText}>Sair da conta</ThemedText></Pressable><View style={styles.tileGrid}>{[['Meus pedidos', onOrders], ['Dados pessoais', onPersonal], ['Favoritos', () => undefined], ['Trocas e devoluções', () => undefined], ['Redefinição de senha', () => undefined], ['Cupons de desconto', () => undefined], ['Nossas lojas', () => undefined], ['Política de privacidade', () => undefined]].map(([label, action]) => <Pressable key={String(label)} onPress={action as () => void} style={styles.tile}><ThemedText>{String(label)}</ThemedText><ThemedText>›</ThemedText></Pressable>)}</View><Preference value={notifications} onChange={setNotifications} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by LojaBL</ThemedText></>;
+type AccountTileData = { label: string; icon: ReactNode; onPress?: () => void };
+
+function AccountTile({ label, icon, onPress }: AccountTileData) {
+  return <Pressable onPress={onPress} style={[styles.tile, styles.accountTile]}>
+    <View style={styles.tileHeader}>
+      <View style={styles.tileIcon}>{icon}</View>
+      <ChevronRightIcon color="#231f20" size={14} />
+    </View>
+    <ThemedText numberOfLines={2} style={styles.tileLabel}>{label}</ThemedText>
+  </Pressable>;
 }
 
-function UtilityGrid({ onRegister }: { onRegister: () => void }) { return <View style={styles.tileGrid}>{['Cupons de desconto', 'Trocas e devoluções', 'Política de privacidade', 'Nossas lojas'].map((label) => <Pressable key={label} onPress={label === 'Nossas lojas' ? onRegister : undefined} style={styles.tile}><ThemedText>{label}</ThemedText><ThemedText>›</ThemedText></Pressable>)}</View>; }
-function Preference({ value = false, onChange }: { value?: boolean; onChange?: (value: boolean) => void }) { return <View style={styles.preference}><ThemedText>Notificações</ThemedText><Switch value={value} onValueChange={onChange} trackColor={{ false: '#dedbd5', true: '#1e120d' }} /></View>; }
+function LoggedAccount({ email, notifications, setNotifications, onLogout, onPersonal, onOrders, onFavorites }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; onPersonal: () => void; onOrders: () => void; onFavorites: () => void }) {
+  return <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={onLogout} logoutLoading={false} onPersonal={onPersonal} onOrders={onOrders} onFavorites={onFavorites} />;
+}
+
+function UtilityGrid({ onRegister }: { onRegister: () => void }) {
+  const tiles: AccountTileData[] = [
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#313235" size={18} /> },
+    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#313235" size={18} /> },
+    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#313235" size={18} /> },
+    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#313235" size={18} />, onPress: onRegister },
+  ];
+  return <View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View>;
+}
+function Preference({ value = true, onChange }: { value?: boolean; onChange?: (value: boolean) => void }) {
+  return <View style={styles.preference}>
+    <View style={styles.preferenceLabel}>
+      <HomeNotificationsIcon color="#313235" size={18} />
+      <ThemedText style={styles.preferenceText}>Notificações</ThemedText>
+    </View>
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      onPress={() => onChange?.(!value)}
+      style={[styles.notificationSwitch, value ? styles.notificationSwitchOn : styles.notificationSwitchOff]}
+    >
+      <View style={styles.notificationThumb} />
+    </Pressable>
+  </View>;
+}
 function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, message, onRegister }: { onPassword: () => void; onEmail: () => void; onGoogle: () => void; onApple: () => void; googleLoading: boolean; message: string | null; onRegister: () => void }) {
   return (
     <ThemedView style={styles.card}>
@@ -219,7 +279,7 @@ function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, mes
       </Pressable>
       <Pressable disabled={googleLoading} onPress={onGoogle} style={[styles.outlineButton, styles.googleButton, googleLoading && styles.disabled]}>
         <GoogleGIcon size={18} />
-        <ThemedText type="smallBold">{googleLoading ? 'Entrando...' : 'Entrar com Google'}</ThemedText>
+        {googleLoading ? <ActivityIndicator size="small" color="#231f20" /> : <ThemedText type="smallBold">Entrar com Google</ThemedText>}
       </Pressable>
       <Pressable onPress={onApple} style={[styles.outlineButton, styles.googleButton]}>
         <AppleLogoIcon size={22} />
@@ -260,17 +320,26 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
       </View>
       <ThemedText type="smallBold">Esqueceu a senha?</ThemedText>
       {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
-      <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}><ThemedText style={styles.primaryText}>{loading ? 'Entrando...' : 'Entrar'}</ThemedText></Pressable>
+      <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Entrar</ThemedText>}</Pressable>
       <Pressable onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable>
     </ThemedView>
   );
 }
-function EmailAccessView({ email, setEmail, onSend, onRegister, message }: { email: string; setEmail: (value: string) => void; onSend: () => void; onRegister: () => void; message: string | null }) { return <ThemedView style={styles.card}><ThemedText type="subtitle">Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Informe seu e-mail para acessar ou registrar seus dados com segurança</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" style={styles.input} /><Pressable onPress={onSend} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Insira seu e-mail</ThemedText></Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<ThemedText themeColor="textSecondary">Ao se cadastrar, você concorda com nossa Política de Privacidade.</ThemedText><Pressable onPress={onRegister}><ThemedText type="link">Criar uma conta</ThemedText></Pressable></ThemedView>; }
-function CodeView({ code, setCode, onValidate, onBack, message }: { code: string; setCode: (value: string) => void; onValidate: () => void; onBack: () => void; message: string | null }) { return <ThemedView style={styles.card}><ThemedText type="subtitle">Digite o código de acesso</ThemedText><ThemedText themeColor="textSecondary">Enviamos um código para o seu e-mail.</ThemedText><TextInput value={code} onChangeText={setCode} placeholder="Código de acesso" keyboardType="number-pad" style={styles.input} /><Pressable onPress={onValidate} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Confirmar código</ThemedText></Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<Pressable onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable></ThemedView>; }
+function EmailAccessView({ email, setEmail, onSend, loading, onRegister, message }: { email: string; setEmail: (value: string) => void; onSend: () => void; loading: boolean; onRegister: () => void; message: string | null }) { return <ThemedView style={styles.card}><ThemedText type="subtitle">Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Informe seu e-mail para acessar ou registrar seus dados com segurança</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" style={styles.input} /><Pressable disabled={loading} onPress={onSend} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Insira seu e-mail</ThemedText>}</Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<ThemedText themeColor="textSecondary">Ao se cadastrar, você concorda com nossa Política de Privacidade.</ThemedText><Pressable disabled={loading} onPress={onRegister}><ThemedText type="link">Criar uma conta</ThemedText></Pressable></ThemedView>; }
+function CodeView({ code, setCode, onValidate, loading, onBack, message }: { code: string; setCode: (value: string) => void; onValidate: () => void; loading: boolean; onBack: () => void; message: string | null }) { return <ThemedView style={styles.card}><ThemedText type="subtitle">Digite o código de acesso</ThemedText><ThemedText themeColor="textSecondary">Enviamos um código para o seu e-mail.</ThemedText><TextInput value={code} onChangeText={setCode} placeholder="Código de acesso" keyboardType="number-pad" style={styles.input} /><Pressable disabled={loading} onPress={onValidate} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Confirmar código</ThemedText>}</Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<Pressable disabled={loading} onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable></ThemedView>; }
 function RegisterView({ email, setEmail, accepted, setAccepted, onBack }: { email: string; setEmail: (value: string) => void; accepted: boolean; setAccepted: (value: boolean) => void; onBack: () => void }) { return <ThemedView style={styles.card}><ThemedText type="subtitle">Acessar com o seu e-mail</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" style={styles.input} /><Pressable onPress={() => setAccepted(!accepted)} style={styles.checkRow}><View style={[styles.checkbox, accepted && styles.checked]} /><ThemedText themeColor="textSecondary">Ao clicar em Registrar você concorda com os termos de serviço.</ThemedText></Pressable><Pressable disabled={!accepted} style={[styles.primaryButton, !accepted && styles.disabled]}><ThemedText style={styles.primaryText}>Enviar código</ThemedText></Pressable><Pressable onPress={onBack} style={styles.outlineButton}><ThemedText type="smallBold">Voltar</ThemedText></Pressable></ThemedView>; }
-function LoggedAccountV2({ email, notifications, setNotifications, onLogout, onPersonal, onOrders, onFavorites }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; onPersonal: () => void; onOrders: () => void; onFavorites: () => void }) {
-  const tiles: Array<[string, () => void]> = [['Meus pedidos', onOrders], ['Dados pessoais', onPersonal], ['Favoritos', onFavorites], ['Trocas e devoluções', () => undefined], ['Redefinição de senha', () => undefined], ['Cupons de desconto', () => undefined], ['Nossas lojas', () => undefined], ['Política de privacidade', () => undefined]];
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><Pressable onPress={onLogout} style={styles.logout}><ThemedText style={styles.logoutText}>Sair</ThemedText></Pressable><View style={styles.tileGrid}>{tiles.map(([label, action]) => <Pressable key={label} onPress={action} style={styles.tile}><ThemedText>{label}</ThemedText><ThemedText>›</ThemedText></Pressable>)}</View><Preference value={notifications} onChange={setNotifications} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by LojaBL</ThemedText></>;
+function LoggedAccountV2({ email, notifications, setNotifications, onLogout, logoutLoading, onPersonal, onOrders, onFavorites }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void }) {
+  const tiles: AccountTileData[] = [
+    { label: 'Meus pedidos', icon: <Box01Icon color="#313235" size={18} />, onPress: onOrders },
+    { label: 'Dados pessoais', icon: <UserIcon color="#313235" size={18} />, onPress: onPersonal },
+    { label: 'Favoritos', icon: <HeartIcon color="#313235" size={18} />, onPress: onFavorites },
+    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#313235" size={18} /> },
+    { label: 'Redefinição de senha', icon: <LockIcon color="#313235" size={18} /> },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#313235" size={18} /> },
+    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#313235" size={18} /> },
+    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#313235" size={18} /> },
+  ];
+  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}>{logoutLoading ? <ActivityIndicator size="small" color="#231f20" /> : <ThemedText style={styles.logoutText}>Sair</ThemedText>}</Pressable><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by LojaBL</ThemedText></>;
 }
 
 function PersonalData({ email, profile, profileMessage, onSaved, onBack }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void }) {
@@ -306,9 +375,15 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack }: { ema
   }
 
   const fields = [{ label: 'Nome', value: firstName, set: setFirstName }, { label: 'Sobrenome', value: lastName, set: setLastName }, { label: 'CPF', value: document, set: setDocument }, { label: 'Data de nascimento', value: birthDate, set: setBirthDate }, { label: 'Telefone com DDD', value: phone, set: setPhone }];
-  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Dados Pessoais" onBack={onBack} /><ScrollView contentContainerStyle={styles.content}><ThemedView style={styles.card}><ThemedText type="subtitle">Dados Pessoais</ThemedText><ThemedText themeColor="textSecondary">E-mail</ThemedText>{editing ? <TextInput value={email} editable={false} style={[styles.input, styles.readonly]} /> : <ThemedText>{email || 'Não informado'}</ThemedText>}{fields.map((field) => <View key={field.label}><ThemedText themeColor="textSecondary">{field.label}</ThemedText>{editing ? <TextInput value={field.value} onChangeText={field.set} style={styles.input} /> : <ThemedText>{field.value || 'Não informado'}</ThemedText>}</View>)}<ThemedText themeColor="textSecondary">Gênero (opcional)</ThemedText>{editing ? <><Pressable onPress={() => setGenderOpen(!genderOpen)} style={styles.select}><ThemedText>{gender || 'Selecione'}</ThemedText><ThemedText>⌄</ThemedText></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText>{option}</ThemedText></Pressable>)}</View>}</> : <ThemedText>{gender || 'Não informado'}</ThemedText>}{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}{editing ? <Pressable disabled={saving} onPress={save} style={[styles.primaryButton, saving && styles.disabled]}><ThemedText style={styles.primaryText}>{saving ? 'Salvando...' : 'Confirmar'}</ThemedText></Pressable> : <Pressable onPress={() => setEditing(true)}><ThemedText type="link">Editar dados pessoais</ThemedText></Pressable>}</ThemedView></ScrollView></SafeAreaView></ThemedView>;
+  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Dados Pessoais" onBack={onBack} /><ScrollView contentContainerStyle={styles.content}><ThemedView style={styles.card}><ThemedText type="subtitle">Dados Pessoais</ThemedText><ThemedText themeColor="textSecondary">E-mail</ThemedText>{editing ? <TextInput value={email} editable={false} style={[styles.input, styles.readonly]} /> : <ThemedText>{email || 'Não informado'}</ThemedText>}{fields.map((field) => <View key={field.label}><ThemedText themeColor="textSecondary">{field.label}</ThemedText>{editing ? <TextInput value={field.value} onChangeText={field.set} style={styles.input} /> : <ThemedText>{field.value || 'Não informado'}</ThemedText>}</View>)}<ThemedText themeColor="textSecondary">Gênero (opcional)</ThemedText>{editing ? <><Pressable onPress={() => setGenderOpen(!genderOpen)} style={styles.select}><ThemedText>{gender || 'Selecione'}</ThemedText><ThemedText>⌄</ThemedText></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText>{option}</ThemedText></Pressable>)}</View>}</> : <ThemedText>{gender || 'Não informado'}</ThemedText>}{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}{editing ? <Pressable disabled={saving} onPress={save} style={[styles.primaryButton, saving && styles.disabled]}>{saving ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Confirmar</ThemedText>}</Pressable> : <Pressable onPress={() => setEditing(true)}><ThemedText type="link">Editar dados pessoais</ThemedText></Pressable>}</ThemedView></ScrollView></SafeAreaView></ThemedView>;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingVertical: Spacing.five }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#1e120d' }, primaryText: { color: '#ffffff', fontWeight: '700' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#231f20', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#231f20', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#231f20', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4 }, checked: { backgroundColor: '#1e120d' }, disabled: { opacity: 0.5 },
+  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingVertical: Spacing.five }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#1e120d' }, primaryText: { color: '#ffffff', fontWeight: '700' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#231f20', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#231f20', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, notificationSwitch: { width: 30, height: 16, padding: 3, borderRadius: 14, justifyContent: 'center' }, notificationSwitchOn: { backgroundColor: '#231f20', alignItems: 'flex-end' }, notificationSwitchOff: { backgroundColor: '#dedbd5', alignItems: 'flex-start' }, notificationThumb: { width: 12, height: 12, borderRadius: 11, backgroundColor: '#ffffff', shadowColor: '#000000', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#231f20', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4 }, checked: { backgroundColor: '#1e120d' }, disabled: { opacity: 0.5 },
+  accountTile: { minHeight: 96, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'stretch' },
+  tileHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  tileIcon: { width: 20, height: 20, alignItems: 'flex-start', justifyContent: 'flex-start' },
+  tileLabel: { color: '#313235', fontSize: 13, lineHeight: 18 },
+  preferenceLabel: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  preferenceText: { color: '#313235', fontSize: 14 },
 });
