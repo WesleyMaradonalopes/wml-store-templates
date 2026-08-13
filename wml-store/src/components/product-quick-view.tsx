@@ -132,7 +132,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
             <View style={styles.header}>
               <ThemedText type="smallBold" numberOfLines={2} style={styles.title}>{details.name}</ThemedText>
               <Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.closeButton}>
-                <ThemedText style={styles.closeText}>×</ThemedText>
+                <ThemedText style={styles.closeText}>✕</ThemedText>
               </Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   header: { minHeight: 64, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#ece8e2' },
   title: { flex: 1, paddingRight: Spacing.three },
   closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 30, lineHeight: 30, color: '#615d58' },
+  closeText: { fontSize: 24, lineHeight: 28, color: '#000000', fontWeight: '400' },
   content: { gap: Spacing.three, padding: Spacing.four, paddingBottom: Spacing.five },
   gallery: { gap: 12, paddingRight: Spacing.four },
   image: { width: 160, height: 220, borderRadius: 8, backgroundColor: '#e8e8ea' },

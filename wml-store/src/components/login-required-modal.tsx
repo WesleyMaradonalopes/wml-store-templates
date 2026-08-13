@@ -23,7 +23,7 @@ export function LoginRequiredModal({ visible, onClose, onLogin }: LoginRequiredM
           <View style={styles.header}>
             <ThemedText type="subtitle" style={styles.title}>Favoritos</ThemedText>
             <Pressable accessibilityLabel="Fechar aviso de favoritos" onPress={onClose} style={styles.closeButton}>
-              <ThemedText style={styles.closeText}>×</ThemedText>
+              <ThemedText style={styles.closeText}>✕</ThemedText>
             </Pressable>
           </View>
           <ThemedText style={styles.message}>Entre na sua conta ou crie uma para favoritar seus itens preferidos</ThemedText>
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
   header: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { flex: 1 },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  closeText: { color: '#5d5955', fontSize: 28, lineHeight: 30, fontWeight: '300' },
+  closeText: { color: '#000000', fontSize: 24, lineHeight: 28, fontWeight: '400' },
   message: { color: '#393531', fontSize: 15, lineHeight: 23 },
   loginButton: { minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
   loginText: { color: '#FFFFFF', fontWeight: '700' },

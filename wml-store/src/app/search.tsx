@@ -145,7 +145,7 @@ export default function SearchScreen() {
             <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder="O que você procura?" returnKeyType="search" style={styles.searchInput} />
           </View>
           <Pressable accessibilityLabel="Fechar busca" onPress={() => router.back()} style={styles.closeButton}>
-            <ThemedText style={styles.closeText}>×</ThemedText>
+            <ThemedText style={styles.closeText}>✕</ThemedText>
           </Pressable>
         </View>
         <View style={styles.body}>
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   searchInputWrap: { flex: 1, minHeight: 42, borderRadius: 22, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, backgroundColor: '#f1f1f3' },
   searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#3c3936', fontFamily: Fonts.sans },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 32, lineHeight: 34, color: '#55514d' },
+  closeText: { fontSize: 24, lineHeight: 28, color: '#000000', fontWeight: '400' },
   body: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.three },
   trending: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, borderWidth: 1, borderColor: '#ebe7e1', backgroundColor: '#FFFFFF' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },

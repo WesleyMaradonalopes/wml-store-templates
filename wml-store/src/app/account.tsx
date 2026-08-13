@@ -1,4 +1,7 @@
+import { makeRedirectUri, ResponseType } from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,16 +11,21 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
-import { clearAccountSession, getAccountSession, loginVtexPassword, saveAccountSession, sendVtexAccessKey, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
+import { clearAccountSession, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
 
 import EyeIcon from '@/components/icons/EyeIcon';
+import GoogleGIcon from '@/components/icons/GoogleGIcon';
 
 type AccountView = 'home' | 'access' | 'password' | 'email' | 'code' | 'register' | 'personal';
 type CustomerProfile = NonNullable<OrderForm['clientProfileData']> & { gender?: string; birthDate?: string; homePhone?: string };
 
 const userEmail = 'wesley.lopes@hopelingerie.com.br';
+const googleClientIdPlaceholder = 'not-configured.apps.googleusercontent.com';
+const googleRedirectUri = makeRedirectUri({ scheme: 'lojabl', path: 'oauthredirect' });
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function AccountScreen() {
   const router = useRouter();
@@ -34,7 +42,33 @@ export default function AccountScreen() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [profile, setProfile] = useState<CustomerProfile>({});
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const configuredGoogleClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
+  const [googleClientId, setGoogleClientId] = useState(configuredGoogleClientId || googleClientIdPlaceholder);
+  const [googleConfigured, setGoogleConfigured] = useState(Boolean(configuredGoogleClientId));
+  const [googleConfigMessage, setGoogleConfigMessage] = useState<string | null>(null);
+  const [googleRequest, , promptGoogleAsync] = Google.useAuthRequest({
+    clientId: googleClientId,
+    webClientId: googleClientId,
+    responseType: ResponseType.IdToken,
+    redirectUri: googleRedirectUri,
+    scopes: ['openid', 'profile', 'email'],
+    selectAccount: true,
+  });
   const onScroll = useTabBarScroll();
+
+  useEffect(() => {
+    if (configuredGoogleClientId) return;
+    let active = true;
+    getVtexGoogleClientId().then((clientId) => {
+      if (!active) return;
+      setGoogleClientId(clientId);
+      setGoogleConfigured(true);
+    }).catch(() => {
+      if (!active) return;
+      setGoogleConfigMessage('Não foi possível carregar a configuração do Google da VTEX.');
+    });
+    return () => { active = false; };
+  }, [configuredGoogleClientId]);
 
   useEffect(() => {
     if (requestedView === 'access') setView('access');
@@ -102,6 +136,35 @@ export default function AccountScreen() {
     } catch (error) { setAuthMessage(error instanceof Error ? error.message : 'Código inválido.'); }
   }
 
+  async function loginWithGoogle() {
+    if (!googleConfigured || !googleRequest) {
+      setAuthMessage(googleConfigMessage || 'A configuração do login Google ainda não está pronta.');
+      return;
+    }
+    try {
+      setAuthMessage(null);
+      setLoginLoading(true);
+      const result = await promptGoogleAsync();
+      if (result.type !== 'success') {
+        if (result.type !== 'cancel' && result.type !== 'dismiss') setAuthMessage('Não foi possível abrir o login com Google.');
+        return;
+      }
+      const credential = result.params.id_token || result.authentication?.idToken || '';
+      if (!credential) throw new Error('O Google não retornou a credencial de acesso.');
+      const data = await loginVtexGoogle(credential);
+      const accountEmail = getGoogleEmailFromIdToken(credential) || (data.userId?.includes('@') ? data.userId.toLowerCase() : '');
+      if (!accountEmail) throw new Error('Não foi possível identificar o e-mail da conta Google.');
+      await saveAccountSession(accountEmail);
+      setEmail(accountEmail);
+      setLoggedIn(true);
+      setView('home');
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : 'Não foi possível entrar com Google.');
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
   if (view === 'home') {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader back={false} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
       {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={logout} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} /> : <GuestAccount onEnter={() => setView('access')} onRegister={() => setView('register')} />}
@@ -118,7 +181,7 @@ export default function AccountScreen() {
   };
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={view === 'register' ? 'Registrar' : 'Acesse sua conta'} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-    {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onRegister={() => setView('register')} />}
+    {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
     {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} />}
     {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} onRegister={() => setView('register')} message={authMessage} />}
     {view === 'code' && <CodeView code={accessCode} setCode={setAccessCode} onValidate={validateAccessCode} onBack={() => setView('email')} message={authMessage} />}
@@ -136,7 +199,31 @@ function LoggedAccount({ email, notifications, setNotifications, onLogout, onPer
 
 function UtilityGrid({ onRegister }: { onRegister: () => void }) { return <View style={styles.tileGrid}>{['Cupons de desconto', 'Trocas e devoluções', 'Política de privacidade', 'Nossas lojas'].map((label) => <Pressable key={label} onPress={label === 'Nossas lojas' ? onRegister : undefined} style={styles.tile}><ThemedText>{label}</ThemedText><ThemedText>›</ThemedText></Pressable>)}</View>; }
 function Preference({ value = false, onChange }: { value?: boolean; onChange?: (value: boolean) => void }) { return <View style={styles.preference}><ThemedText>Notificações</ThemedText><Switch value={value} onValueChange={onChange} trackColor={{ false: '#dedbd5', true: '#1e120d' }} /></View>; }
-function AccessView({ onPassword, onEmail, onRegister }: { onPassword: () => void; onEmail: () => void; onRegister: () => void }) { return <ThemedView style={styles.card}><ThemedText type="subtitle">Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Entre de forma rápida e segura usando uma das opções abaixo</ThemedText><View style={styles.divider} /><Pressable onPress={onEmail} style={styles.outlineButton}><ThemedText type="smallBold">Receber código de acesso por e-mail</ThemedText></Pressable><Pressable onPress={onPassword} style={styles.outlineButton}><ThemedText type="smallBold">Entrar com e-mail e senha</ThemedText></Pressable><View style={styles.divider} /><ThemedText style={styles.centerText}>Ainda não possui uma conta?</ThemedText><Pressable onPress={onRegister} style={styles.outlineButton}><ThemedText type="smallBold">Crie sua conta</ThemedText></Pressable></ThemedView>; }
+function AccessView({ onPassword, onEmail, onGoogle, googleLoading, message, onRegister }: { onPassword: () => void; onEmail: () => void; onGoogle: () => void; googleLoading: boolean; message: string | null; onRegister: () => void }) {
+  return (
+    <ThemedView style={styles.card}>
+      <ThemedText type="subtitle">Acesse sua conta</ThemedText>
+      <ThemedText themeColor="textSecondary">Entre de forma rápida e segura usando uma das opções abaixo</ThemedText>
+      <View style={styles.divider} />
+      <Pressable onPress={onEmail} style={styles.outlineButton}>
+        <ThemedText type="smallBold">Receber código de acesso por e-mail</ThemedText>
+      </Pressable>
+      {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
+      <Pressable onPress={onPassword} style={styles.outlineButton}>
+        <ThemedText type="smallBold">Entrar com e-mail e senha</ThemedText>
+      </Pressable>
+			<Pressable disabled={googleLoading} onPress={onGoogle} style={[styles.outlineButton, styles.googleButton, googleLoading && styles.disabled]}>
+        <GoogleGIcon size={20} />
+        <ThemedText type="smallBold">{googleLoading ? 'Entrando...' : 'Entrar com Google'}</ThemedText>
+      </Pressable>
+      <View style={styles.divider} />
+      <ThemedText style={styles.centerText}>Ainda não possui uma conta?</ThemedText>
+      <Pressable onPress={onRegister} style={styles.outlineButton}>
+        <ThemedText type="smallBold">Crie sua conta</ThemedText>
+      </Pressable>
+    </ThemedView>
+  );
+}
 function PasswordView({ email, setEmail, password, setPassword, onLogin, loading, message, onBack }: { email: string; setEmail: (value: string) => void; password: string; setPassword: (value: string) => void; onLogin: () => void; loading: boolean; message: string | null; onBack: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -214,5 +301,5 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack }: { ema
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingVertical: Spacing.five }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#1e120d' }, primaryText: { color: '#ffffff', fontWeight: '700' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#231f20', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#231f20', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#231f20', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4 }, checked: { backgroundColor: '#1e120d' }, disabled: { opacity: 0.5 },
+  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingVertical: Spacing.five }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#1e120d' }, primaryText: { color: '#ffffff', fontWeight: '700' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#231f20', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#231f20', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#231f20', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4 }, checked: { backgroundColor: '#1e120d' }, disabled: { opacity: 0.5 },
 });

@@ -542,7 +542,7 @@ function ProductImageViewer({
             <ThemedText style={styles.viewerText}>{currentIndex + 1}/{images.length}</ThemedText>
           </View>
           <Pressable accessibilityLabel="Fechar imagem" onPress={onClose} style={styles.viewerClose}>
-            <ThemedText style={styles.viewerCloseText}>×</ThemedText>
+            <ThemedText style={styles.viewerCloseText}>✕</ThemedText>
           </Pressable>
         </View>
         {images.length > 1 && (
@@ -708,7 +708,7 @@ function ColorOptionsModal({ products, visible, selectedProductId, onClose, onSe
           <View style={styles.colorModalHeader}>
             <ThemedText type="subtitle">Ver cores ({products.length})</ThemedText>
             <Pressable accessibilityLabel="Fechar cores" onPress={onClose} style={styles.colorModalClose}>
-              <ThemedText style={styles.colorModalCloseText}>×</ThemedText>
+              <ThemedText style={styles.colorModalCloseText}>✕</ThemedText>
             </Pressable>
           </View>
           <FlatList
@@ -769,7 +769,7 @@ const styles = StyleSheet.create({
   viewerCounter: { minWidth: 48, height: 36, paddingHorizontal: Spacing.three, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
   viewerClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
   viewerText: { color: '#FFFFFF', fontSize: 14, lineHeight: 18, fontWeight: '600' },
-  viewerCloseText: { color: '#FFFFFF', fontSize: 28, lineHeight: 30, fontWeight: '300' },
+  viewerCloseText: { color: '#000000', fontSize: 24, lineHeight: 28, fontWeight: '400' },
   viewerDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 5 },
   viewerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fff' },
   viewerDotActive: { width: 20, backgroundColor: '#fff' },
@@ -846,7 +846,7 @@ const styles = StyleSheet.create({
   colorModalSafeArea: { flex: 1 },
   colorModalHeader: { minHeight: 64, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e8e3dc' },
   colorModalClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  colorModalCloseText: { fontSize: 32, lineHeight: 34, color: '#4f4a45' },
+  colorModalCloseText: { fontSize: 24, lineHeight: 28, color: '#000000', fontWeight: '400' },
   colorModalList: { padding: Spacing.three, paddingBottom: Spacing.five },
   colorModalRow: { gap: Spacing.two },
   colorModalItem: { width: '31.5%', minWidth: 0, marginBottom: Spacing.three, padding: 3, borderRadius: 10, borderWidth: 1, borderColor: 'transparent', backgroundColor: '#FFFFFF' },

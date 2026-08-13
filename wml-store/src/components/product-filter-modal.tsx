@@ -7,6 +7,7 @@ import { type CatalogFacet, type SelectedFacet, searchProductListing } from '@/s
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+import ChevronRightIcon from './icons/ChevronRightIcon';
 
 type Props = {
   visible: boolean;
@@ -88,7 +89,7 @@ export function ProductFilterModal({ visible, query, facets, baseFacets = [], se
           <View style={styles.header}>
             <ThemedText style={styles.headerTitle}>Filtros</ThemedText>
             <Pressable accessibilityLabel="Fechar filtros" onPress={onClose} style={styles.closeButton}>
-              <ThemedText style={styles.closeText}>×</ThemedText>
+              <ThemedText style={styles.closeText}>✕</ThemedText>
             </Pressable>
           </View>
 
@@ -113,7 +114,9 @@ export function ProductFilterModal({ visible, query, facets, baseFacets = [], se
                 <View key={facet.key} style={styles.facetSection}>
                   <Pressable accessibilityState={{ expanded: open }} onPress={() => setOpenFacets((current) => ({ ...current, [facet.key]: !open }))} style={styles.facetHeader}>
                     <ThemedText type="smallBold">{facet.name}</ThemedText>
-                    <ThemedText style={styles.chevron}>{open ? '⌃' : '⌄'}</ThemedText>
+                    <View style={[styles.chevron, open && styles.chevronOpen]}>
+                      <ChevronRightIcon color="#77716b" size={16} />
+                    </View>
                   </Pressable>
                   {open && (
                     <View style={styles.facetValues}>
@@ -156,7 +159,7 @@ const styles = StyleSheet.create({
   header: { minHeight: 58, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
   headerTitle: { fontSize: 18 },
   closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 30, lineHeight: 32, color: '#4f4b47' },
+  closeText: { fontSize: 24, lineHeight: 28, color: '#000000', fontWeight: '400' },
   content: { padding: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.four },
   sortSection: { gap: Spacing.two },
   sortGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
@@ -166,7 +169,8 @@ const styles = StyleSheet.create({
   selectedSortText: { color: '#FFFFFF' },
   facetSection: { gap: Spacing.two },
   facetHeader: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  chevron: { fontSize: 18, color: '#77716b' },
+  chevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
+  chevronOpen: { transform: [{ rotate: '-90deg' }] },
   facetValues: { gap: Spacing.two },
   facetValue: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   lockedValue: { opacity: 0.7 },

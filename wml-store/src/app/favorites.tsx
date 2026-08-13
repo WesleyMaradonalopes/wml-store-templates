@@ -65,12 +65,12 @@ export default function FavoritesScreen() {
           keyExtractor={(item) => item.id}
           columnWrapperStyle={styles.columns}
           contentContainerStyle={styles.list}
-          ListHeaderComponent={(
+          ListHeaderComponent={favorites.length > 0 ? (
             <View style={styles.productsHeader}>
               <ThemedText style={styles.productsCount}>({favorites.length})</ThemedText>
               <ThemedText style={styles.productsTitle}>Produtos</ThemedText>
             </View>
-          )}
+          ) : null}
           ListEmptyComponent={!loadingFavorites ? (
             <View style={styles.emptyState}>
               <ThemedText themeColor="textSecondary" style={styles.emptyMessage}>Você ainda não favoritou produtos.</ThemedText>

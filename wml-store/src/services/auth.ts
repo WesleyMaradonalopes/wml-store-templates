@@ -52,9 +52,73 @@ async function saveVtexUserToken(token: string) {
 
 type StartAuthResponse = { authenticationToken?: string };
 type ValidateAuthResponse = { authStatus?: string; authCookie?: { Value?: string }; userId?: string };
+type GoogleClientIdResponse = { enabled?: boolean; clientId?: string };
+export type VtexGoogleLoginResponse = {
+  authStatus?: string;
+  authCookie?: unknown;
+  accountAuthCookie?: unknown;
+  userId?: string;
+};
 
 function authUrl(path: string) {
   return `${storeConfig.vtexBaseUrl}/api/vtexid/pub/authentication/${path}`;
+}
+
+export async function getVtexGoogleClientId() {
+  const response = await fetch(`${storeConfig.vtexBaseUrl}/api/vtexid/google/onetap/id`, {
+    headers: { Accept: 'application/json' },
+  });
+  const data = await response.json().catch(() => ({})) as GoogleClientIdResponse;
+  if (!response.ok || data.enabled === false || !data.clientId) {
+    throw new Error('O login com Google não está configurado na VTEX.');
+  }
+  return data.clientId;
+}
+
+function extractAuthToken(value: unknown) {
+  if (typeof value === 'string') return value.trim();
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  return String(record.Value ?? record.value ?? record.token ?? '').trim();
+}
+
+export async function loginVtexGoogle(credential: string) {
+  const form = new URLSearchParams();
+  form.append('account', storeConfig.account);
+  form.append('credential', credential);
+  const response = await fetch(`${storeConfig.vtexBaseUrl}/api/vtexid/google/onetap/signin`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form,
+  });
+  const data = await response.json().catch(() => ({})) as VtexGoogleLoginResponse;
+  const token = extractAuthToken(data.authCookie) || extractAuthToken(data.accountAuthCookie);
+  if (!response.ok || data.authStatus !== 'Success' || !token) {
+    const messages: Record<string, string> = {
+      InvalidToken: 'O Google não retornou uma credencial válida.',
+      CanceledByUser: 'O login com Google foi cancelado.',
+      InativeUser: 'Esta conta Google não está ativa na loja.',
+    };
+    throw new Error(messages[data.authStatus || ''] || 'Não foi possível concluir o login com Google.');
+  }
+  await saveVtexUserToken(token);
+  return data;
+}
+
+export function getGoogleEmailFromIdToken(idToken: string) {
+  try {
+    const encodedPayload = idToken.split('.')[1];
+    if (!encodedPayload) return '';
+    const base64 = encodedPayload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(encodedPayload.length / 4) * 4, '=');
+    const atobFn = (globalThis as typeof globalThis & { atob?: (value: string) => string }).atob;
+    if (!atobFn) return '';
+    const binary = atobFn(base64);
+    const json = decodeURIComponent(Array.from(binary).map((character) => `%${character.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''));
+    const email = String((JSON.parse(json) as { email?: string }).email || '').trim().toLowerCase();
+    return email.includes('@') ? email : '';
+  } catch {
+    return '';
+  }
 }
 
 export async function startVtexAuthentication() {
