@@ -297,7 +297,6 @@ export async function selectPaymentMethod({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         payments: [{ paymentSystem, referenceValue: Math.round(value * 100), value: Math.round(value * 100), installments: 1 }],
-        giftCards: [],
       }),
     },
   );
@@ -453,6 +452,18 @@ export async function updateCartItem({
 export async function addCouponToCart(orderFormId: string, coupon: string): Promise<OrderForm> {
   const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${orderFormId}/coupons`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: coupon }) });
   if (!response.ok) throw new Error('Não foi possível aplicar o cupom.');
+  const orderForm = await response.json() as VtexOrderForm;
+  await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
+  return normalizeOrderForm(orderForm);
+}
+
+export async function addGiftCardToCart(orderFormId: string, redemptionCode: string): Promise<OrderForm> {
+  const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${orderFormId}/giftcards`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ giftCards: [{ redemptionCode, inUse: true }] }),
+  });
+  if (!response.ok) throw new Error('Não foi possível adicionar o vale-presente.');
   const orderForm = await response.json() as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   return normalizeOrderForm(orderForm);

@@ -1,16 +1,20 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
+import CreditCardIcon from '@/components/icons/CreditCardIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
+import TruckIcon from '@/components/icons/TruckIcon';
+import UserIcon from '@/components/icons/UserIcon';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, getOrderForm, OrderForm, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem } from '@/services/cart';
+import { addCouponToCart, addGiftCardToCart, getOrderForm, OrderForm, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 
 type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'review';
@@ -19,8 +23,47 @@ type ShippingOption = NonNullable<OrderForm['shippingData']>['logisticsInfo'][nu
 
 function digits(value: string) { return value.replace(/\D/g, ''); }
 function validEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); }
-function isShippingStep(step: Step): boolean { return step === 'shipping'; }
-function shippingOptionKey(sla: ShippingOption) { return sla.id || sla.name || `${sla.shippingEstimate}-${sla.deliveryChannel || 'delivery'}`; }
+function validPhone(value: string) { return [10, 11].includes(digits(value).length); }
+function validCpf(value: string) { return digits(value).length === 11; }
+function money(value: number) { return 'R$ ' + value.toFixed(2).replace('.', ','); }
+function formatPhone(value: string) {
+  const valueDigits = digits(value).slice(0, 11);
+  if (valueDigits.length <= 2) return valueDigits;
+  if (valueDigits.length <= 7) return valueDigits.slice(0, 2) + ' ' + valueDigits.slice(2);
+  return valueDigits.slice(0, 2) + ' ' + valueDigits.slice(2, 7) + '-' + valueDigits.slice(7);
+}
+function formatCpf(value: string) {
+  const valueDigits = digits(value).slice(0, 11);
+  if (valueDigits.length <= 3) return valueDigits;
+  if (valueDigits.length <= 6) return valueDigits.slice(0, 3) + '.' + valueDigits.slice(3);
+  if (valueDigits.length <= 9) return valueDigits.slice(0, 3) + '.' + valueDigits.slice(3, 6) + '.' + valueDigits.slice(6);
+  return valueDigits.slice(0, 3) + '.' + valueDigits.slice(3, 6) + '.' + valueDigits.slice(6, 9) + '-' + valueDigits.slice(9);
+}
+function formatPostalCode(value: string) {
+  const valueDigits = digits(value).slice(0, 8);
+  return valueDigits.length > 5 ? valueDigits.slice(0, 5) + '-' + valueDigits.slice(5) : valueDigits;
+}
+function formatCardNumber(value: string) {
+  const valueDigits = digits(value).slice(0, 16);
+  return valueDigits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+}
+function formatExpiry(value: string) {
+  const valueDigits = digits(value).slice(0, 4);
+  return valueDigits.length > 2 ? valueDigits.slice(0, 2) + '/' + valueDigits.slice(2) : valueDigits;
+}
+function isShippingStep(step: Step) { return step === 'shipping'; }
+function shippingOptionKey(sla: ShippingOption) { return sla.id || sla.name || sla.shippingEstimate + '-' + (sla.deliveryChannel || 'delivery'); }
+function isCardPayment(method: { name: string; group: string }) {
+  const text = (method.name + ' ' + method.group).toLowerCase();
+  return text.includes('cart') || text.includes('credit') || text.includes('card');
+}
+function isPixPayment(method: { name: string; group: string }) {
+  return (method.name + ' ' + method.group).toLowerCase().includes('pix');
+}
+function deliveryEstimate(estimate: string) {
+  const match = estimate.match(/\d+/);
+  return match ? 'Receba em até ' + match[0] + ' dias úteis' : 'Prazo de entrega a confirmar';
+}
 
 function getShippingOptions(orderForm: OrderForm): ShippingOption[] {
   const options = new Map<string, ShippingOption>();
@@ -74,8 +117,20 @@ export default function CheckoutScreen() {
   const [state, setState] = useState('');
   const [selectedSla, setSelectedSla] = useState<string | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
+  const [selectedPaymentLabel, setSelectedPaymentLabel] = useState('');
+  const [cardPaymentSystem, setCardPaymentSystem] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardValidationAttempted, setCardValidationAttempted] = useState(false);
+  const [emailValidationAttempted, setEmailValidationAttempted] = useState(false);
+  const [customerValidationAttempted, setCustomerValidationAttempted] = useState(false);
+  const [addressValidationAttempted, setAddressValidationAttempted] = useState(false);
   const [coupon, setCoupon] = useState('');
   const [voucher, setVoucher] = useState('');
+  const [voucherOpen, setVoucherOpen] = useState(false);
+  const [voucherApplied, setVoucherApplied] = useState(false);
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<CartItem | null>(null);
   const [customerExists, setCustomerExists] = useState(false);
@@ -87,14 +142,12 @@ export default function CheckoutScreen() {
   const [addressSelectionOpen, setAddressSelectionOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const genders = ['Feminino', 'Masculino', 'Prefiro não informar', 'Outro'];
-
   const customerDataRequests = useRef(new Map<string, Promise<CustomerCheckoutData>>()).current;
 
   function loadCustomerData(customerEmail: string) {
     const key = customerEmail.trim().toLowerCase();
     const existing = customerDataRequests.get(key);
     if (existing) return existing;
-
     const request = Promise.all([
       getCustomerProfileFromMasterData(key).catch(() => null),
       getCustomerAddressesFromMasterData(key).catch(() => []),
@@ -109,16 +162,12 @@ export default function CheckoutScreen() {
       if (!active) return;
       setOrderForm(value);
       const loggedEmail = session?.email?.trim().toLowerCase() ?? '';
-
-      // Nunca reaproveita os dados pessoais que outro e-mail anexou ao mesmo
-      // carrinho. A sessão atual é a fonte de verdade para o checkout.
       setEmail(loggedEmail);
       setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setGender('');
       setCustomerExists(false); setEditingCustomer(false);
       setCustomerAddresses([]); setAddressSaved(false); setEditingAddress(false);
       setLoading(false);
       if (!loggedEmail) return;
-
       const { profile: customer, addresses } = await loadCustomerData(loggedEmail);
       if (!active) return;
       setEmail(loggedEmail);
@@ -139,16 +188,94 @@ export default function CheckoutScreen() {
     if (target) setStep(target); else router.back();
   }
 
-  async function saveCustomer() {
-    if (!orderForm || !validEmail(email) || !firstName.trim() || !lastName.trim()) return setMessage('Informe e-mail, nome e sobrenome.');
-    setSaving(true); setMessage('');
-    try { setOrderForm(await updateClientProfile({ orderFormId: orderForm.orderFormId, email, firstName, lastName, document: digits(document), phone: digits(phone), gender: gender || undefined })); setStep('address'); }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.'); } finally { setSaving(false); }
+  function applyProfile(profile: CustomerProfile, fallbackEmail = '') {
+    setEmail(fallbackEmail || profile.email || '');
+    setFirstName(profile.firstName || '');
+    setLastName(profile.lastName || '');
+    setDocument(formatCpf(profile.document || ''));
+    setPhone(formatPhone(profile.phone || profile.homePhone || ''));
+    setGender(profile.gender || '');
+  }
+
+  function applyAddress(address: CustomerAddress | NonNullable<NonNullable<OrderForm['shippingData']>['selectedAddresses']>[number]) {
+    const id = String(('id' in address ? address.id : '') || (address.postalCode || '') + '-' + (address.street || '') + '-' + (address.number || ''));
+    setSelectedAddressId(id);
+    setAddressSaved(true);
+    setEditingAddress(false);
+    setReceiverName(address.receiverName ?? '');
+    setPostalCode(formatPostalCode(address.postalCode ?? ''));
+    setStreet(address.street ?? '');
+    setNumber(address.number ?? '');
+    setComplement(address.complement ?? '');
+    setNeighborhood(address.neighborhood ?? '');
+    setCity(address.city ?? '');
+    setState(address.state ?? '');
+  }
+
+  function getCustomerErrors() {
+    return {
+      email: validEmail(email) ? '' : 'E-mail inválido',
+      firstName: firstName.trim() ? '' : 'Nome inválido',
+      lastName: lastName.trim() ? '' : 'Sobrenome inválido',
+      phone: validPhone(phone) ? '' : 'Telefone inválido',
+      document: validCpf(document) ? '' : 'CPF inválido',
+    };
+  }
+
+  function getAddressErrors() {
+    return {
+      postalCode: digits(postalCode).length === 8 ? '' : 'CEP inválido',
+      street: street.trim() ? '' : 'Endereço inválido',
+      number: number.trim() ? '' : 'Número inválido',
+      neighborhood: neighborhood.trim() ? '' : 'Bairro inválido',
+      city: city.trim() ? '' : 'Cidade inválida',
+      state: state.trim() ? '' : 'Estado inválido',
+      receiverName: receiverName.trim() ? '' : 'Nome inválido',
+    };
+  }
+
+  async function persistCustomer() {
+    if (!orderForm) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      setOrderForm(await updateClientProfile({
+        orderFormId: orderForm.orderFormId,
+        email: email.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        document: digits(document),
+        phone: digits(phone),
+        gender: gender || undefined,
+      }));
+      setStep('address');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function continueCustomer() {
+    setCustomerValidationAttempted(true);
+    if (Object.values(getCustomerErrors()).some(Boolean)) {
+      setEditingCustomer(true);
+      return;
+    }
+    void persistCustomer();
+  }
+
+  function saveCustomer() {
+    setCustomerValidationAttempted(true);
+    if (Object.values(getCustomerErrors()).some(Boolean)) return;
+    void persistCustomer();
   }
 
   async function continueWithEmail() {
-    if (!validEmail(email)) return setMessage('Informe um e-mail válido.');
-    setSaving(true); setMessage('');
+    setEmailValidationAttempted(true);
+    if (!validEmail(email)) return;
+    setSaving(true);
+    setMessage('');
     try {
       const { profile, addresses } = await loadCustomerData(email);
       if (profile) {
@@ -157,20 +284,15 @@ export default function CheckoutScreen() {
         const preferred = addresses.find((item) => item.postalCode && item.street);
         if (preferred) applyAddress(preferred);
         setStep('customer');
-      } else { setCustomerExists(false); setEditingCustomer(true); setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setGender(''); setCustomerAddresses([]); setAddressSaved(false); setStep('customer'); }
+      } else {
+        setCustomerExists(false); setEditingCustomer(true); setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setGender('');
+        setCustomerAddresses([]); setAddressSaved(false); setCustomerValidationAttempted(false); setStep('customer');
+      }
     } catch {
-      setCustomerExists(false); setEditingCustomer(true); setStep('customer');
-    } finally { setSaving(false); }
-  }
-
-  function applyProfile(profile: CustomerProfile, fallbackEmail = '') {
-    setEmail(fallbackEmail || profile.email || ''); setFirstName(profile.firstName || ''); setLastName(profile.lastName || ''); setDocument(profile.document || ''); setPhone(profile.phone || profile.homePhone || ''); setGender(profile.gender || '');
-  }
-
-  function applyAddress(address: CustomerAddress | NonNullable<NonNullable<OrderForm['shippingData']>['selectedAddresses']>[number]) {
-    const id = String(('id' in address ? address.id : '') || `${address.postalCode || ''}-${address.street || ''}-${address.number || ''}`);
-    setSelectedAddressId(id); setAddressSaved(true); setEditingAddress(false);
-    setReceiverName(address.receiverName ?? ''); setPostalCode(address.postalCode ?? ''); setStreet(address.street ?? ''); setNumber(address.number ?? ''); setComplement(address.complement ?? ''); setNeighborhood(address.neighborhood ?? ''); setCity(address.city ?? ''); setState(address.state ?? '');
+      setCustomerExists(false); setEditingCustomer(true); setCustomerValidationAttempted(false); setStep('customer');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function openAddressSelection() {
@@ -190,7 +312,9 @@ export default function CheckoutScreen() {
       setAddressSelectionOpen(false); setAddressSaved(true); setEditingAddress(false); setStep('shipping');
     } catch {
       setMessage('Não foi possível calcular a entrega.');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
   function chooseShippingLocally(slaId: string) {
@@ -208,46 +332,109 @@ export default function CheckoutScreen() {
       setStep('payment');
     } catch {
       setMessage('Não foi possível selecionar esta entrega.');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function lookupCep(value: string) {
-    const cep = digits(value); setPostalCode(value);
+    const cep = digits(value);
+    setPostalCode(formatPostalCode(value));
     if (cep.length !== 8) return;
-    const result = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then((response) => response.ok ? response.json() : null).catch(() => null);
-    if (result && !result.erro) { setStreet(result.logradouro ?? ''); setNeighborhood(result.bairro ?? ''); setCity(result.localidade ?? ''); setState(result.uf ?? ''); }
+    const result = await fetch('https://viacep.com.br/ws/' + cep + '/json/').then((response) => response.ok ? response.json() : null).catch(() => null);
+    if (result && !result.erro) {
+      setStreet(result.logradouro ?? '');
+      setNeighborhood(result.bairro ?? '');
+      setCity(result.localidade ?? '');
+      setState(result.uf ?? '');
+    }
   }
 
   async function saveAddress() {
-    if (!orderForm || !receiverName || !postalCode || !street || !number || !neighborhood || !city || !state) return setMessage('Preencha o endereço completo.');
+    setAddressValidationAttempted(true);
+    if (!orderForm || Object.values(getAddressErrors()).some(Boolean)) return setMessage('Preencha o endereço completo.');
     setSaving(true); setMessage('');
-    try { setOrderForm(await updateShippingAddress({ orderFormId: orderForm.orderFormId, address: { receiverName, postalCode: digits(postalCode), street, number, complement, neighborhood, city, state } })); setAddressSaved(true); setEditingAddress(false); setStep('shipping'); }
-    catch { setMessage('Não foi possível calcular a entrega.'); } finally { setSaving(false); }
+    try {
+      setOrderForm(await updateShippingAddress({ orderFormId: orderForm.orderFormId, address: { receiverName, postalCode: digits(postalCode), street, number, complement, neighborhood, city, state } }));
+      setAddressSaved(true); setEditingAddress(false); setStep('shipping');
+    } catch {
+      setMessage('Não foi possível calcular a entrega.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function chooseShipping(slaId: string) {
-    if (!orderForm) return;
-    setSelectedSla(slaId); setSaving(true);
-    try { setOrderForm(await selectShippingOption({ orderFormId: orderForm.orderFormId, address: { receiverName, postalCode: digits(postalCode), street, number, complement, neighborhood, city, state }, logisticsInfo: orderForm.shippingData?.logisticsInfo ?? [], slaId })); setStep('payment'); }
-    catch { setMessage('Não foi possível selecionar esta entrega.'); } finally { setSaving(false); }
+  function openCardPayment(method: { id: string; name: string }) {
+    setCardPaymentSystem(method.id);
+    setSelectedPayment(method.id);
+    setSelectedPaymentLabel(method.name || 'Cartão de crédito');
+    setCardValidationAttempted(false);
+    setStep('card');
   }
 
-  async function choosePayment(paymentSystem: string) {
+  function getCardErrors() {
+    return {
+      number: digits(cardNumber).length === 16 ? '' : 'Número do cartão inválido',
+      holder: cardHolder.trim() ? '' : 'Nome inválido',
+      expiry: /^\d{2}\/\d{2}$/.test(cardExpiry) ? '' : 'Validade inválida',
+      cvv: /^\d{3,4}$/.test(digits(cardCvv)) ? '' : 'CVV inválido',
+    };
+  }
+
+  async function choosePayment(paymentSystem: string, label: string) {
     if (!orderForm) return;
-    setSelectedPayment(paymentSystem); setSaving(true);
-    try { setOrderForm(await selectPaymentMethod({ orderFormId: orderForm.orderFormId, paymentSystem, value: orderForm.value })); setStep('review'); }
-    catch { setMessage('Não foi possível selecionar esta forma de pagamento.'); } finally { setSaving(false); }
+    setSelectedPayment(paymentSystem);
+    setSelectedPaymentLabel(label);
+    setSaving(true);
+    setMessage('');
+    try {
+      setOrderForm(await selectPaymentMethod({ orderFormId: orderForm.orderFormId, paymentSystem, value: orderForm.value }));
+      setStep('review');
+    } catch {
+      setMessage('Não foi possível selecionar esta forma de pagamento.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function continueWithCard() {
+    setCardValidationAttempted(true);
+    if (Object.values(getCardErrors()).some(Boolean)) return;
+    void choosePayment(cardPaymentSystem || '1', 'Cartão de crédito');
   }
 
   async function applyCoupon() {
     if (!orderForm || !coupon.trim()) return;
-    setSaving(true); try { setOrderForm(await addCouponToCart(orderForm.orderFormId, coupon.trim())); setMessage('Cupom aplicado.'); } catch { setMessage('Cupom inválido.'); } finally { setSaving(false); }
+    setSaving(true);
+    try {
+      setOrderForm(await addCouponToCart(orderForm.orderFormId, coupon.trim()));
+      setMessage('Cupom aplicado.');
+    } catch {
+      setMessage('Cupom inválido.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function applyVoucher() {
+    if (!orderForm || !voucher.trim()) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      setOrderForm(await addGiftCardToCart(orderForm.orderFormId, voucher.trim()));
+      setVoucherApplied(true);
+      setMessage('Vale-presente adicionado.');
+    } catch {
+      setVoucherApplied(false);
+      setMessage('Não foi possível adicionar o vale-presente.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function changeItemQuantity(index: number, itemId: string, quantity: number) {
     if (!orderForm || updatingItem) return;
-    const currentItem = orderForm.items.find((item) => item.index === index && item.id === itemId)
-      ?? orderForm.items.find((item) => item.id === itemId);
+    const currentItem = orderForm.items.find((item) => item.index === index && item.id === itemId) ?? orderForm.items.find((item) => item.id === itemId);
     if (!currentItem) return;
     const previousOrderForm = orderForm;
     const nextQuantity = Math.max(0, quantity);
@@ -255,7 +442,6 @@ export default function CheckoutScreen() {
       .map((item) => item.index === currentItem.index && item.id === currentItem.id ? { ...item, quantity: nextQuantity } : item)
       .filter((item) => item.quantity > 0);
     const optimisticValue = Math.max(0, orderForm.value + ((nextQuantity - currentItem.quantity) * currentItem.price));
-
     setUpdatingItem(itemId); setMessage('');
     setOrderForm({ ...orderForm, items: optimisticItems, value: optimisticValue });
     try {
@@ -263,7 +449,9 @@ export default function CheckoutScreen() {
     } catch (error) {
       setOrderForm(previousOrderForm);
       setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar o produto.');
-    } finally { setUpdatingItem(null); }
+    } finally {
+      setUpdatingItem(null);
+    }
   }
 
   function confirmItemRemoval() {
@@ -275,58 +463,74 @@ export default function CheckoutScreen() {
 
   if (loading) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ActivityIndicator color="#000000" /></SafeAreaView></ThemedView>;
   if (!orderForm) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ThemedText>{message || 'Carrinho vazio.'}</ThemedText></SafeAreaView></ThemedView>;
-
   if (orderForm.items.length === 0) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Carrinho" onBack={() => router.replace('/')} showSearch={false} showCart /><View style={styles.emptyState}><ThemedText type="subtitle">Seu carrinho está vazio</ThemedText><ThemedText themeColor="textSecondary">Encontre produtos para continuar sua compra.</ThemedText><Primary title="Encontrar produtos" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
 
   const slas = getShippingOptions(orderForm);
+  const selectedShippingId = getShippingSelectionId(orderForm, slas, selectedSla);
+  const selectedShipping = slas.find((sla) => (sla.id || sla.name) === selectedShippingId);
+
   if (step === 'address' && addressSelectionOpen && customerAddresses.length > 1) {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={() => setAddressSelectionOpen(false)} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
-      <ThemedText type="smallBold">Selecione um endereço para entrega</ThemedText>
+      <ThemedText style={styles.pageTitle}>Selecione um endereço para entrega</ThemedText>
       <View style={styles.addressList}>{customerAddresses.map((address) => {
-        const addressId = String(address.id || `${address.postalCode || ''}-${address.street || ''}-${address.number || ''}`);
+        const addressId = String(address.id || (address.postalCode || '') + '-' + (address.street || '') + '-' + (address.number || ''));
         const selected = selectedAddressId === addressId;
-        return <Pressable key={addressId} onPress={() => { applyAddress(address); setAddressSelectionOpen(false); }} style={[styles.addressOption, selected && styles.addressOptionSelected]}><Radio selected={selected} /><View style={styles.addressDetails}><ThemedText type="smallBold">{address.addressName || `${address.street}, ${address.number}`}</ThemedText><ThemedText>{address.street}, {address.number}{address.complement ? ` - ${address.complement}` : ''}</ThemedText><ThemedText themeColor="textSecondary">{address.neighborhood} - {address.city}/{address.state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {address.postalCode}</ThemedText></View></Pressable>;
+        return <Pressable key={addressId} onPress={() => { applyAddress(address); setAddressSelectionOpen(false); }} style={[styles.addressOption, selected && styles.addressOptionSelected]}><Radio selected={selected} /><View style={styles.addressDetails}><ThemedText style={styles.dataLabel}>{address.addressName || (address.street + ', ' + address.number)}</ThemedText><ThemedText>{address.street + ', ' + address.number + (address.complement ? ' - ' + address.complement : '')}</ThemedText><ThemedText themeColor="textSecondary">{address.neighborhood + ' - ' + address.city + '/' + address.state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {address.postalCode}</ThemedText></View></Pressable>;
       })}</View>
     </ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithSavedAddress} /><Secondary title="Alterar endereço de entrega" onPress={() => { setAddressSelectionOpen(false); setEditingAddress(true); }} /></View></SafeAreaView></ThemedView>;
   }
 
   if (isShippingStep(step)) {
-    const selectedShippingId = getShippingSelectionId(orderForm, slas, selectedSla);
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
-      <ThemedText type="smallBold">Como deseja receber seu produto?</ThemedText>
-      <ThemedView style={styles.shippingCard}><View style={styles.shippingAddressRow}><ThemedText style={styles.pinIcon}>⌖</ThemedText><ThemedText style={styles.shippingAddressText}>Envio para {street}{number ? `, ${number}` : ''}</ThemedText></View>{slas.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma forma de entrega disponível.</ThemedText>}{slas.map((sla) => { const optionId = sla.id || sla.name; const selected = selectedShippingId === optionId; return <Pressable key={shippingOptionKey(sla)} onPress={() => chooseShippingLocally(optionId)} disabled={saving} style={[styles.shippingOption, selected && styles.shippingOptionSelected]}><Radio selected={selected} /><View style={styles.shippingOptionDetails}><ThemedText type="smallBold">{sla.name}{sla.price === 0 ? ' - Grátis' : ''}</ThemedText><ThemedText themeColor="textSecondary">{sla.price === 0 ? 'Grátis' : `R$ ${sla.price.toFixed(2)}`} · {sla.shippingEstimate}</ThemedText></View></Pressable>; })}</ThemedView>
+      <ThemedText style={styles.pageTitle}>Como deseja receber seu produto?</ThemedText>
+      <ThemedView style={styles.shippingCard}><View style={styles.shippingAddressRow}><ThemedText style={styles.pinIcon}>⌖</ThemedText><ThemedText style={styles.shippingAddressText}>Envio para {street}{number ? ', ' + number : ''}</ThemedText></View>{slas.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma forma de entrega disponível.</ThemedText>}{slas.map((sla) => { const optionId = sla.id || sla.name; const selected = selectedShippingId === optionId; return <Pressable key={shippingOptionKey(sla)} onPress={() => chooseShippingLocally(optionId)} disabled={saving} style={[styles.shippingOption, selected && styles.shippingOptionSelected]}><Radio selected={selected} /><View style={styles.shippingOptionDetails}><ThemedText style={styles.dataLabel}>{sla.name}{sla.price === 0 ? ' - Grátis' : ''}</ThemedText><ThemedText themeColor="textSecondary">{sla.price === 0 ? 'Grátis' : money(sla.price)} · {sla.shippingEstimate}</ThemedText></View></Pressable>; })}</ThemedView>
     </ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithShipping} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
   }
 
   if (step === 'address' && addressSaved && !editingAddress) {
-    return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}><ThemedText type="smallBold">Endereço de entrega</ThemedText><ThemedView style={[styles.shippingCard, styles.selectedAddressCard]}><View style={styles.shippingAddressRow}><Radio selected /><View style={styles.addressDetails}><ThemedText type="smallBold">Enviar para {street}, {number}</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{neighborhood} - {city}/{state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {postalCode}</ThemedText></View></View><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></ThemedView></ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithSavedAddress} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
+    return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}><ThemedText style={styles.pageTitle}>Endereço de entrega</ThemedText><ThemedView style={[styles.shippingCard, styles.selectedAddressCard]}><View style={styles.shippingAddressRow}><Radio selected /><View style={styles.addressDetails}><ThemedText style={styles.dataLabel}>Enviar para {street}, {number}</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{neighborhood} - {city}/{state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {postalCode}</ThemedText></View></View><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></ThemedView></ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithSavedAddress} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
   }
 
   const payments = orderForm.paymentData?.paymentSystems ?? [];
-  const title: Record<Step, string> = { cart: 'Carrinho', email: 'Dados pessoais', customer: 'Dados pessoais', address: 'Entrega', shipping: 'Entrega', payment: 'Pagamento', card: 'Novo cartão', review: 'Revise e confirme' };
+  const cardMethod = payments.find(isCardPayment);
+  const pixMethod = payments.find(isPixPayment);
+  const title: Record<Step, string> = { cart: 'Carrinho', email: 'Dados pessoais', customer: 'Dados pessoais', address: 'Entrega', shipping: 'Entrega', payment: 'Pagamento', card: 'Cartão de crédito', review: 'Revise e confirme' };
+  const customerErrors = getCustomerErrors();
+  const addressErrors = getAddressErrors();
+  const cardErrors = getCardErrors();
+
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
-    {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={`${item.id}-${item.index}`} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText type="smallBold" style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={`Remover ${item.name}`} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText type="smallBold">R$ {item.price.toFixed(2)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}<Pressable onPress={() => setGiftWrap((value) => !value)} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable></ThemedView><ThemedView style={styles.card}><ThemedText type="smallBold">Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={setCoupon} placeholder="Insira o código" style={[styles.input, styles.flex]} /><Pressable onPress={applyCoupon} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View></ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
-    {step === 'email' && <><Card><ThemedText type="smallBold">Informe seu e-mail para continuar</ThemedText><ThemedText themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="Digite seu e-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} /></Card></>}
-    {step === 'customer' && (customerExists && !editingCustomer ? <><Card><ThemedText type="subtitle">Dados pessoais</ThemedText><ThemedText themeColor="textSecondary">E-mail</ThemedText><ThemedText>{email}</ThemedText><ThemedText themeColor="textSecondary">Nome</ThemedText><ThemedText>{firstName || 'Não informado'} {lastName}</ThemedText><ThemedText themeColor="textSecondary">CPF</ThemedText><ThemedText>{document || 'Não informado'}</ThemedText><ThemedText themeColor="textSecondary">Telefone</ThemedText><ThemedText>{phone || 'Não informado'}</ThemedText><ThemedText themeColor="textSecondary">Gênero</ThemedText><ThemedText>{gender || 'Não informado'}</ThemedText><Pressable onPress={() => setEditingCustomer(true)}><ThemedText style={styles.link}>Editar dados</ThemedText></Pressable></Card></> : <><Card><Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" /><Field label="Nome" value={firstName} setValue={setFirstName} /><Field label="Sobrenome" value={lastName} setValue={setLastName} /><Field label="Telefone" value={phone} setValue={setPhone} keyboardType="phone-pad" /><Field label="CPF" value={document} setValue={setDocument} keyboardType="numeric" /><ThemedText type="smallBold">Gênero (opcional)</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText>{gender || 'Selecione seu gênero'}</ThemedText><ThemedText>⌄</ThemedText></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText>{option}</ThemedText></Pressable>)}</View>}</Card></>)}
-    {step === 'address' && (addressSaved && !editingAddress ? <Card><ThemedText type="smallBold">Endereço de entrega</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{street}, {number}{complement ? ` - ${complement}` : ''}</ThemedText><ThemedText>{neighborhood} - {city}/{state}</ThemedText><ThemedText>CEP: {postalCode}</ThemedText><Pressable onPress={() => customerAddresses.length > 1 ? setAddressSelectionOpen(true) : setEditingAddress(true)}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable>{addressSelectionOpen && customerAddresses.length > 1 && <View style={styles.addressList}>{customerAddresses.map((address) => { const addressId = String(address.id || `${address.postalCode || ''}-${address.street || ''}-${address.number || ''}`); return <Pressable key={addressId} onPress={() => { applyAddress(address); setAddressSelectionOpen(false); }} style={[styles.addressOption, selectedAddressId === addressId && styles.selected]}><ThemedText type="smallBold">{address.addressName || 'Enviar para este endereço'}</ThemedText><ThemedText>{address.street}, {address.number}</ThemedText><ThemedText themeColor="textSecondary">{address.neighborhood} - {address.city}/{address.state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {address.postalCode}</ThemedText></Pressable>; })}<Pressable onPress={() => { setAddressSelectionOpen(false); setEditingAddress(true); }}><ThemedText style={styles.link}>Cadastrar outro endereço</ThemedText></Pressable></View>}</Card> : <Card><Field label="CEP" value={postalCode} setValue={lookupCep} keyboardType="numeric" /><Field label="Endereço" value={street} setValue={setStreet} /><View style={styles.inline}><Field label="Número" value={number} setValue={setNumber} /><Field label="Complemento" value={complement} setValue={setComplement} /></View><Field label="Bairro" value={neighborhood} setValue={setNeighborhood} /><View style={styles.inline}><Field label="Cidade" value={city} setValue={setCity} /><Field label="Estado" value={state} setValue={setState} /></View><Field label="Quem irá receber?" value={receiverName} setValue={setReceiverName} /></Card>)}
-    {step === 'shipping' && <><ThemedText type="smallBold">Como deseja receber seu produto?</ThemedText>{slas.map((sla) => <Pressable key={shippingOptionKey(sla)} disabled={saving} onPress={() => chooseShipping(sla.id || sla.name)} style={[styles.option, selectedSla === (sla.id || sla.name) && styles.selected]}><ThemedText type="smallBold">{sla.name}</ThemedText><ThemedText themeColor="textSecondary">R$ {sla.price.toFixed(2)} · {sla.shippingEstimate}</ThemedText></Pressable>)}</>}
-    {step === 'payment' && <><ThemedText type="smallBold">Escolha como pagar</ThemedText>{payments.map((method) => <Pressable key={method.id} onPress={() => method.group.toLowerCase().includes('card') || method.name.toLowerCase().includes('cart') ? setStep('card') : choosePayment(method.id)} style={styles.option}><ThemedText type="smallBold">{method.name}</ThemedText><ThemedText themeColor="textSecondary">{method.group}</ThemedText></Pressable>)}<Card><ThemedText type="smallBold">Vale presente</ThemedText><View style={styles.inline}><TextInput value={voucher} onChangeText={setVoucher} placeholder="Código do vale" style={[styles.input, styles.flex]} /><Pressable style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View></Card><Pressable onPress={() => choosePayment(payments.find((item) => item.group.toLowerCase().includes('pix') || item.name.toLowerCase().includes('pix'))?.id ?? '6')} style={styles.option}><ThemedText type="smallBold">Pix</ThemedText><ThemedText themeColor="textSecondary">Pagamento instantâneo</ThemedText></Pressable></>}
-    {step === 'card' && <><Card><Field label="Número do cartão" value="" setValue={() => undefined} placeholder="Insira o número do seu cartão" keyboardType="numeric" /><Field label="Nome impresso no cartão" value="" setValue={() => undefined} placeholder="Nome impresso no cartão" /><View style={styles.inline}><Field label="Validade" value="" setValue={() => undefined} placeholder="MM/AA" /><Field label="CVV" value="" setValue={() => undefined} placeholder="CVV" keyboardType="numeric" /></View><ThemedText themeColor="textSecondary">Os dados serão tokenizados pela VTEX antes do pagamento.</ThemedText></Card></>}
-    {step === 'review' && <><ThemedText type="smallBold">Revise e confirme</ThemedText><Summary orderForm={orderForm} /><Card><ThemedText type="smallBold">DADOS PESSOAIS</ThemedText><ThemedText>{email}</ThemedText><ThemedText>{firstName} {lastName}</ThemedText><ThemedText>{phone}</ThemedText></Card><Card><ThemedText type="smallBold">ENTREGA</ThemedText><ThemedText>{street}, {number} - {city}/{state}</ThemedText><ThemedText>{selectedSla || 'Entrega selecionada'}</ThemedText></Card><Card><ThemedText type="smallBold">PAGAMENTO</ThemedText><ThemedText>{selectedPayment || 'Pagamento selecionado'}</ThemedText></Card>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}</>}
-  </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText type="subtitle" style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText type="smallBold">Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? () => setStep('shipping') : saveAddress} />}{step === 'card' && <Primary title="Continuar" onPress={() => setStep('payment')} />}{step === 'review' && <Primary title="Finalizar compra" onPress={() => setMessage('A finalização será habilitada após conectar a tokenização e o endpoint seguro de pagamento VTEX.')} />}</View></SafeAreaView></ThemedView>;
+    {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}<Pressable onPress={() => setGiftWrap((value) => !value)} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable></ThemedView><ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={setCoupon} placeholder="Insira o código" style={[styles.input, styles.flex]} /><Pressable onPress={applyCoupon} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View></ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
+    {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /></Card>}
+    {step === 'customer' && (customerExists && !editingCustomer ? <Card><ThemedText style={styles.cardTitle}>Dados pessoais</ThemedText><ThemedText style={styles.dataLabel}>E-mail</ThemedText><ThemedText>{email}</ThemedText><ThemedText style={styles.dataLabel}>Nome</ThemedText><ThemedText>{firstName + ' ' + lastName}</ThemedText><ThemedText style={styles.dataLabel}>Telefone com DDD</ThemedText><ThemedText>{phone || 'Não informado'}</ThemedText><ThemedText style={styles.dataLabel}>CPF</ThemedText><ThemedText>{document || 'Não informado'}</ThemedText><ThemedText style={styles.dataLabel}>Gênero</ThemedText><ThemedText>{gender || 'Não informado'}</ThemedText><Pressable onPress={() => setEditingCustomer(true)}><ThemedText style={styles.link}>Editar dados</ThemedText></Pressable></Card> : <Card><ThemedText style={styles.cardTitle}>Dados pessoais</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={customerValidationAttempted ? customerErrors.email : ''} /><Field label="Nome" value={firstName} setValue={setFirstName} required placeholder="Nome" error={customerValidationAttempted ? customerErrors.firstName : ''} /><Field label="Sobrenome" value={lastName} setValue={setLastName} required placeholder="Sobrenome" error={customerValidationAttempted ? customerErrors.lastName : ''} /><Field label="Telefone com DDD" value={phone} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11 99999-9999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} /><Field label="CPF" value={document} setValue={(value) => setDocument(formatCpf(value))} required placeholder="000.000.000-00" keyboardType="numeric" error={customerValidationAttempted ? customerErrors.document : ''} /><View style={styles.field}><ThemedText style={styles.fieldLabel}>Gênero</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText themeColor="textSecondary">{gender || 'Selecione seu gênero'}</ThemedText><View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText>{option}</ThemedText></Pressable>)}</View>}</View></Card>)}
+    {step === 'address' && (addressSaved && !editingAddress ? <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{street + ', ' + number + (complement ? ' - ' + complement : '')}</ThemedText><ThemedText>{neighborhood + ' - ' + city + '/' + state}</ThemedText><ThemedText>CEP: {postalCode}</ThemedText><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></Card> : <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><Field label="CEP" value={postalCode} setValue={lookupCep} required placeholder="00000-000" keyboardType="numeric" error={addressValidationAttempted ? addressErrors.postalCode : ''} /><Field label="Endereço" value={street} setValue={setStreet} required placeholder="Endereço" error={addressValidationAttempted ? addressErrors.street : ''} /><View style={styles.inline}><Field label="Número" value={number} setValue={setNumber} required placeholder="Número" error={addressValidationAttempted ? addressErrors.number : ''} /><Field label="Complemento" value={complement} setValue={setComplement} placeholder="Complemento" /></View><Field label="Bairro" value={neighborhood} setValue={setNeighborhood} required placeholder="Bairro" error={addressValidationAttempted ? addressErrors.neighborhood : ''} /><View style={styles.inline}><Field label="Cidade" value={city} setValue={setCity} required placeholder="Cidade" error={addressValidationAttempted ? addressErrors.city : ''} /><Field label="Estado" value={state} setValue={setState} required placeholder="Estado" error={addressValidationAttempted ? addressErrors.state : ''} /></View><Field label="Quem irá receber?" value={receiverName} setValue={setReceiverName} required placeholder="Nome do recebedor" error={addressValidationAttempted ? addressErrors.receiverName : ''} />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</Card>)}
+    {step === 'payment' && <><ThemedText style={styles.pageTitle}>Escolha como pagar</ThemedText><Pressable disabled={saving} onPress={() => openCardPayment(cardMethod || { id: '1', name: 'Cartão de crédito' })} style={styles.paymentCard}><View style={styles.paymentHeader}><CreditCardIcon color="#231f20" size={21} /><ThemedText style={styles.dataLabel}>Cartão de Crédito</ThemedText></View><View style={styles.paymentDivider} /><ThemedText themeColor="textSecondary">+ novo cartão</ThemedText></Pressable><View style={styles.paymentCard}><ThemedText style={styles.dataLabel}>Vale presente</ThemedText>{!voucherOpen ? <Pressable onPress={() => setVoucherOpen(true)} style={styles.voucherTrigger}><ThemedText style={styles.dataLabel}>{voucherApplied ? 'Vale presente adicionado' : 'Adicionar vale presente'}</ThemedText></Pressable> : <><View style={styles.paymentDivider} /><View style={styles.inline}><TextInput value={voucher} onChangeText={setVoucher} placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} /><Pressable disabled={saving} onPress={applyVoucher} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View>{voucherApplied && <ThemedText style={styles.successText}>Vale-presente adicionado.</ThemedText>}</>}</View>{!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}<Pressable disabled={saving} onPress={() => choosePayment(pixMethod?.id || '6', pixMethod?.name || 'Pix')} style={styles.paymentCard}><ThemedText style={styles.dataLabel}>Pix</ThemedText><ThemedText themeColor="textSecondary">Pagamento instantâneo</ThemedText><View style={styles.pixInfo}><ThemedText style={styles.pixWord}>pix</ThemedText><ThemedText themeColor="textSecondary">O código Pix será exibido na próxima etapa, após a revisão do seu pedido.</ThemedText></View></Pressable></>}
+    {step === 'card' && <><View style={styles.creditCardVisual}><ThemedText style={styles.creditCardLabel}>CARTÃO DE CRÉDITO</ThemedText><ThemedText style={styles.creditCardNumber}>{cardNumber ? cardNumber : '•••• •••• •••• ••••'}</ThemedText><View style={styles.creditCardBottom}><ThemedText style={styles.creditCardMeta}>{cardHolder || 'NOME DO TITULAR'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardExpiry || 'MM/AA'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardCvv ? 'CVV' : 'CVV'}</ThemedText></View></View><Card><Field label="Número do cartão" value={cardNumber} setValue={(value) => setCardNumber(formatCardNumber(value))} required placeholder="Insira o número do seu cartão" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.number : ''} /><Field label="Nome impresso no cartão" value={cardHolder} setValue={setCardHolder} required placeholder="Nome impresso no cartão" error={cardValidationAttempted ? cardErrors.holder : ''} /><View style={styles.inline}><Field label="Validade" value={cardExpiry} setValue={(value) => setCardExpiry(formatExpiry(value))} required placeholder="MM/AA" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.expiry : ''} /><Field label="CVV" value={cardCvv} setValue={setCardCvv} required placeholder="CVV" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.cvv : ''} /></View><ThemedText style={styles.cardTitle}>Endereço de cobrança</ThemedText><Pressable onPress={() => undefined} style={styles.billingRow}><View style={styles.billingCheckbox}><ThemedText style={styles.billingCheck}>✓</ThemedText></View><ThemedText style={styles.billingText}>O endereço da fatura é {street + ', ' + number + ' - ' + neighborhood + ', ' + city + ' - ' + state}</ThemedText></Pressable></Card><ThemedText style={styles.acceptedTitle}>Bandeiras aceitas:</ThemedText><View style={styles.brandRow}><BrandBadge label="AMEX" color="#2c77b8" /><BrandBadge label="VISA" color="#1e4c9a" /><BrandBadge label="elo" color="#2e9ba3" /><BrandBadge label="MasterCard" color="#9c2020" /><BrandBadge label="Hipercard" color="#c52b2b" /><BrandBadge label="elo" color="#f2a900" /></View>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
+    {step === 'review' && <><ThemedText style={styles.pageTitle}>Revise e confirme</ThemedText><Summary orderForm={orderForm} shippingPrice={selectedShipping?.price} /><Card><ReviewHeader icon="user" title="DADOS PESSOAIS" /><ThemedText>{email}</ThemedText><ThemedText>{firstName + ' ' + lastName}</ThemedText><ThemedText>{phone}</ThemedText><ThemedText>{document}</ThemedText><Pressable onPress={() => { setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><View style={styles.reviewDeliveryTop}><ReviewHeader icon="truck" title="ENTREGA" /><ThemedText style={styles.freeText}>{selectedShipping?.price === 0 ? 'Grátis' : money(selectedShipping?.price || 0)}</ThemedText></View><ThemedText style={styles.dataLabel}>{selectedShipping?.name || 'Entrega selecionada'}</ThemedText><ThemedText style={styles.deliveryText}>◷ {deliveryEstimate(selectedShipping?.shippingEstimate || '')}</ThemedText><View style={styles.reviewAddress}><ThemedText style={styles.dataLabel}>Endereço de Entrega</ThemedText><ThemedText>{street + ', ' + number}</ThemedText><ThemedText>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText>CEP: {postalCode}</ThemedText></View>{orderForm.items.slice(0, 1).map((item) => <View key={item.id + '-review'} style={styles.reviewItem}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.reviewItemImage} />}<ThemedText style={styles.reviewItemName}>{item.name + ' ' + item.quantity + ' un.'}</ThemedText></View>)}<Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><ReviewHeader icon="card" title="PAGAMENTO" /><View style={styles.paymentReview}><ThemedText style={styles.pixWord}>{selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : '▣'}</ThemedText><ThemedText>{selectedPaymentLabel || 'Pagamento selecionado'}</ThemedText><ThemedText themeColor="textSecondary">{selectedPaymentLabel.toLowerCase().includes('pix') ? 'Aprovação imediata' : 'Cartão de crédito'}</ThemedText></View><Pressable onPress={() => setStep('payment')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
+  </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title="Finalizar Compra" onPress={() => setMessage('A finalização será habilitada após conectar a tokenização e o endpoint seguro de pagamento VTEX.')} />}</View></SafeAreaView></ThemedView>;
 }
 
-function Card({ children }: { children: React.ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
-function Field({ label, value, setValue, placeholder, keyboardType }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address' }) { return <View style={styles.field}><ThemedText type="smallBold">{label}</ThemedText><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType} style={styles.input} /></View>; }
+function Card({ children }: { children: ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
+function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '' }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string }) {
+  return <View style={styles.field}><ThemedText style={styles.fieldLabel}>{label + (required ? ' *' : '')}</ThemedText><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType} placeholderTextColor="#96918b" style={[styles.input, error && styles.inputError]} />{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
+}
 function Primary({ title, onPress }: { title: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.primary}><ThemedText style={styles.buttonText}>{title}</ThemedText></Pressable>; }
 function Secondary({ title, onPress }: { title: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.secondary}><ThemedText style={styles.secondaryText}>{title}</ThemedText></Pressable>; }
 function Radio({ selected }: { selected: boolean }) { return <View style={[styles.radio, selected && styles.radioSelected]}>{selected && <View style={styles.radioDot} />}</View>; }
-function Summary({ orderForm }: { orderForm: OrderForm }) { return <Card><ThemedText type="smallBold">Resumo</ThemedText><View style={styles.summary}><ThemedText>Subtotal</ThemedText><ThemedText>R$ {orderForm.value.toFixed(2)}</ThemedText></View><View style={styles.summary}><ThemedText type="smallBold">Total</ThemedText><ThemedText type="smallBold">R$ {orderForm.value.toFixed(2)}</ThemedText></View></Card>; }
+function Summary({ orderForm, shippingPrice }: { orderForm: OrderForm; shippingPrice?: number }) {
+  const itemsTotal = orderForm.items.reduce((total, item) => total + item.price * item.quantity, 0);
+  const shippingLabel = shippingPrice === undefined ? 'A calcular' : shippingPrice === 0 ? 'Grátis' : money(shippingPrice);
+  return <Card><View style={styles.summary}><ThemedText>Total dos itens</ThemedText><ThemedText>{money(itemsTotal)}</ThemedText></View><View style={styles.summary}><ThemedText>Total do frete</ThemedText><ThemedText>{shippingLabel}</ThemedText></View><View style={[styles.summary, styles.summaryTotal]}><ThemedText style={styles.dataLabel}>Total</ThemedText><ThemedText style={styles.dataLabel}>{money(orderForm.value)}</ThemedText></View></Card>;
+}
 function FreeShippingProgress({ value }: { value: number }) {
   const target = 249;
   const remaining = Math.max(0, target - value);
   const progress = Math.min(1, value / target);
-  return <View style={styles.progressCard}><ThemedText type="smallBold">{remaining > 0 ? `Faltam R$ ${remaining.toFixed(2)} para Frete Grátis` : 'Frete grátis desbloqueado'}</ThemedText><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress * 100}%` }]} /></View></View>;
+  return <View style={styles.progressCard}><ThemedText style={styles.dataLabel}>{remaining > 0 ? 'Faltam ' + money(remaining) + ' para Frete Grátis' : 'Frete grátis desbloqueado'}</ThemedText><View style={styles.progressTrack}><View style={[styles.progressFill, { width: (progress * 100 + '%') as `${number}%` }]} /></View></View>;
+}
+function BrandBadge({ label, color }: { label: string; color: string }) { return <View style={[styles.brandBadge, { backgroundColor: color }]}><ThemedText style={styles.brandText}>{label}</ThemedText></View>; }
+function ReviewHeader({ icon, title }: { icon: 'user' | 'truck' | 'card'; title: string }) {
+  return <View style={styles.reviewHeader}>{icon === 'user' && <UserIcon color="#231f20" size={20} />}{icon === 'truck' && <TruckIcon color="#231f20" size={20} />}{icon === 'card' && <CreditCardIcon color="#231f20" size={20} />}<ThemedText style={styles.dataLabel}>{title}</ThemedText></View>;
 }
 
 const styles = StyleSheet.create({
@@ -335,7 +539,9 @@ const styles = StyleSheet.create({
   content: { gap: Spacing.three, paddingVertical: Spacing.three, paddingBottom: 170 },
   flex: { flex: 1 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.three, padding: Spacing.five },
+  pageTitle: { fontSize: 17, lineHeight: 23, fontFamily: Fonts.sans, fontWeight: '400' },
   card: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
+  cardTitle: { fontSize: 16, lineHeight: 22, fontFamily: Fonts.sans, fontWeight: '400' },
   productsCard: { padding: Spacing.three, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
   productBlock: { paddingVertical: Spacing.one },
   productDivider: { marginTop: Spacing.two, paddingTop: Spacing.three, borderTopWidth: 1, borderTopColor: '#ece8e2' },
@@ -343,35 +549,43 @@ const styles = StyleSheet.create({
   itemImage: { width: 64, height: 84, borderRadius: 8, backgroundColor: '#e8e8ea' },
   itemDetails: { flex: 1, gap: 5 },
   itemTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.one },
-  itemName: { flex: 1 },
+  itemName: { flex: 1, fontSize: 14 },
   itemBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   quantityControl: { minHeight: 34, flexDirection: 'row', alignItems: 'center', borderRadius: 9, borderWidth: 1, borderColor: '#cfc8bf', overflow: 'hidden' },
   quantityButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  quantityValue: { minWidth: 42, height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  quantityValue: { minWidth: 42, height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   quantityCount: { minWidth: 14, textAlign: 'center' },
   removeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   giftRow: { marginTop: Spacing.three, paddingTop: Spacing.three, borderTopWidth: 1, borderTopColor: '#ece8e2', flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   giftCheckbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: '#aaa49c', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   giftCheckboxSelected: { borderColor: '#1e120d', backgroundColor: '#1e120d' },
-  giftCheck: { color: '#FFFFFF', fontSize: 13, lineHeight: 15, fontWeight: '700' },
+  giftCheck: { color: '#FFFFFF', fontSize: 13, lineHeight: 15 },
   giftText: { flex: 1, fontSize: 13 },
   field: { flex: 1, gap: 4 },
-  input: { minHeight: 46, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
-  inline: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
-  select: { padding: Spacing.three, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#d9d3cc', flexDirection: 'row', justifyContent: 'space-between' },
-  dropdown: { borderWidth: 1, borderColor: '#d9d3cc', borderRadius: 10, backgroundColor: '#FFFFFF' },
+  fieldLabel: { fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  input: { minHeight: 46, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 15, color: '#231f20' },
+  inputError: { borderColor: '#ff7772', borderWidth: 1.5 },
+  errorText: { color: '#ed6560', fontSize: 11, lineHeight: 15, fontFamily: Fonts.sans },
+  successText: { color: '#2f8f5b', fontSize: 12, fontFamily: Fonts.sans },
+  inline: { flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-start' },
+  select: { minHeight: 46, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#d9d3cc', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectArrow: { fontSize: 20, color: '#625d57', lineHeight: 22 },
+  dropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
+  dropdownIconOpen: { transform: [{ rotate: '-90deg' }] },
+  dropdown: { borderWidth: 1, borderColor: '#d9d3cc', borderRadius: 8, backgroundColor: '#FFFFFF' },
+  option: { gap: 4, padding: Spacing.three, borderRadius: 14, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF' },
   addressList: { gap: Spacing.two, marginTop: Spacing.two },
   addressOption: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two, padding: Spacing.two, borderRadius: 12, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#fbfaf7' },
   addressOptionSelected: { borderColor: '#1e120d', borderWidth: 2 },
   addressDetails: { flex: 1, gap: 4 },
-  link: { color: '#1e120d', textDecorationLine: 'underline' },
-  primary: { padding: Spacing.four, borderRadius: 10, alignItems: 'center', backgroundColor: '#1e120d' },
-  secondary: { minHeight: 48, padding: Spacing.three, borderRadius: 10, borderWidth: 1, borderColor: '#1e120d', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  secondaryText: { color: '#1e120d', fontWeight: '700' },
+  dataLabel: { fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19, fontWeight: '400' },
+  link: { color: '#4f4b47', textDecorationLine: 'underline', fontSize: 12, fontFamily: Fonts.sans },
+  primary: { minHeight: 48, padding: Spacing.four, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  secondary: { minHeight: 48, padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#1e120d', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  secondaryText: { color: '#1e120d', fontFamily: Fonts.sans, fontSize: 14 },
   fixedFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, gap: Spacing.two, padding: Spacing.two, paddingBottom: Spacing.three, backgroundColor: '#fbfaf7' },
-  smallButton: { padding: 12, borderRadius: 10, backgroundColor: '#1e120d' },
-  buttonText: { color: '#FFFFFF', fontWeight: '700' },
-  option: { gap: 4, padding: Spacing.three, borderRadius: 14, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF' },
+  smallButton: { minHeight: 46, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  buttonText: { color: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 13 },
   selected: { borderColor: '#1e120d', borderWidth: 2 },
   selectedAddressCard: { gap: Spacing.three },
   shippingCard: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
@@ -384,10 +598,39 @@ const styles = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#b0a69b', alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: '#1e120d' },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#1e120d' },
-  summary: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressCard: { gap: 8, padding: Spacing.two, borderRadius: 10, backgroundColor: '#f4f0e9' },
+  summary: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
+  summaryTotal: { marginTop: 4, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eeeae5' },
+  progressCard: { gap: 8, padding: Spacing.two, borderRadius: 10, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e1da' },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#e3ded5' },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: '#2f8f5b' },
+  paymentCard: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
+  paymentHeader: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, justifyContent: 'space-between' },
+  paymentDivider: { height: 1, backgroundColor: '#eeeae5' },
+  voucherTrigger: { minHeight: 34, justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#eeeae5' },
+  pixInfo: { gap: Spacing.two, marginTop: Spacing.one, padding: Spacing.three, borderRadius: 8, backgroundColor: '#f5f5f5' },
+  pixWord: { color: '#4bb5ad', fontSize: 28, lineHeight: 32, fontFamily: Fonts.sans, fontWeight: '400' },
+  creditCardVisual: { minHeight: 155, padding: Spacing.three, borderRadius: 8, backgroundColor: '#344762', justifyContent: 'space-between' },
+  creditCardLabel: { color: '#dfe5ee', fontSize: 12, fontFamily: Fonts.sans },
+  creditCardNumber: { color: '#FFFFFF', fontSize: 20, letterSpacing: 1, fontFamily: Fonts.sans },
+  creditCardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  creditCardMeta: { flex: 1, color: '#e3e8ef', fontSize: 10, fontFamily: Fonts.sans },
+  billingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
+  billingCheckbox: { width: 20, height: 20, borderRadius: 5, backgroundColor: '#231f20', alignItems: 'center', justifyContent: 'center' },
+  billingCheck: { color: '#FFFFFF', fontSize: 14, lineHeight: 17 },
+  billingText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  acceptedTitle: { fontSize: 13, color: '#625d57', fontFamily: Fonts.sans },
+  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 5 },
+  brandBadge: { minWidth: 38, height: 24, paddingHorizontal: 4, borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
+  brandText: { color: '#FFFFFF', fontSize: 8, lineHeight: 10, fontFamily: Fonts.sans },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  reviewDeliveryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  freeText: { color: '#2f9b62', fontFamily: Fonts.sans, fontSize: 13 },
+  deliveryText: { color: '#2f9b62', fontFamily: Fonts.sans, fontSize: 12 },
+  reviewAddress: { gap: 3, marginTop: Spacing.one, padding: Spacing.two, borderRadius: 8, backgroundColor: '#f8f8f8' },
+  reviewItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  reviewItemImage: { width: 48, height: 62, borderRadius: 4, backgroundColor: '#eeeae5' },
+  reviewItemName: { flex: 1, fontSize: 13, lineHeight: 18 },
+  paymentReview: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.five, backgroundColor: 'rgba(0, 0, 0, 0.62)' },
   modalCard: { width: '100%', maxWidth: 340, gap: Spacing.two, padding: Spacing.four, borderRadius: 6, backgroundColor: '#FFFFFF' },
   modalTitle: { textAlign: 'center', lineHeight: 26, fontSize: 18, marginBottom: Spacing.two },
