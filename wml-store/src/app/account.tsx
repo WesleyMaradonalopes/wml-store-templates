@@ -1,9 +1,9 @@
-import { makeRedirectUri, ResponseType } from 'expo-auth-session';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { type ReactNode, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
-import { clearAccountSession, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
+import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
 
@@ -56,14 +56,26 @@ export default function AccountScreen() {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [profile, setProfile] = useState<CustomerProfile>({});
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
-  const configuredGoogleClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
-  const [googleClientId, setGoogleClientId] = useState(configuredGoogleClientId || googleClientIdPlaceholder);
-  const [googleConfigured, setGoogleConfigured] = useState(Boolean(configuredGoogleClientId));
+  const configuredGoogleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
+  const configuredGoogleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+  const configuredGoogleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+  const [googleWebClientId, setGoogleWebClientId] = useState(configuredGoogleWebClientId || googleClientIdPlaceholder);
   const [googleConfigMessage, setGoogleConfigMessage] = useState<string | null>(null);
-  const [googleRequest, , promptGoogleAsync] = Google.useAuthRequest({
-    clientId: googleClientId,
-    webClientId: googleClientId,
-    responseType: ResponseType.IdToken,
+  const googlePlatformClientId = Platform.select({
+    ios: configuredGoogleIosClientId,
+    android: configuredGoogleAndroidClientId,
+    default: googleWebClientId,
+  }) || googleClientIdPlaceholder;
+  const googleConfigured = Platform.select({
+    ios: Boolean(configuredGoogleIosClientId),
+    android: Boolean(configuredGoogleAndroidClientId),
+    default: Boolean(googleWebClientId && googleWebClientId !== googleClientIdPlaceholder),
+  }) ?? false;
+  const [googleRequest, , promptGoogleAsync] = Google.useIdTokenAuthRequest({
+    clientId: googlePlatformClientId,
+    iosClientId: configuredGoogleIosClientId || undefined,
+    androidClientId: configuredGoogleAndroidClientId || undefined,
+    webClientId: googleWebClientId,
     redirectUri: googleRedirectUri,
     scopes: ['openid', 'profile', 'email'],
     selectAccount: true,
@@ -71,18 +83,17 @@ export default function AccountScreen() {
   const onScroll = useTabBarScroll();
 
   useEffect(() => {
-    if (configuredGoogleClientId) return;
+    if (configuredGoogleWebClientId || Platform.OS !== 'web') return;
     let active = true;
     getVtexGoogleClientId().then((clientId) => {
       if (!active) return;
-      setGoogleClientId(clientId);
-      setGoogleConfigured(true);
+      setGoogleWebClientId(clientId);
     }).catch(() => {
       if (!active) return;
       setGoogleConfigMessage('Não foi possível carregar a configuração do Google da VTEX.');
     });
     return () => { active = false; };
-  }, [configuredGoogleClientId]);
+  }, [configuredGoogleWebClientId]);
 
   useEffect(() => {
     if (requestedView === 'access') setView('access');
@@ -164,7 +175,12 @@ export default function AccountScreen() {
 
   async function loginWithGoogle() {
     if (!googleConfigured || !googleRequest) {
-      setAuthMessage(googleConfigMessage || 'A configuração do login Google ainda não está pronta.');
+      const platformMessage = Platform.OS === 'ios'
+        ? 'Configure o Client ID OAuth do iOS para este app.'
+        : Platform.OS === 'android'
+          ? 'Configure o Client ID OAuth do Android para este app.'
+          : 'A configuração web do login Google ainda não está pronta.';
+      setAuthMessage(googleConfigMessage || platformMessage);
       return;
     }
     try {
@@ -176,8 +192,9 @@ export default function AccountScreen() {
         return;
       }
       const credential = result.params.id_token || result.authentication?.idToken || '';
-      if (!credential) throw new Error('O Google não retornou a credencial de acesso.');
-      const data = await loginVtexGoogle(credential);
+      const accessToken = result.authentication?.accessToken || result.params.access_token || '';
+      if (!credential && !accessToken) throw new Error('O Google não retornou a credencial de acesso.');
+      const data = accessToken ? await exchangeVtexGoogleAccessToken(accessToken) : await loginVtexGoogle(credential);
       const accountEmail = getGoogleEmailFromIdToken(credential) || (data.userId?.includes('@') ? data.userId.toLowerCase() : '');
       if (!accountEmail) throw new Error('Não foi possível identificar o e-mail da conta Google.');
       await saveAccountSession(accountEmail);

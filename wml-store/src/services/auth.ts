@@ -57,7 +57,9 @@ export type VtexGoogleLoginResponse = {
   authStatus?: string;
   authCookie?: unknown;
   accountAuthCookie?: unknown;
+  authToken?: string;
   userId?: string;
+  message?: string;
 };
 
 function authUrl(path: string) {
@@ -100,6 +102,22 @@ export async function loginVtexGoogle(credential: string) {
       InativeUser: 'Esta conta Google não está ativa na loja.',
     };
     throw new Error(messages[data.authStatus || ''] || 'Não foi possível concluir o login com Google.');
+  }
+  await saveVtexUserToken(token);
+  return data;
+}
+
+export async function exchangeVtexGoogleAccessToken(accessToken: string) {
+  const providerId = process.env.EXPO_PUBLIC_VTEX_GOOGLE_PROVIDER_ID || 'Google';
+  const response = await fetch(`${storeConfig.vtexBaseUrl}/api/vtexid/audience/webstore/provider/oauth/exchange`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ providerId, accessToken }),
+  });
+  const data = await response.json().catch(() => ({})) as VtexGoogleLoginResponse;
+  const token = extractAuthToken(data.authToken) || extractAuthToken(data.authCookie) || extractAuthToken(data.accountAuthCookie);
+  if (!response.ok || !token) {
+    throw new Error(data.message || 'Não foi possível vincular o login Google à VTEX.');
   }
   await saveVtexUserToken(token);
   return data;
