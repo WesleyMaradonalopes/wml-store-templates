@@ -26,7 +26,18 @@ function validEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(va
 function validPhone(value: string) {
   return /^(?:\d{2} \d{4}-\d{4}|\d{2} \d \d{4}-\d{4})$/.test(value.trim());
 }
-function validCpf(value: string) { return digits(value).length === 11; }
+function validCpf(value: string) {
+  const cpf = digits(value);
+  if (cpf.length !== 11 || /^([0-9])\1{10}$/.test(cpf)) return false;
+
+  const calculateDigit = (length: number) => {
+    const sum = cpf.slice(0, length).split('').reduce((total, digit, index) => total + Number(digit) * (length + 1 - index), 0);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  return calculateDigit(9) === Number(cpf[9]) && calculateDigit(10) === Number(cpf[10]);
+}
 function money(value: number) { return 'R$ ' + value.toFixed(2).replace('.', ','); }
 function formatPhone(value: string) {
   const valueDigits = digits(value).slice(0, 11);
@@ -520,7 +531,8 @@ export default function CheckoutScreen() {
 function Card({ children }: { children: ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
 function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '' }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string }) {
   const isFreeText = !keyboardType || keyboardType === 'default';
-  return <View style={styles.field}><ThemedText style={styles.fieldLabel}>{label + (required ? ' *' : '')}</ThemedText><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={isFreeText} placeholderTextColor="#96918b" style={[styles.input, error && styles.inputError]} />{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
+  const inputMode = isFreeText ? 'text' : keyboardType === 'email-address' ? 'email' : keyboardType === 'phone-pad' ? 'tel' : 'numeric';
+  return <View style={styles.field}><ThemedText style={styles.fieldLabel}>{label + (required ? ' *' : '')}</ThemedText><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} inputMode={inputMode} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={false} spellCheck={false} placeholderTextColor="#96918b" style={[styles.input, error && styles.inputError]} />{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
 }
 function Primary({ title, onPress }: { title: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.primary}><ThemedText style={styles.buttonText}>{title}</ThemedText></Pressable>; }
 function Secondary({ title, onPress }: { title: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.secondary}><ThemedText style={styles.secondaryText}>{title}</ThemedText></Pressable>; }
