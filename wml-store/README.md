@@ -48,6 +48,22 @@ To learn more about developing your project with Expo, look at the following res
 - [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
 - [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
+## Checkout com reCAPTCHA
+
+O cartão usa a chave reCAPTCHA Enterprise configurada na VTEX. O app nativo
+usa o SDK nativo quando disponível e mantém um fallback WebView para testes.
+Como o SDK nativo não é incluído no Expo Go, depois de instalar as dependências
+é necessário gerar um development build para testar no Android/iOS:
+
+```bash
+npx expo run:android
+# ou, no macOS com Xcode:
+npx expo run:ios
+```
+
+O `clientSecret`/API key permanece somente na configuração da VTEX/backend e
+nunca deve ser colocado em `EXPO_PUBLIC_*`.
+
 ## Join the community
 
 Join our community of developers creating universal apps.

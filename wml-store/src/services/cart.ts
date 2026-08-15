@@ -28,7 +28,7 @@ export type OrderForm = {
     birthDate?: string;
   };
   shippingData?: {
-    selectedAddresses?: Array<{ receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
+    selectedAddresses?: Array<{ addressType?: string; addressId?: string; receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
     logisticsInfo: Array<{
       itemIndex: number;
       selectedSla?: string;
@@ -80,7 +80,7 @@ type VtexOrderForm = {
   }>;
   clientProfileData?: OrderForm['clientProfileData'];
   shippingData?: {
-    selectedAddresses?: Array<{ receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
+    selectedAddresses?: Array<{ addressType?: string; addressId?: string; receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
     logisticsInfo?: Array<{
       itemIndex?: number;
       selectedSla?: string;
@@ -228,8 +228,9 @@ export async function updateShippingAddress({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        address: { ...address, country: address.country ?? 'BRA' },
-        selectedAddresses: [{ ...address, country: address.country ?? 'BRA' }],
+        clearAddressIfPostalCodeNotFound: false,
+        address: { ...address, addressType: 'residential', country: address.country ?? 'BRA' },
+        selectedAddresses: [{ ...address, addressType: 'residential', country: address.country ?? 'BRA' }],
       }),
     },
   );
@@ -259,8 +260,9 @@ export async function selectShippingOption({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        address: { ...address, country: address.country ?? 'BRA' },
-        selectedAddresses: [{ ...address, country: address.country ?? 'BRA' }],
+        clearAddressIfPostalCodeNotFound: false,
+        address: { ...address, addressType: 'residential', country: address.country ?? 'BRA' },
+        selectedAddresses: [{ ...address, addressType: 'residential', country: address.country ?? 'BRA' }],
         logisticsInfo: logisticsInfo.map((info) => {
           const selected = info.slas.find((sla) => sla.id === slaId || sla.name === slaId) ?? info.slas[0];
           return {
@@ -334,6 +336,21 @@ export function getOrderForm(orderFormId?: string): Promise<OrderForm> {
   return request.finally(() => {
     if (orderFormReadsInFlight.get(key) === request) orderFormReadsInFlight.delete(key);
   });
+}
+
+export async function clearCart(orderFormId?: string): Promise<OrderForm | null> {
+  const id = orderFormId ?? await getStoredJson<string>(ORDER_FORM_ID_KEY);
+  if (!id) return null;
+  const response = await checkoutFetch(
+    `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(id)}/items/removeAll`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+  );
+  if (!response.ok) throw new Error(`Unable to clear cart: ${response.status}`);
+  const orderForm = await response.json() as VtexOrderForm;
+  await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
+  const normalizedOrderForm = normalizeOrderForm(orderForm);
+  publishCartChange(normalizedOrderForm);
+  return normalizedOrderForm;
 }
 
 export async function addItemToCart({

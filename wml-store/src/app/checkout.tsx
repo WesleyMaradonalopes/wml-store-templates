@@ -9,13 +9,15 @@ import CreditCardIcon from '@/components/icons/CreditCardIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import TruckIcon from '@/components/icons/TruckIcon';
 import UserIcon from '@/components/icons/UserIcon';
+import Recaptcha, { type RecaptchaHandle } from '@/components/recaptcha';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, addGiftCardToCart, getOrderForm, OrderForm, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem } from '@/services/cart';
+import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, OrderForm, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, type CustomerAddress, type CustomerProfile } from '@/services/customer';
+import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 
 type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'review';
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
@@ -77,6 +79,33 @@ function isCardPayment(method: { name: string; group: string }) {
 }
 function isPixPayment(method: { name: string; group: string }) {
   return (method.name + ' ' + method.group).toLowerCase().includes('pix');
+}
+function parsePaymentAppPayload(paymentApp?: PaymentAppData | null) {
+  if (!paymentApp?.appPayload) return null;
+  const raw = paymentApp.appPayload;
+  let parsed: Record<string, unknown> = {};
+  try {
+    const value = JSON.parse(raw);
+    if (value && typeof value === 'object') parsed = value as Record<string, unknown>;
+  } catch {
+    const read = (key: string) => raw.match(new RegExp(key + '\\s*[:=]\\s*([^,}]+)', 'i'))?.[1]?.trim() || '';
+    parsed = {
+      code: read('code'),
+      qrCodeBase64Image: read('qrCodeBase64Image'),
+      paymentId: read('paymentId'),
+      transactionId: read('transactionId'),
+    };
+  }
+  const code = String(parsed.code || parsed.qrCode || parsed.qrCodeText || '').trim();
+  const image = String(parsed.qrCodeBase64Image || parsed.qrCodeBase64 || '').trim();
+  const paymentId = String(parsed.paymentId || '').trim();
+  const transactionId = String(parsed.transactionId || '').trim();
+  return {
+    code,
+    paymentId,
+    transactionId,
+    imageUri: image ? (image.startsWith('data:') ? image : 'data:image/png;base64,' + image) : '',
+  };
 }
 function deliveryEstimate(estimate: string) {
   const match = estimate.match(/\d+/);
@@ -159,6 +188,9 @@ export default function CheckoutScreen() {
   const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>([]);
   const [addressSelectionOpen, setAddressSelectionOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [orderResult, setOrderResult] = useState<CheckoutOrderResult | null>(null);
+  const [recaptchaSiteKey, setRecaptchaSiteKey] = useState(process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || '');
+  const recaptchaRef = useRef<RecaptchaHandle>(null);
   const genders = ['Feminino', 'Masculino', 'Prefiro não informar', 'Outro'];
   const customerDataRequests = useRef(new Map<string, Promise<CustomerCheckoutData>>()).current;
 
@@ -199,6 +231,40 @@ export default function CheckoutScreen() {
     }).catch(() => { if (active) setMessage('Não foi possível carregar o carrinho.'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!orderResult || orderResult.status !== 'pending_payment' || !orderResult.transactionId) return;
+    let active = true;
+    const checkStatus = async () => {
+      try {
+        const pixPayload = parsePaymentAppPayload(orderResult.paymentApp);
+        const status = await getTransactionStatus(orderResult.transactionId, orderResult.orderGroup, pixPayload?.paymentId);
+        if (!active) return;
+        if (status.status === 'completed') {
+          void clearCart(orderForm?.orderFormId).catch(() => undefined);
+          setOrderResult((current) => current ? {
+            ...current,
+            status: 'completed',
+            message: 'Pagamento confirmado e pedido processado com sucesso.',
+          } : current);
+        } else if (status.status === 'failed') {
+          setOrderResult((current) => current ? {
+            ...current,
+            status: 'payment_failed',
+            message: 'O pagamento não foi autorizado pela VTEX.',
+          } : current);
+        }
+      } catch {
+        // A consulta pode falhar momentaneamente; a próxima tentativa mantém o Pix ativo.
+      }
+    };
+    void checkStatus();
+    const interval = setInterval(() => { void checkStatus(); }, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [orderForm?.orderFormId, orderResult?.orderGroup, orderResult?.status, orderResult?.transactionId]);
 
   function back() {
     const previous: Record<Step, Step | null> = { cart: null, email: 'cart', customer: 'email', address: 'customer', shipping: 'address', payment: 'shipping', card: 'payment', review: 'payment' };
@@ -392,7 +458,7 @@ export default function CheckoutScreen() {
 
   function getCardErrors() {
     return {
-      number: digits(cardNumber).length === 16 ? '' : 'Número do cartão inválido',
+      number: digits(cardNumber).length >= 13 && digits(cardNumber).length <= 19 ? '' : 'Número do cartão inválido',
       holder: cardHolder.trim() ? '' : 'Nome inválido',
       expiry: /^\d{2}\/\d{2}$/.test(cardExpiry) ? '' : 'Validade inválida',
       cvv: /^\d{3,4}$/.test(digits(cardCvv)) ? '' : 'CVV inválido',
@@ -419,6 +485,73 @@ export default function CheckoutScreen() {
     setCardValidationAttempted(true);
     if (Object.values(getCardErrors()).some(Boolean)) return;
     void choosePayment(cardPaymentSystem || '1', 'Cartão de crédito');
+  }
+
+  async function finishOrder() {
+    if (!orderForm || !selectedPayment || saving) return;
+    const paymentKind = selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : 'card';
+    setSaving(true);
+    setMessage('');
+    try {
+      let captchaToken = '';
+      if (paymentKind === 'card' && recaptchaSiteKey) {
+        captchaToken = (await recaptchaRef.current?.getToken()) || '';
+        if (!captchaToken) {
+          setMessage('Conclua a verificação de segurança e tente novamente.');
+          return;
+        }
+      }
+      let paymentOrderForm = orderForm;
+      const selectedAddress = orderForm.shippingData?.selectedAddresses?.[0];
+      if (!selectedAddress || selectedAddress.addressType !== 'residential') {
+        paymentOrderForm = await updateShippingAddress({
+          orderFormId: orderForm.orderFormId,
+          address: { receiverName, postalCode: digits(postalCode), street, number, complement, neighborhood, city, state },
+        });
+        setOrderForm(paymentOrderForm);
+      }
+      const result = await placeOrder({
+        orderFormId: paymentOrderForm.orderFormId,
+        paymentSystem: selectedPayment,
+        paymentKind,
+        document: digits(document),
+        address: {
+          receiverName,
+          postalCode: digits(postalCode),
+          street,
+          number,
+          complement,
+          neighborhood,
+          city,
+          state,
+        },
+        ...(paymentKind === 'card' ? {
+          card: {
+            cardNumber: digits(cardNumber),
+            holderName: cardHolder.trim(),
+            validationCode: digits(cardCvv),
+            dueDate: cardExpiry,
+          },
+        } : {}),
+        savePersonalData: true,
+        optinNewsLetter: false,
+        ...(captchaToken ? { captchaToken, captchaSiteKey: recaptchaSiteKey } : {}),
+      });
+      setOrderResult(result);
+      if (result.status === 'completed') {
+        void clearCart(paymentOrderForm.orderFormId).catch(() => undefined);
+      }
+    } catch (error) {
+      if (error instanceof CheckoutOrderError && error.recaptchaKey) {
+        setRecaptchaSiteKey(error.recaptchaKey);
+        recaptchaRef.current?.reset();
+        setMessage('A VTEX solicitou uma verificação de segurança. Toque em Finalizar Compra novamente para validá-la.');
+        return;
+      }
+      setMessage(error instanceof Error ? error.message : 'Não foi possível finalizar o pedido.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function applyCoupon() {
@@ -483,6 +616,41 @@ export default function CheckoutScreen() {
   if (!orderForm) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ThemedText>{message || 'Carrinho vazio.'}</ThemedText></SafeAreaView></ThemedView>;
   if (orderForm.items.length === 0) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Carrinho" onBack={() => router.replace('/')} showSearch={false} showCart /><View style={styles.emptyState}><ThemedText type="subtitle">Seu carrinho está vazio</ThemedText><ThemedText themeColor="textSecondary">Encontre produtos para continuar sua compra.</ThemedText><Primary title="Encontrar produtos" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
 
+  if (orderResult) {
+    const pixPayload = parsePaymentAppPayload(orderResult.paymentApp);
+    const isCompleted = orderResult.status === 'completed';
+    const isPending = orderResult.status === 'pending_payment';
+    const title = isCompleted
+      ? 'Pedido realizado'
+      : isPending
+        ? 'Pagamento pendente'
+        : 'Pagamento não autorizado';
+    return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Resultado do pedido" onBack={() => router.replace('/')} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.paymentReview}>
+        <ThemedText style={styles.pageTitle}>{title}</ThemedText>
+        <ThemedText style={isCompleted ? styles.successText : isPending ? styles.bodyText : styles.errorText}>
+          {orderResult.message || (isCompleted ? 'Seu pedido foi enviado para processamento.' : 'A VTEX não confirmou o pagamento.')}
+        </ThemedText>
+      </View>
+      <Card>
+        <ThemedText style={styles.sectionTitle}>Identificação</ThemedText>
+        <ThemedText style={styles.bodyText}>Pedido: {orderResult.orderId || orderResult.orderGroup}</ThemedText>
+        <ThemedText style={styles.bodyText} themeColor="textSecondary">Transação: {orderResult.transactionId}</ThemedText>
+      </Card>
+      {isPending && pixPayload && <Card>
+        <ThemedText style={styles.sectionTitle}>Pague com Pix</ThemedText>
+        {!!pixPayload.imageUri && <Image source={{ uri: pixPayload.imageUri }} style={styles.pixQrImage} contentFit="contain" />}
+        {!!pixPayload.code && <TextInput value={pixPayload.code} editable={false} multiline style={[styles.input, styles.pixCodeInput]} />}
+        <ThemedText style={styles.bodyText} themeColor="textSecondary">A confirmação será atualizada automaticamente nesta tela.</ThemedText>
+      </Card>}
+      {!isCompleted && !isPending && <ThemedText style={styles.errorText}>A transação foi criada, mas o pedido não deve ser considerado aprovado. Você pode tentar novamente após revisar a configuração do provedor de pagamento.</ThemedText>}
+    </ScrollView><View style={styles.fixedFooter}>
+      {isCompleted && <Primary title="Voltar para a loja" onPress={() => router.replace('/')} />}
+      {isPending && <Secondary title="Voltar para a loja" onPress={() => router.replace('/')} />}
+      {!isCompleted && !isPending && <Primary title="Tentar novamente" onPress={() => { setOrderResult(null); setMessage(''); setStep('payment'); }} />}
+    </View></SafeAreaView></ThemedView>;
+  }
+
   const slas = getShippingOptions(orderForm);
   const selectedShippingId = getShippingSelectionId(orderForm, slas, selectedSla);
   const selectedShipping = slas.find((sla) => (sla.id || sla.name) === selectedShippingId);
@@ -517,15 +685,15 @@ export default function CheckoutScreen() {
   const addressErrors = getAddressErrors();
   const cardErrors = getCardErrors();
 
-  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
+  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{step === 'review' && !selectedPaymentLabel.toLowerCase().includes('pix') && recaptchaSiteKey && <View style={{ paddingHorizontal: Spacing.three, paddingTop: Spacing.two }}><ThemedText style={styles.sectionTitle}>VERIFICAÇÃO DE SEGURANÇA</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">A validação será feita antes de enviar o pagamento.</ThemedText><Recaptcha key={recaptchaSiteKey} ref={recaptchaRef} siteKey={recaptchaSiteKey} /></View>}<ScrollView contentContainerStyle={styles.content}>
     {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}<Pressable onPress={() => setGiftWrap((value) => !value)} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable></ThemedView><ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={setCoupon} placeholder="Insira o código" style={[styles.input, styles.flex]} /><Pressable onPress={applyCoupon} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View></ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /></Card>}
     {step === 'customer' && (customerExists && !editingCustomer ? <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente</ThemedText><ThemedText style={styles.dataLabel}>E-mail</ThemedText><ThemedText style={styles.bodyText}>{email}</ThemedText><ThemedText style={styles.dataLabel}>Nome</ThemedText><ThemedText style={styles.bodyText}>{firstName + ' ' + lastName}</ThemedText><ThemedText style={styles.dataLabel}>Telefone com DDD</ThemedText><ThemedText style={styles.bodyText}>{phone || 'Não informado'}</ThemedText><ThemedText style={styles.dataLabel}>CPF</ThemedText><ThemedText style={styles.bodyText}>{document || 'Não informado'}</ThemedText><ThemedText style={styles.dataLabel}>Gênero</ThemedText><ThemedText style={styles.bodyText}>{gender || 'Não informado'}</ThemedText><Pressable onPress={() => setEditingCustomer(true)}><ThemedText style={styles.link}>Editar dados</ThemedText></Pressable></Card> : <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={customerValidationAttempted ? customerErrors.email : ''} /><Field label="Nome" value={firstName} setValue={setFirstName} required placeholder="Nome" error={customerValidationAttempted ? customerErrors.firstName : ''} /><Field label="Sobrenome" value={lastName} setValue={setLastName} required placeholder="Sobrenome" error={customerValidationAttempted ? customerErrors.lastName : ''} /><Field label="Telefone com DDD" value={phone} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11 99999-9999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} /><Field label="CPF" value={document} setValue={(value) => setDocument(formatCpf(value))} required placeholder="000.000.000-00" keyboardType="numeric" error={customerValidationAttempted ? customerErrors.document : ''} /><View style={styles.field}><ThemedText style={styles.fieldLabel}>Gênero</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText style={styles.bodyText} themeColor="textSecondary">{gender || 'Selecione seu gênero'}</ThemedText><View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText style={styles.bodyText}>{option}</ThemedText></Pressable>)}</View>}</View></Card>)}
     {step === 'address' && (addressSaved && !editingAddress ? <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{street + ', ' + number + (complement ? ' - ' + complement : '')}</ThemedText><ThemedText>{neighborhood + ' - ' + city + '/' + state}</ThemedText><ThemedText>CEP: {postalCode}</ThemedText><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></Card> : <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><Field label="CEP" value={postalCode} setValue={lookupCep} required placeholder="00000-000" keyboardType="numeric" error={addressValidationAttempted ? addressErrors.postalCode : ''} /><Field label="Endereço" value={street} setValue={setStreet} required placeholder="Endereço" error={addressValidationAttempted ? addressErrors.street : ''} /><View style={styles.inline}><Field label="Número" value={number} setValue={setNumber} required placeholder="Número" error={addressValidationAttempted ? addressErrors.number : ''} /><Field label="Complemento" value={complement} setValue={setComplement} placeholder="Complemento" /></View><Field label="Bairro" value={neighborhood} setValue={setNeighborhood} required placeholder="Bairro" error={addressValidationAttempted ? addressErrors.neighborhood : ''} /><View style={styles.inline}><Field label="Cidade" value={city} setValue={setCity} required placeholder="Cidade" error={addressValidationAttempted ? addressErrors.city : ''} /><Field label="Estado" value={state} setValue={setState} required placeholder="Estado" error={addressValidationAttempted ? addressErrors.state : ''} /></View><Field label="Quem irá receber?" value={receiverName} setValue={setReceiverName} required placeholder="Nome do recebedor" error={addressValidationAttempted ? addressErrors.receiverName : ''} />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</Card>)}
-    {step === 'payment' && <><ThemedText style={styles.pageTitle}>Escolha como pagar</ThemedText><Pressable disabled={saving} onPress={() => openCardPayment(cardMethod || { id: '1', name: 'Cartão de crédito' })} style={styles.paymentCard}><View style={styles.paymentHeader}><CreditCardIcon color="#231f20" size={21} /><ThemedText style={styles.sectionTitle}>Cartão de Crédito</ThemedText></View><View style={styles.paymentDivider} /><ThemedText style={styles.bodyText} themeColor="textSecondary">+ novo cartão</ThemedText></Pressable><View style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>{!voucherOpen ? <Pressable onPress={() => setVoucherOpen(true)} style={styles.voucherTrigger}><ThemedText style={styles.sectionTitle}>{voucherApplied ? 'Vale presente adicionado' : 'Adicionar vale presente'}</ThemedText></Pressable> : <><View style={styles.paymentDivider} /><View style={styles.inline}><TextInput value={voucher} onChangeText={(text) => setVoucher(text.normalize('NFC'))} autoCapitalize="characters" placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} /><Pressable disabled={saving} onPress={applyVoucher} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View>{voucherApplied && <ThemedText style={styles.successText}>Vale-presente adicionado.</ThemedText>}</>}</View>{!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}<Pressable disabled={saving} onPress={() => choosePayment(pixMethod?.id || '6', pixMethod?.name || 'Pix')} style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Pagamento instantâneo</ThemedText><View style={styles.pixInfo}><ThemedText style={styles.pixWord}>pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">O código Pix será exibido na próxima etapa, após a revisão do seu pedido.</ThemedText></View></Pressable></>}
+    {step === 'payment' && <><ThemedText style={styles.pageTitle}>Escolha como pagar</ThemedText><Pressable disabled={saving} onPress={() => openCardPayment(cardMethod || { id: '1', name: 'Cartão de crédito' })} style={styles.paymentCard}><View style={styles.paymentHeader}><CreditCardIcon color="#231f20" size={21} /><ThemedText style={styles.sectionTitle}>Cartão de Crédito</ThemedText></View><View style={styles.paymentDivider} /><ThemedText style={styles.bodyText} themeColor="textSecondary">+ novo cartão</ThemedText></Pressable><View style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>{!voucherOpen ? <Pressable onPress={() => setVoucherOpen(true)} style={styles.voucherTrigger}><ThemedText style={styles.sectionTitle}>{voucherApplied ? 'Vale presente adicionado' : 'Adicionar vale presente'}</ThemedText></Pressable> : <><View style={styles.paymentDivider} /><View style={styles.inline}><TextInput value={voucher} onChangeText={(text) => setVoucher(text.normalize('NFC'))} autoCapitalize="characters" placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} /><Pressable disabled={saving} onPress={applyVoucher} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View>{voucherApplied && <ThemedText style={styles.successText}>Vale-presente adicionado.</ThemedText>}</>}</View>{!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}<Pressable disabled={saving} onPress={() => pixMethod ? choosePayment(pixMethod.id, pixMethod.name || 'Pix') : setMessage('Pix não está disponível para este carrinho.')} style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Pagamento instantâneo</ThemedText><View style={styles.pixInfo}><ThemedText style={styles.pixWord}>pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">O código Pix será exibido na próxima etapa, após a revisão do seu pedido.</ThemedText></View></Pressable></>}
     {step === 'card' && <><View style={styles.creditCardVisual}><ThemedText style={styles.creditCardLabel}>CARTÃO DE CRÉDITO</ThemedText><ThemedText style={styles.creditCardNumber}>{cardNumber ? cardNumber : '•••• •••• •••• ••••'}</ThemedText><View style={styles.creditCardBottom}><ThemedText style={styles.creditCardMeta}>{cardHolder || 'NOME DO TITULAR'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardExpiry || 'MM/AA'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardCvv ? 'CVV' : 'CVV'}</ThemedText></View></View><Card><Field label="Número do cartão" value={cardNumber} setValue={(value) => setCardNumber(formatCardNumber(value))} required placeholder="Insira o número do seu cartão" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.number : ''} /><Field label="Nome impresso no cartão" value={cardHolder} setValue={setCardHolder} required placeholder="Nome impresso no cartão" error={cardValidationAttempted ? cardErrors.holder : ''} /><View style={styles.inline}><Field label="Validade" value={cardExpiry} setValue={(value) => setCardExpiry(formatExpiry(value))} required placeholder="MM/AA" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.expiry : ''} /><Field label="CVV" value={cardCvv} setValue={setCardCvv} required placeholder="CVV" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.cvv : ''} /></View><ThemedText style={styles.cardTitle}>Endereço de cobrança</ThemedText><Pressable onPress={() => undefined} style={styles.billingRow}><View style={styles.billingCheckbox}><ThemedText style={styles.billingCheck}>✓</ThemedText></View><ThemedText style={styles.billingText}>O endereço da fatura é {street + ', ' + number + ' - ' + neighborhood + ', ' + city + ' - ' + state}</ThemedText></Pressable></Card><ThemedText style={styles.acceptedTitle}>Bandeiras aceitas:</ThemedText><View style={styles.brandRow}><BrandBadge label="AMEX" color="#2c77b8" /><BrandBadge label="VISA" color="#1e4c9a" /><BrandBadge label="elo" color="#2e9ba3" /><BrandBadge label="MasterCard" color="#9c2020" /><BrandBadge label="Hipercard" color="#c52b2b" /><BrandBadge label="elo" color="#f2a900" /></View>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
     {step === 'review' && <><ThemedText style={styles.pageTitle}>Revise e confirme</ThemedText><Summary orderForm={orderForm} shippingPrice={selectedShipping?.price} /><Card><ReviewHeader icon="user" title="DADOS PESSOAIS" /><ThemedText style={styles.bodyText}>{email}</ThemedText><ThemedText style={styles.bodyText}>{firstName + ' ' + lastName}</ThemedText><ThemedText style={styles.bodyText}>{phone}</ThemedText><ThemedText style={styles.bodyText}>{document}</ThemedText><Pressable onPress={() => { setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><View style={styles.reviewDeliveryTop}><ReviewHeader icon="truck" title="ENTREGA" /><ThemedText style={styles.freeText}>{selectedShipping?.price === 0 ? 'Grátis' : money(selectedShipping?.price || 0)}</ThemedText></View><ThemedText style={styles.bodyText}>{selectedShipping?.name || 'Entrega selecionada'}</ThemedText><ThemedText style={styles.deliveryText}>◷ {deliveryEstimate(selectedShipping?.shippingEstimate || '')}</ThemedText><View style={styles.reviewAddress}><ThemedText style={styles.sectionTitle}>Endereço de Entrega</ThemedText><ThemedText style={styles.bodyText}>{street + ', ' + number}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText></View><View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.reviewItemImage} />}<ThemedText style={styles.reviewItemName}>{item.name + ' ' + item.quantity + ' un.'}</ThemedText></View>)}</View><Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><ReviewHeader icon="card" title="PAGAMENTO" /><View style={styles.paymentReview}><ThemedText style={styles.pixWord}>{selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : '▣'}</ThemedText><ThemedText style={styles.bodyText}>{selectedPaymentLabel || 'Pagamento selecionado'}</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">{selectedPaymentLabel.toLowerCase().includes('pix') ? 'Aprovação imediata' : 'Cartão de crédito'}</ThemedText></View><Pressable onPress={() => setStep('payment')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
-  </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title="Finalizar Compra" onPress={() => setMessage('A finalização será habilitada após conectar a tokenização e o endpoint seguro de pagamento VTEX.')} />}</View></SafeAreaView></ThemedView>;
+  </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
 }
 
 function Card({ children }: { children: ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
@@ -631,6 +799,8 @@ const styles = StyleSheet.create({
   voucherTrigger: { minHeight: 34, justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#eeeae5' },
   pixInfo: { gap: Spacing.two, marginTop: Spacing.one, padding: Spacing.three, borderRadius: 8, backgroundColor: '#f5f5f5' },
   pixWord: { color: '#4bb5ad', fontSize: 28, lineHeight: 32, fontFamily: Fonts.sans, fontWeight: '400' },
+  pixQrImage: { alignSelf: 'center', width: 240, height: 240, marginVertical: Spacing.two },
+  pixCodeInput: { minHeight: 92, textAlignVertical: 'top' },
   creditCardVisual: { minHeight: 155, padding: Spacing.three, borderRadius: 8, backgroundColor: '#344762', justifyContent: 'space-between' },
   creditCardLabel: { color: '#dfe5ee', fontSize: 12, fontFamily: Fonts.sans },
   creditCardNumber: { color: '#FFFFFF', fontSize: 20, letterSpacing: 1, fontFamily: Fonts.sans },

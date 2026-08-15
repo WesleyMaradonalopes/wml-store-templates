@@ -7,6 +7,8 @@ const port = Number(process.env.PORT || 6001);
 const account = process.env.VTEX_ACCOUNT || 'lojabl';
 const domain = process.env.VTEX_STORE_DOMAIN || `${account}.myvtex.com`;
 const vtexBaseUrl = `https://${domain}`;
+const vtexPaymentsBaseUrl = `https://${account}.vtexpayments.com.br`;
+const vtexVaultBaseUrl = 'https://api.vtexvault.com';
 const allowedOrigins = String(process.env.ALLOWED_ORIGINS || '').split(',').map((item) => item.trim()).filter(Boolean);
 const wishlistEntity = process.env.VTEX_WISHLIST_ENTITY || 'wishlist';
 const wishlistSchema = process.env.VTEX_WISHLIST_SCHEMA || 'wishlist';
@@ -24,9 +26,247 @@ function vtexHeaders() {
   return headers;
 }
 
+function checkoutHeaders(userToken = '', contentType = false, cookie = '') {
+  const headers = { ...vtexHeaders() };
+  if (contentType) headers['Content-Type'] = 'application/json';
+  if (userToken) {
+    headers.VtexIdclientAutCookie = userToken;
+    if (!cookie) headers.Cookie = `VtexIdclientAutCookie_${account}=${userToken}`;
+  }
+  if (cookie) headers.Cookie = cookie;
+  return headers;
+}
+
+function publicCheckoutHeaders(userToken = '', contentType = false, cookie = '') {
+  const headers = { Accept: 'application/json' };
+  if (contentType) headers['Content-Type'] = 'application/json';
+  if (userToken) {
+    headers.VtexIdclientAutCookie = userToken;
+    if (!cookie) headers.Cookie = `VtexIdclientAutCookie_${account}=${userToken}`;
+  }
+  if (cookie) headers.Cookie = cookie;
+  return headers;
+}
+
+async function requestCheckout(url, {
+  method = 'GET',
+  body,
+  userToken = '',
+  contentType = false,
+  cookie = '',
+  fallbackToAppAuth = false,
+  } = {}) {
+  const init = {
+    method,
+    headers: publicCheckoutHeaders(userToken, contentType, cookie),
+    ...(body === undefined ? {} : { body }),
+  };
+  let result = await fetch(url, init);
+  if (!result.ok && [401, 403].includes(result.status) && userToken) {
+    result = await fetch(url, {
+      ...init,
+      headers: publicCheckoutHeaders('', contentType, cookie),
+    });
+  }
+  if (!result.ok && [401, 403].includes(result.status) && fallbackToAppAuth && hasVtexPaymentCredentials()) {
+    result = await fetch(url, {
+      ...init,
+      headers: checkoutHeaders('', contentType, cookie),
+    });
+  }
+  return result;
+}
+
+function hasVtexPaymentCredentials() {
+  return Boolean(process.env.VTEX_APP_KEY && process.env.VTEX_APP_TOKEN);
+}
+
+async function readResponseBody(response) {
+  const text = await response.text().catch(() => '');
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return { raw: text }; }
+}
+
+function vtexErrorMessage(body, fallback) {
+  const candidates = [
+    body?.error?.message,
+    typeof body?.error === 'string' ? body.error : '',
+    body?.message,
+    body?.errorMessage,
+    body?.errors?.[0]?.message,
+  ];
+  const message = candidates.find((value) => typeof value === 'string' && value.trim());
+  return String(message || fallback).slice(0, 300);
+}
+
+function vtexErrorCode(body) {
+  return body?.error?.code || body?.code || body?.errorCode || '';
+}
+
+function vtexRecaptchaKey(body) {
+  const candidates = [
+    body?.recaptchaKeyV3,
+    body?.recaptchaKey,
+    body?.fields?.recaptchaKeyV3,
+    body?.fields?.recaptchaKey,
+    body?.details?.recaptchaKey,
+    body?.error?.recaptchaKey,
+    body?.error?.recaptchaKeyV3,
+    body?.error?.fields?.recaptchaKeyV3,
+    body?.error?.fields?.recaptchaKey,
+    body?.error?.details?.recaptchaKey,
+  ];
+  const key = candidates.find((value) => typeof value === 'string' && value.trim());
+  return String(key || '').trim();
+}
+
+function digits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function isSafeCheckoutId(value) {
+  return /^[A-Za-z0-9-]{16,80}$/.test(String(value || ''));
+}
+
+function normalizePaymentSystem(value) {
+  const stringValue = String(value || '').trim();
+  return /^\d+$/.test(stringValue) ? Number(stringValue) : stringValue;
+}
+
+function paymentSystemMatches(orderForm, paymentSystem) {
+  const requested = String(paymentSystem);
+  const systems = [
+    ...(orderForm?.paymentData?.paymentSystems || []),
+    ...(orderForm?.paymentData?.payments || []),
+  ];
+  return systems.some((system) => String(
+    system.stringId ?? system.id ?? system.paymentSystem ?? '',
+  ) === requested);
+}
+
+function normalizeAddress(address) {
+  if (!address || typeof address !== 'object') return null;
+  return {
+    addressType: 'residential',
+    receiverName: String(address.receiverName || '').slice(0, 120),
+    postalCode: digits(address.postalCode).slice(0, 8),
+    street: String(address.street || '').slice(0, 160),
+    number: String(address.number || '').slice(0, 30),
+    complement: String(address.complement || '').slice(0, 120),
+    neighborhood: String(address.neighborhood || '').slice(0, 120),
+    city: String(address.city || '').slice(0, 120),
+    state: String(address.state || '').slice(0, 2).toUpperCase(),
+    country: 'BRA',
+  };
+}
+
+function paymentSystemKind(orderForm, paymentSystem, requestedKind) {
+  const requested = String(requestedKind || '').toLowerCase();
+  const system = [
+    ...(orderForm?.paymentData?.paymentSystems || []),
+    ...(orderForm?.paymentData?.payments || []),
+  ].find((item) => String(item.stringId ?? item.id ?? item.paymentSystem ?? '') === String(paymentSystem));
+  const label = `${system?.name || ''} ${system?.groupName || ''} ${system?.group || ''}`.toLowerCase();
+  if (label.includes('pix') || label.includes('instant')) return 'pix';
+  if (label.includes('cart') || label.includes('card') || label.includes('credit')) return 'card';
+  return requested === 'pix' || requested === 'card' ? requested : '';
+}
+
+function buildPaymentFields({ kind, card, document, address, accountId = '', bin = '' }) {
+  const fields = {
+    accountId: String(card?.accountId || accountId || ''),
+    address: normalizeAddress(address),
+  };
+  if (kind === 'card') {
+    fields.holderName = String(card?.holderName || '').trim().slice(0, 120);
+    fields.cardNumber = digits(card?.cardNumber);
+    fields.validationCode = digits(card?.validationCode);
+    fields.dueDate = String(card?.dueDate || '').trim();
+    fields.document = digits(document);
+    fields.bin = digits(bin).slice(0, 6);
+  }
+  return fields;
+}
+
+function validateCardFields(card, document) {
+  const cardNumber = digits(card?.cardNumber);
+  const validationCode = digits(card?.validationCode);
+  const dueDate = String(card?.dueDate || '').trim();
+  if (cardNumber.length < 13 || cardNumber.length > 19) return 'Informe um número de cartão válido.';
+  if (!String(card?.holderName || '').trim()) return 'Informe o nome do titular do cartão.';
+  if (validationCode.length < 3 || validationCode.length > 4) return 'Informe um código de segurança válido.';
+  if (!/^((0[1-9])|(1[0-2]))\/\d{2}$/.test(dueDate)) return 'Informe a validade do cartão no formato MM/AA.';
+  if (digits(document).length !== 11) return 'Informe um CPF válido para o pagamento.';
+  return '';
+}
+
+function paymentGatewayUrl(transactionBody, transactionId, orderGroup) {
+  const candidate = transactionBody?.receiverUri
+    || transactionBody?.merchantTransactions?.[0]?.receiverUri
+    || transactionBody?.merchantTransactions?.[0]?.payments?.[0]?.receiverUri;
+  const expectedHost = `${account}.vtexpayments.com.br`.toLowerCase();
+  if (candidate) {
+    const parsed = new URL(candidate);
+    const allowedHosts = new Set([expectedHost, 'api.vtexvault.com']);
+    if (parsed.protocol !== 'https:' || !allowedHosts.has(parsed.hostname.toLowerCase())) {
+      throw new Error('A VTEX retornou um endereço de pagamento inválido.');
+    }
+    if (parsed.hostname.toLowerCase() === 'api.vtexvault.com') {
+      if (!parsed.searchParams.has('an')) parsed.searchParams.set('an', account);
+      if (!parsed.searchParams.has('orderId')) parsed.searchParams.set('orderId', orderGroup);
+    }
+    return parsed.toString();
+  }
+  if (/^(vault|true)$/i.test(String(process.env.VTEX_PAYMENT_GATEWAY || ''))) {
+    return `${vtexVaultBaseUrl}/api/payments/transactions/${encodeURIComponent(transactionId)}/payments?an=${encodeURIComponent(account)}&orderId=${encodeURIComponent(orderGroup)}`;
+  }
+  return `${vtexPaymentsBaseUrl}/api/pub/transactions/${encodeURIComponent(transactionId)}/payments?orderId=${encodeURIComponent(orderGroup)}`;
+}
+
+function extractPaymentApp(...bodies) {
+  const collection = bodies.flatMap((body) => Array.isArray(body?.paymentAuthorizationAppCollection)
+    ? body.paymentAuthorizationAppCollection
+    : []);
+  const app = collection.find((item) => /pix/i.test(String(item?.appName || ''))) || collection[0];
+  if (!app) return null;
+  const serializedPayload = app.appPayload ?? app.payload ?? app.paymentAppData?.payload ?? '';
+  return {
+    appName: String(app.appName || ''),
+    appPayload: typeof serializedPayload === 'string' ? serializedPayload : JSON.stringify(serializedPayload),
+  };
+}
+
+function normalizeTransactionStatus(body) {
+  const value = String(
+    body?.status
+      || body?.transactionStatus
+      || body?.payments?.[0]?.status
+      || body?.payments?.[0]?.paymentStatus
+      || '',
+  ).toLowerCase();
+  if (['approved', 'authorized', 'completed', 'captured', 'settled'].includes(value)) return 'completed';
+  if (['denied', 'declined', 'canceled', 'cancelled', 'failed', 'rejected'].includes(value)) return 'failed';
+  return 'waiting';
+}
+
 function extractSetCookie(response) {
   if (typeof response.headers.getSetCookie === 'function') return response.headers.getSetCookie().join(', ');
   return response.headers.get('set-cookie') || '';
+}
+
+function extractCookieValue(cookieHeader, name) {
+  const match = String(cookieHeader || '').match(new RegExp(`${name}=([^;]+)`, 'i'));
+  return match?.[1] || '';
+}
+
+function transactionAuthCookie(response) {
+  const raw = extractSetCookie(response);
+  const vtexAuth = extractCookieValue(raw, 'Vtex_CHKO_Auth');
+  const checkoutAccess = extractCookieValue(raw, 'CheckoutDataAccess');
+  return [
+    vtexAuth ? `Vtex_CHKO_Auth=${vtexAuth}` : '',
+    checkoutAccess ? `CheckoutDataAccess=${checkoutAccess}` : '',
+  ].filter(Boolean).join('; ');
 }
 
 function normalizeCookieHeader(raw) {
@@ -348,6 +588,276 @@ async function saveWishlistByEmail(email, items, token = '', current = null) {
 }
 
 app.get('/health', (_request, response) => response.json({ ok: true, service: 'wml-backend' }));
+
+app.post('/checkout/order', async (request, response) => {
+  const orderFormId = String(request.body?.orderFormId || '').trim();
+  const paymentSystem = String(request.body?.paymentSystem || '').trim();
+  const requestedKind = String(request.body?.paymentKind || '').trim().toLowerCase();
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+
+  if (!isSafeCheckoutId(orderFormId) || !paymentSystem) {
+    return response.status(400).json({ ok: false, message: 'Carrinho ou forma de pagamento inválidos.' });
+  }
+
+  try {
+    const orderFormResult = await requestCheckout(
+      `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}`,
+      { userToken, fallbackToAppAuth: true },
+    );
+    const orderForm = await readResponseBody(orderFormResult);
+    if (!orderFormResult.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(orderForm),
+        message: vtexErrorMessage(orderForm, `Não foi possível consultar o carrinho na VTEX (HTTP ${orderFormResult.status}).`),
+      });
+    }
+
+    const orderValue = Number(orderForm?.value || 0);
+    if (!Array.isArray(orderForm?.items) || orderForm.items.length === 0 || !Number.isInteger(orderValue) || orderValue <= 0) {
+      return response.status(400).json({ ok: false, message: 'O carrinho está vazio ou não possui um valor válido.' });
+    }
+    if (!paymentSystemMatches(orderForm, paymentSystem)) {
+      return response.status(400).json({ ok: false, message: 'A forma de pagamento não está disponível para este carrinho.' });
+    }
+
+    const kind = paymentSystemKind(orderForm, paymentSystem, requestedKind);
+    if (!kind) {
+      return response.status(400).json({ ok: false, message: 'Não foi possível identificar a forma de pagamento.' });
+    }
+    const document = String(request.body?.document || '');
+    if (kind === 'card') {
+      const cardError = validateCardFields(request.body?.card, document);
+      if (cardError) return response.status(400).json({ ok: false, message: cardError });
+    }
+
+    const transactionPayload = {
+      referenceId: orderFormId,
+      value: orderValue,
+      referenceValue: orderValue,
+      interestValue: 0,
+      savePersonalData: Boolean(request.body?.savePersonalData),
+      optinNewsLetter: Boolean(request.body?.optinNewsLetter),
+    };
+    if (request.body?.captchaToken && request.body?.captchaSiteKey) {
+      transactionPayload.recaptchaToken = String(request.body.captchaToken);
+      transactionPayload.recaptchaKey = String(request.body.captchaSiteKey);
+    }
+
+    const transactionResult = await requestCheckout(
+      `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/transaction`,
+      {
+        method: 'POST',
+        userToken,
+        contentType: true,
+        fallbackToAppAuth: true,
+        body: JSON.stringify(transactionPayload),
+      },
+    );
+    const transactionBody = await readResponseBody(transactionResult);
+    if (!transactionResult.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(transactionBody),
+        recaptchaKey: vtexRecaptchaKey(transactionBody) || undefined,
+        message: vtexErrorMessage(transactionBody, 'A VTEX não conseguiu iniciar a transação.'),
+      });
+    }
+
+    const orderGroup = String(transactionBody?.orderGroup || transactionBody?.orderId || '').trim();
+    const transactionId = String(
+      transactionBody?.transactionId
+        || transactionBody?.id
+        || transactionBody?.merchantTransactions?.[0]?.transactionId
+        || '',
+    ).trim();
+    if (!orderGroup || !transactionId) {
+      return response.status(502).json({ ok: false, message: 'A VTEX iniciou a transação sem retornar seus identificadores.' });
+    }
+
+    const paymentSystems = orderForm?.paymentData?.paymentSystems || [];
+    const paymentSystemInfo = paymentSystems.find((item) => String(item?.stringId ?? item?.id ?? '') === paymentSystem) || {};
+    const transactionPayments = [
+      ...(transactionBody?.paymentData?.payments || []),
+      ...(transactionBody?.payments || []),
+    ];
+    const payment = transactionPayments.find((item) => String(item?.paymentSystem) === paymentSystem)
+      || transactionPayments[0]
+      || transactionBody?.merchantTransactions?.[0]?.payments?.find((item) => String(item?.paymentSystem) === paymentSystem)
+      || transactionBody?.merchantTransactions?.[0]?.payments?.[0]
+      || {};
+    const merchantSellerPayment = payment?.merchantSellerPayments?.[0] || {};
+    const merchantTransaction = transactionBody?.merchantTransactions?.find((item) =>
+      String(item?.id || '') === String(merchantSellerPayment?.id || '')
+      || item?.payments?.some((itemPayment) => String(itemPayment?.paymentSystem) === paymentSystem),
+    ) || transactionBody?.merchantTransactions?.[0] || {};
+    const paymentGroup = String(
+      paymentSystemInfo?.groupName
+        || paymentSystemInfo?.group
+        || (kind === 'pix' ? 'instantPaymentPaymentGroup' : 'creditCardPaymentGroup'),
+    );
+    const installments = Number(merchantSellerPayment?.installments || payment?.installments || 1);
+    const installmentsInterestRate = Number(merchantSellerPayment?.interestRate ?? payment?.installmentsInterestRate ?? 0);
+    const installmentsValue = Number(merchantSellerPayment?.installmentValue ?? payment?.installmentsValue ?? payment?.value ?? orderValue);
+    const paymentValue = Number(merchantSellerPayment?.value ?? payment?.value ?? orderValue);
+    const paymentReferenceValue = Number(merchantSellerPayment?.referenceValue ?? payment?.referenceValue ?? orderValue);
+    const paymentPayload = [{
+      paymentSystem: normalizePaymentSystem(payment?.paymentSystem ?? paymentSystem),
+      paymentSystemName: String(paymentSystemInfo?.name || (kind === 'pix' ? 'Pix' : 'Cartão de crédito')),
+      group: paymentGroup,
+      groupName: paymentGroup,
+      installments,
+      currencyCode: 'BRL',
+      value: paymentValue,
+      installmentsInterestRate,
+      installmentsValue,
+      referenceValue: paymentReferenceValue,
+      ...(kind === 'card' ? {
+        hasDefaultBillingAddress: true,
+        isLuhnValid: true,
+        bin: payment?.bin || request.body?.card?.bin || '',
+        isBillingAddressDifferent: false,
+        fields: buildPaymentFields({
+          kind,
+          card: request.body?.card,
+          document,
+          address: request.body?.address,
+          accountId: payment?.accountId || '',
+          bin: payment?.bin || request.body?.card?.bin || '',
+        }),
+        chooseToUseNewCard: true,
+        isRegexValid: true,
+      } : {}),
+      id: merchantTransaction?.id || merchantSellerPayment?.id || payment?.id || '',
+      interestRate: installmentsInterestRate,
+      installmentValue: installmentsValue,
+      transaction: {
+        id: merchantTransaction?.transactionId || transactionId,
+        merchantName: merchantTransaction?.merchantName || payment?.merchantName || account,
+      },
+      originalPaymentIndex: 0,
+    }];
+
+    let paymentUrl;
+    try {
+      paymentUrl = paymentGatewayUrl(transactionBody, transactionId, orderGroup);
+    } catch (error) {
+      return response.status(502).json({ ok: false, orderGroup, transactionId, message: error.message });
+    }
+
+    const paymentResult = await requestCheckout(paymentUrl, {
+      method: 'POST',
+      userToken,
+      contentType: true,
+      fallbackToAppAuth: true,
+      body: JSON.stringify(paymentPayload),
+    });
+    const paymentBody = await readResponseBody(paymentResult);
+    if (!paymentResult.ok) {
+      return response.json({
+        ok: true,
+        status: 'payment_failed',
+        phase: 'payment',
+        orderId: orderGroup,
+        orderGroup,
+        transactionId,
+        code: vtexErrorCode(paymentBody),
+        message: vtexErrorMessage(paymentBody, 'A VTEX criou a transação, mas o pagamento não foi autorizado.'),
+      });
+    }
+
+    const callbackResult = await requestCheckout(
+      `${vtexBaseUrl}/api/checkout/pub/gatewayCallback/${encodeURIComponent(orderGroup)}`,
+      {
+        method: 'POST',
+        userToken,
+        contentType: true,
+        cookie: transactionAuthCookie(transactionResult),
+        fallbackToAppAuth: true,
+      },
+    );
+    const callbackBody = await readResponseBody(callbackResult);
+    const paymentApp = extractPaymentApp(transactionBody, paymentBody, callbackBody);
+    if (!callbackResult.ok) {
+      return response.json({
+        ok: true,
+        status: paymentApp ? 'pending_payment' : 'payment_failed',
+        phase: 'authorization',
+        orderId: orderGroup,
+        orderGroup,
+        transactionId,
+        paymentApp,
+        code: vtexErrorCode(callbackBody),
+        message: vtexErrorMessage(callbackBody, 'A VTEX criou a transação, mas não confirmou o pagamento.'),
+      });
+    }
+
+    const callbackStatus = normalizeTransactionStatus(callbackBody);
+    const status = paymentApp || (callbackResult.status !== 204 && callbackStatus === 'waiting')
+      ? 'pending_payment'
+      : callbackStatus === 'failed' ? 'payment_failed' : 'completed';
+
+    return response.json({
+      ok: true,
+      status,
+      orderId: orderGroup,
+      orderGroup,
+      transactionId,
+      paymentId: payment?.paymentId || payment?.id || '',
+      paymentApp,
+      message: status === 'completed'
+        ? 'Pedido processado com sucesso.'
+        : status === 'pending_payment'
+          ? 'Aguardando a confirmação do pagamento.'
+          : 'A VTEX criou a transação, mas o pagamento não foi autorizado.',
+    });
+  } catch (error) {
+    console.error(`[CHECKOUT] order ${orderFormId} -> error`);
+    return response.status(502).json({
+      ok: false,
+      message: error instanceof Error ? error.message : 'Não foi possível finalizar o pedido.',
+    });
+  }
+});
+
+app.get('/checkout/transaction/:transactionId/status', async (request, response) => {
+  const transactionId = String(request.params.transactionId || '').trim();
+  const orderGroup = String(request.query.orderGroup || '').trim();
+  const paymentId = String(request.query.paymentId || '').trim();
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  if (!isSafeCheckoutId(transactionId)) {
+    return response.status(400).json({ ok: false, message: 'Transação inválida.' });
+  }
+
+  try {
+    const statusUrl = paymentId
+      ? `${vtexBaseUrl}/_v/private/pix/status/${encodeURIComponent(transactionId)}/payments/${encodeURIComponent(paymentId)}`
+      : `${vtexPaymentsBaseUrl}/api/pvt/transactions/${encodeURIComponent(transactionId)}`;
+    const result = await requestCheckout(
+      statusUrl,
+      { userToken, fallbackToAppAuth: true },
+    );
+    const body = await readResponseBody(result);
+    if (!result.ok) {
+      return response.status(502).json({
+        ok: false,
+        message: vtexErrorMessage(body, 'Não foi possível consultar o status do pagamento.'),
+      });
+    }
+    const payment = body?.payments?.[0] || body?.merchantTransactions?.[0]?.payments?.[0] || {};
+    return response.json({
+      ok: true,
+      status: normalizeTransactionStatus(body),
+      orderId: orderGroup || body?.orderGroup || body?.orderId || '',
+      paymentId: payment.paymentId || payment.id || '',
+    });
+  } catch (error) {
+    return response.status(502).json({
+      ok: false,
+      message: error instanceof Error ? error.message : 'Não foi possível consultar o status do pagamento.',
+    });
+  }
+});
 
 app.post('/checkout/order-form/:orderFormId/items', async (request, response) => {
   const orderFormId = String(request.params.orderFormId || '').trim();

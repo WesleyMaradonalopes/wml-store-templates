@@ -9,6 +9,8 @@
 - Detalhe de produto e prateleiras conectados ao catálogo.
 - Carrinho usando `orderForm` VTEX.
 - Checkout com cliente, endereço, frete, SLA e seleção de pagamento.
+- Finalização do checkout integrada ao fluxo de transação, pagamento e callback da VTEX para cartão e Pix.
+- Resultado do pedido com identificadores da transação, QR Code Pix e consulta automática de status.
 - Nenhuma dependência ou referência da plataforma legada no diretório `wml-store`.
 
 ## Próximas integrações
@@ -16,7 +18,7 @@
 1. Configurar autenticação do cliente via VTEX ID/OAuth.
 2. Migrar perfil, pedidos e favoritos.
 3. Validar token de usuário e persistência de sessão no dispositivo.
-4. Implementar finalização do pedido em ambiente de testes.
+4. Validar a finalização do pedido em ambiente de testes com as credenciais e afiliações de pagamento ativas.
 5. Testar no Android e iOS.
 6. Auditar o conteúdo antes de enviar ao repositório próprio.
 
