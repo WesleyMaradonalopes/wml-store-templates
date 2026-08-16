@@ -50,19 +50,36 @@ To learn more about developing your project with Expo, look at the following res
 
 ## Checkout com reCAPTCHA
 
-O cartão usa a chave reCAPTCHA Enterprise configurada na VTEX. O app nativo
-usa o SDK nativo quando disponível e mantém um fallback WebView para testes.
-Como o SDK nativo não é incluído no Expo Go, depois de instalar as dependências
-é necessário gerar um development build para testar no Android/iOS:
+O cartão usa a chave pública reCAPTCHA configurada na VTEX. No development
+build, o fluxo tenta primeiro o SDK nativo recomendado para aplicativos móveis.
+No Expo Go ou quando o SDK não aceita a chave, usa uma WebView com a origem
+`https://lojabl.myvtex.com/` como fallback.
+
+Para o SDK Android aceitar a chave, ela deve ser criada no Google Cloud como
+tipo Android, permitir o pacote `br.com.lojabl.store` e, nos development builds
+instalados fora da Play Store, permitir distribuição fora da Google Play.
+
+Para validar o checkout completo, prefira o development build já instalado:
 
 ```bash
-npx expo run:android
+npx expo start --dev-client -c
+```
+
+Alterações apenas em JavaScript/TypeScript, como as do checkout, não exigem
+recompilar o APK. Gere um novo development build somente quando uma dependência
+nativa mudar ou quando o aplicativo ainda não estiver instalado:
+
+```bash
+# Windows: contorna o problema do prebuild em caminhos com acentos
+npm run android:native
 # ou, no macOS com Xcode:
 npx expo run:ios
 ```
 
-O `clientSecret`/API key permanece somente na configuração da VTEX/backend e
-nunca deve ser colocado em `EXPO_PUBLIC_*`.
+O `clientId`/site key é público e pode ficar em
+`EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY`. O `clientSecret`, a API key e outras
+credenciais permanecem somente na configuração da VTEX/backend e nunca devem
+ser colocados em `EXPO_PUBLIC_*`.
 
 ## Join the community
 

@@ -29,22 +29,26 @@ function vtexHeaders() {
 function checkoutHeaders(userToken = '', contentType = false, cookie = '') {
   const headers = { ...vtexHeaders() };
   if (contentType) headers['Content-Type'] = 'application/json';
+  const cookies = [];
   if (userToken) {
     headers.VtexIdclientAutCookie = userToken;
-    if (!cookie) headers.Cookie = `VtexIdclientAutCookie_${account}=${userToken}`;
+    cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
-  if (cookie) headers.Cookie = cookie;
+  if (cookie) cookies.push(cookie);
+  if (cookies.length) headers.Cookie = cookies.join('; ');
   return headers;
 }
 
 function publicCheckoutHeaders(userToken = '', contentType = false, cookie = '') {
   const headers = { Accept: 'application/json' };
   if (contentType) headers['Content-Type'] = 'application/json';
+  const cookies = [];
   if (userToken) {
     headers.VtexIdclientAutCookie = userToken;
-    if (!cookie) headers.Cookie = `VtexIdclientAutCookie_${account}=${userToken}`;
+    cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
-  if (cookie) headers.Cookie = cookie;
+  if (cookie) cookies.push(cookie);
+  if (cookies.length) headers.Cookie = cookies.join('; ');
   return headers;
 }
 
@@ -55,6 +59,7 @@ async function requestCheckout(url, {
   contentType = false,
   cookie = '',
   fallbackToAppAuth = false,
+  singleAttempt = false,
   } = {}) {
   const init = {
     method,
@@ -62,16 +67,21 @@ async function requestCheckout(url, {
     ...(body === undefined ? {} : { body }),
   };
   let result = await fetch(url, init);
-  if (!result.ok && [401, 403].includes(result.status) && userToken) {
+  let fallbackUserToken = userToken;
+  // A VTEX também usa 403 para desafios de reCAPTCHA/progressive auth. Nesse
+  // caso, remover o cookie troca a identidade no meio do checkout e pode abrir
+  // uma nova tela de login. Só descartamos um token realmente não autorizado.
+  if (!singleAttempt && !result.ok && result.status === 401 && userToken) {
     result = await fetch(url, {
       ...init,
       headers: publicCheckoutHeaders('', contentType, cookie),
     });
+    fallbackUserToken = '';
   }
-  if (!result.ok && [401, 403].includes(result.status) && fallbackToAppAuth && hasVtexPaymentCredentials()) {
+  if (!singleAttempt && !result.ok && [401, 403].includes(result.status) && fallbackToAppAuth && hasVtexPaymentCredentials()) {
     result = await fetch(url, {
       ...init,
-      headers: checkoutHeaders('', contentType, cookie),
+      headers: checkoutHeaders(fallbackUserToken, contentType, cookie),
     });
   }
   return result;
@@ -589,6 +599,55 @@ async function saveWishlistByEmail(email, items, token = '', current = null) {
 
 app.get('/health', (_request, response) => response.json({ ok: true, service: 'wml-backend' }));
 
+app.post('/checkout/order-form/:orderFormId/client-profile', async (request, response) => {
+  const orderFormId = String(request.params.orderFormId || '').trim();
+  if (!isSafeCheckoutId(orderFormId)) {
+    return response.status(400).json({ ok: false, message: 'Carrinho inválido.' });
+  }
+
+  const source = request.body && typeof request.body === 'object' ? request.body : {};
+  const profile = {
+    email: String(source.email || '').trim(),
+    ...(source.firstName ? { firstName: String(source.firstName).trim() } : {}),
+    ...(source.lastName ? { lastName: String(source.lastName).trim() } : {}),
+    ...(source.document ? { document: digits(source.document), documentType: 'cpf' } : {}),
+    ...(source.phone ? { phone: digits(source.phone) } : {}),
+    ...(source.gender ? { gender: String(source.gender).trim() } : {}),
+    ...(source.birthDate ? { birthDate: String(source.birthDate).trim() } : {}),
+  };
+  if (!profile.email) {
+    return response.status(400).json({ ok: false, message: 'Informe o e-mail do cliente.' });
+  }
+
+  try {
+    // O orderForm é identificado pelo próprio ID. Evitar o cookie do usuário
+    // aqui impede que um token antigo do Expo Go bloqueie um attachment público.
+    const result = await requestCheckout(
+      `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
+      {
+        method: 'POST',
+        contentType: true,
+        fallbackToAppAuth: true,
+        body: JSON.stringify(profile),
+      },
+    );
+    const body = await readResponseBody(result);
+    if (!result.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(body),
+        message: vtexErrorMessage(body, `A VTEX não conseguiu atualizar os dados pessoais (HTTP ${result.status}).`),
+      });
+    }
+    return response.json(body);
+  } catch (error) {
+    return response.status(502).json({
+      ok: false,
+      message: error instanceof Error ? error.message : 'Não foi possível atualizar os dados pessoais.',
+    });
+  }
+});
+
 app.post('/checkout/order', async (request, response) => {
   const orderFormId = String(request.body?.orderFormId || '').trim();
   const paymentSystem = String(request.body?.paymentSystem || '').trim();
@@ -648,18 +707,33 @@ app.post('/checkout/order', async (request, response) => {
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/transaction`,
       {
         method: 'POST',
-        userToken,
+        // PIX não exige reCAPTCHA e precisa conservar a identidade que já era
+        // usada pelo orderForm; removê-la faz a VTEX responder ORD062. Para
+        // cartão mantemos a chamada pública, como no app-test-one, evitando
+        // que um cookie expirado bloqueie a validação antes do reCAPTCHA.
+        userToken: kind === 'pix' ? userToken : '',
         contentType: true,
-        fallbackToAppAuth: true,
+        // PIX pode refazer apenas a autenticação porque não carrega token de
+        // uso único. Cartão deve fazer exatamente uma chamada por token.
+        fallbackToAppAuth: kind === 'pix',
+        singleAttempt: kind === 'card',
         body: JSON.stringify(transactionPayload),
       },
     );
     const transactionBody = await readResponseBody(transactionResult);
     if (!transactionResult.ok) {
+      const transactionErrorCode = vtexErrorCode(transactionBody);
+      const requestedRecaptchaKey = vtexRecaptchaKey(transactionBody);
+      console.warn(
+        `[CHECKOUT] transaction rejected -> HTTP ${transactionResult.status}`
+          + ` code=${transactionErrorCode || 'unknown'}`
+          + ` recaptcha=${Boolean(requestedRecaptchaKey)}`
+          + ` tokenSent=${Boolean(transactionPayload.recaptchaToken)}`,
+      );
       return response.status(502).json({
         ok: false,
-        code: vtexErrorCode(transactionBody),
-        recaptchaKey: vtexRecaptchaKey(transactionBody) || undefined,
+        code: transactionErrorCode,
+        recaptchaKey: requestedRecaptchaKey || undefined,
         message: vtexErrorMessage(transactionBody, 'A VTEX não conseguiu iniciar a transação.'),
       });
     }
@@ -674,6 +748,7 @@ app.post('/checkout/order', async (request, response) => {
     if (!orderGroup || !transactionId) {
       return response.status(502).json({ ok: false, message: 'A VTEX iniciou a transação sem retornar seus identificadores.' });
     }
+    console.info(`[CHECKOUT] transaction created -> payment=${kind} order=${orderGroup} transaction=${transactionId}`);
 
     const paymentSystems = orderForm?.paymentData?.paymentSystems || [];
     const paymentSystemInfo = paymentSystems.find((item) => String(item?.stringId ?? item?.id ?? '') === paymentSystem) || {};

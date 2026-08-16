@@ -18,6 +18,8 @@ export type OrderForm = {
   orderFormId: string;
   value: number;
   items: CartItem[];
+  recaptchaKey?: string;
+  recaptchaKeyV3?: string;
   clientProfileData?: {
     email?: string;
     firstName?: string;
@@ -69,6 +71,8 @@ export type ShippingQuote = {
 type VtexOrderForm = {
   orderFormId: string;
   value?: number;
+  recaptchaKey?: string;
+  recaptchaKeyV3?: string;
   items?: Array<{
     seller?: string;
     id?: string;
@@ -122,6 +126,8 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
   return {
     orderFormId: orderForm.orderFormId,
     value: (orderForm.value ?? 0) / 100,
+    recaptchaKey: orderForm.recaptchaKey,
+    recaptchaKeyV3: orderForm.recaptchaKeyV3,
     items: (orderForm.items ?? []).map((item, index) => ({
       index,
       id: item.id ?? '',
@@ -177,27 +183,42 @@ export async function updateClientProfile({
   gender?: string;
   birthDate?: string;
 }): Promise<OrderForm> {
-  const response = await checkoutFetch(
-    `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${orderFormId}/attachments/clientProfileData`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // A attachment clientProfileData recebe os campos diretamente. O
-      // objeto aninhado funciona em algumas respostas, mas é rejeitado pelo
-      // Checkout quando o cliente ainda não existe.
-      body: JSON.stringify({
-        email,
-        ...(firstName ? { firstName } : {}),
-        ...(lastName ? { lastName } : {}),
-        ...(document ? { document, documentType: 'cpf' } : {}),
-        ...(phone ? { phone } : {}),
-        ...(gender ? { gender } : {}),
-        ...(birthDate ? { birthDate } : {}),
-      }),
-    },
-  );
+  // A attachment clientProfileData recebe os campos diretamente. O objeto
+  // aninhado funciona em algumas respostas, mas é rejeitado quando o cliente
+  // ainda não existe.
+  const body = JSON.stringify({
+    email,
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
+    ...(document ? { document, documentType: 'cpf' } : {}),
+    ...(phone ? { phone } : {}),
+    ...(gender ? { gender } : {}),
+    ...(birthDate ? { birthDate } : {}),
+  });
+  const requestInit: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  };
 
-  if (!response.ok) throw new Error(`Unable to update client profile: ${response.status}`);
+  // O backend evita que diferenças de cookies/SecureStore entre Expo Go e o
+  // development build bloqueiem esta etapa. A chamada pública direta continua
+  // como fallback para desenvolvimento sem o backend.
+  let response = await fetch(
+    `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/client-profile`,
+    requestInit,
+  ).catch(() => null);
+  if (!response?.ok) {
+    response = await checkoutFetch(
+      `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
+      requestInit,
+    );
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(error.message || `Não foi possível atualizar os dados pessoais (HTTP ${response.status}).`);
+  }
   const orderForm = (await response.json()) as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   const normalizedOrderForm = normalizeOrderForm(orderForm);
