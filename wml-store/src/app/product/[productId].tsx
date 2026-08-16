@@ -12,6 +12,9 @@ import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
+import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
+import ExchangeIcon from '@/components/icons/ExchangeIcon';
+import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRoundedIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import { ProductCard } from '@/components/product-card';
 import { ProductQuickView } from '@/components/product-quick-view';
@@ -382,7 +385,7 @@ export default function ProductScreen() {
               </Pressable>
               <View style={styles.helperButtons}>
                 <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><ThemedText>♧</ThemedText><ThemedText type="smallBold">Provador Virtual</ThemedText></Pressable>
-                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><ThemedText>↔</ThemedText><ThemedText type="smallBold">Tabela de medidas</ThemedText></Pressable>
+                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon color="#231f20" size={17} /><ThemedText type="smallBold">Tabela de medidas</ThemedText></Pressable>
               </View>
 
               <View style={styles.shippingSection}>
@@ -635,7 +638,7 @@ function CompleteLook({ products }: { products: Product[] }) {
         <View key={product.id} style={[styles.lookRow, openSize === product.id && styles.lookRowOpen]}>
           <View style={styles.lookImageWrap}>
             {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.lookImage} contentFit="cover" />}
-            {index === 0 ? <View style={styles.lookTag}><ThemedText style={styles.lookTagText}>Você está vendo</ThemedText></View> : <Pressable disabled={recommendations.length < 2} onPress={() => { setReplacementIndex((value) => (value + 1) % recommendations.length); setOpenSize(null); setMessage(''); }} style={[styles.lookTag, recommendations.length < 2 && styles.lookTagDisabled]}><ThemedText style={styles.lookTagText}>↻ Trocar</ThemedText></Pressable>}
+            {index === 0 ? <View style={styles.lookTag}><ThemedText style={styles.lookTagText}>Você está vendo</ThemedText></View> : <Pressable disabled={recommendations.length < 2} onPress={() => { setReplacementIndex((value) => (value + 1) % recommendations.length); setOpenSize(null); setMessage(''); }} style={[styles.lookTag, styles.lookTagInteractive, recommendations.length < 2 && styles.lookTagDisabled]}><ExchangeIcon color="#231f20" size={14} /><ThemedText style={styles.lookTagText}>Trocar</ThemedText></Pressable>}
           </View>
           <View style={styles.lookInfo}>
             <ThemedText numberOfLines={2} style={styles.lookName}>{product.name}</ThemedText>
@@ -644,7 +647,7 @@ function CompleteLook({ products }: { products: Product[] }) {
               <View style={styles.lookSelectorWrap}>
                 <Pressable onPress={() => setOpenSize(openSize === product.id ? null : product.id)} style={[styles.lookSelect, selectionErrors[product.id] && styles.lookSelectError]}>
                   <ThemedText>{selectedSizes[product.id] || 'Tamanho'}</ThemedText>
-                  <ThemedText>⌄</ThemedText>
+                  <DropdownChevron open={openSize === product.id} />
                 </Pressable>
                 {openSize === product.id && <View style={styles.lookOptions}>{size.options.map((option) => <Pressable key={option.value} disabled={!option.available} onPress={() => { setSelectedSizes((current) => ({ ...current, [product.id]: option.value })); setSelectionErrors((current) => { const next = { ...current }; delete next[product.id]; return next; }); setOpenSize(null); setMessage(''); }} style={[styles.lookOption, !option.available && styles.lookUnavailable]}><ThemedText style={!option.available && styles.lookUnavailableText}>{option.value}</ThemedText></Pressable>)}</View>}
                 {!!selectionErrors[product.id] && <ThemedText style={styles.lookSelectionError}>{selectionErrors[product.id]}</ThemedText>}
@@ -690,7 +693,11 @@ function PdpHeader({ scrolled, onBack, onLogo, onSearch, onCart }: { scrolled: b
 }
 
 function Accordion({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
-  return <View style={styles.accordion}><Pressable accessibilityState={{ expanded: open }} onPress={onToggle} style={styles.accordionHeader}><ThemedText style={styles.sectionTitle}>{title}</ThemedText><ThemedText style={styles.chevron}>{open ? '⌃' : '⌄'}</ThemedText></Pressable>{open && <View style={styles.accordionContent}>{children}</View>}</View>;
+  return <View style={styles.accordion}><Pressable accessibilityState={{ expanded: open }} onPress={onToggle} style={styles.accordionHeader}><ThemedText style={styles.sectionTitle}>{title}</ThemedText><DropdownChevron open={open} /></Pressable>{open && <View style={styles.accordionContent}>{children}</View>}</View>;
+}
+
+function DropdownChevron({ open }: { open: boolean }) {
+  return <View style={[styles.dropdownChevron, open && styles.dropdownChevronOpen]}><ChevronRightIcon color="#625d57" size={16} /></View>;
 }
 
 function ColorOptionsModal({ products, visible, selectedProductId, onClose, onSelect }: { products: Product[]; visible: boolean; selectedProductId?: string; onClose: () => void; onSelect: (product: Product) => void }) {
@@ -804,7 +811,8 @@ const styles = StyleSheet.create({
   accordionHeader: { minHeight: 52, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   accordionContent: { gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
   accordionText: { color: '#625d57', lineHeight: 21 },
-  chevron: { fontSize: 20, color: '#625d57' },
+  dropdownChevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
+  dropdownChevronOpen: { transform: [{ rotate: '-90deg' }] },
   floatingBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 92, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
   floatingInfo: { flex: 1, gap: 2 },
   floatingName: { fontSize: 12 },
@@ -818,6 +826,7 @@ const styles = StyleSheet.create({
   lookImageWrap: { width: 150, height: 208, position: 'relative', overflow: 'hidden', borderRadius: 18, backgroundColor: '#e8e8ea' },
   lookImage: { width: '100%', height: '100%' },
   lookTag: { position: 'absolute', left: 5, right: 5, bottom: 6, minHeight: 25, paddingHorizontal: 8, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 255, 255, 0.86)' },
+  lookTagInteractive: { flexDirection: 'row', gap: 4 },
   lookTagDisabled: { opacity: 0.7 },
   lookTagText: { fontSize: 12 },
   lookInfo: { flex: 1, gap: Spacing.two },

@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CmsSectionView } from '@/components/cms-section';
+import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -33,7 +34,8 @@ export default function CmsPageScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader back={!isCategoryPage} />
         <Pressable onPress={() => router.back()} style={styles.hiddenBack}>
-          <ThemedText type="link">← Voltar</ThemedText>
+          <ArrowLeftIAIcon color="#231f20" size={16} />
+          <ThemedText type="link">Voltar</ThemedText>
         </Pressable>
         <ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
           {!isCategoryPage && <ThemedText type="subtitle">{page?.name ?? slug}</ThemedText>}
