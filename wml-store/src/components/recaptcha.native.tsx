@@ -58,7 +58,12 @@ function buildCaptchaHtml(siteKey: string) {
   window.getVtexRecaptchaToken = function () {
     var attempts = 0;
     function execute() {
-      if (!window.grecaptcha || !window.grecaptcha.enterprise) {
+      var hasEnterprise = Boolean(window.grecaptcha
+        && window.grecaptcha.enterprise
+        && typeof window.grecaptcha.enterprise.execute === 'function');
+      var hasClassic = Boolean(window.grecaptcha
+        && typeof window.grecaptcha.execute === 'function');
+      if (!hasEnterprise && !hasClassic) {
         attempts += 1;
         if (attempts < 40) { window.setTimeout(execute, 250); return; }
         signal({ type: 'error', message: 'Falha ao carregar a validacao de seguranca.' });
@@ -75,7 +80,7 @@ function buildCaptchaHtml(siteKey: string) {
             signal({ type: 'error', message: String(error && error.message || error || 'Falha no reCAPTCHA') });
           });
       }
-      if (window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function') {
+      if (hasEnterprise) {
         var enterpriseReady = false;
         window.setTimeout(function () {
           if (!enterpriseReady) executeClassic();
@@ -206,9 +211,14 @@ const Recaptcha = forwardRef<RecaptchaHandle, RecaptchaProps>(({ siteKey }, ref)
 
     const nativeToken = await getNativeToken(requestedKey);
     if (nativeToken) return nativeToken;
-    const webToken = await getWebViewToken(requestedKey);
-    if (webToken) console.info('[RECAPTCHA] token generated via WebView');
-    return webToken;
+    try {
+      const webToken = await getWebViewToken(requestedKey);
+      if (webToken) console.info('[RECAPTCHA] token generated via WebView');
+      return webToken;
+    } catch (error) {
+      console.warn(`[RECAPTCHA] WebView unavailable (${nativeErrorSummary(error)})`);
+      throw error;
+    }
   }
 
   useImperativeHandle(ref, () => ({
@@ -228,6 +238,7 @@ const Recaptcha = forwardRef<RecaptchaHandle, RecaptchaProps>(({ siteKey }, ref)
       request.resolve(String(payload.token));
       return;
     }
+    console.warn(`[RECAPTCHA] WebView rejected token (${payload.message || 'resposta vazia'})`);
     request.reject(new Error(payload.message || 'Não foi possível validar o reCAPTCHA.'));
   }
 
@@ -250,8 +261,15 @@ const Recaptcha = forwardRef<RecaptchaHandle, RecaptchaProps>(({ siteKey }, ref)
         domStorageEnabled
         onLoadStart={() => { webViewReadyRef.current = false; }}
         onLoadEnd={() => { webViewReadyRef.current = true; }}
-        onError={(event) => rejectPending(event.nativeEvent.description || 'Falha ao carregar a validação de segurança.')}
-        onHttpError={() => rejectPending('Falha ao carregar a validação de segurança.')}
+        onError={(event) => {
+          const description = event.nativeEvent.description || 'Falha ao carregar a validação de segurança.';
+          console.warn(`[RECAPTCHA] WebView error (${description})`);
+          rejectPending(description);
+        }}
+        onHttpError={(event) => {
+          console.warn(`[RECAPTCHA] WebView HTTP error (${event.nativeEvent.statusCode})`);
+          rejectPending('Falha ao carregar a validação de segurança.');
+        }}
         onMessage={handleMessage}
         style={styles.webView}
       />

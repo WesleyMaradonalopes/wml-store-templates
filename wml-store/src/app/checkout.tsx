@@ -534,10 +534,13 @@ export default function CheckoutScreen() {
         try {
           captchaToken = (await recaptchaRef.current?.getToken(activeRecaptchaSiteKey)) || '';
         } catch {
-          // Uma chamada sem token faz a VTEX devolver a chave mais recente;
-          // o retry abaixo sempre gera outro token, que é de uso único.
-          captchaToken = '';
+          setMessage('Não foi possível concluir a verificação de segurança automaticamente. Tente novamente.');
+          return;
         }
+      }
+      if (paymentKind === 'card' && !captchaToken) {
+        setMessage('Não foi possível concluir a verificação de segurança automaticamente. Tente novamente.');
+        return;
       }
 
       const createOrderInput = (token = '', siteKey = activeRecaptchaSiteKey) => ({
