@@ -7,15 +7,15 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { CartIconButton } from '@/components/cart-icon-button';
-import { LoginRequiredModal } from '@/components/login-required-modal';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
+import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
+import ExchangeIcon from '@/components/icons/ExchangeIcon';
 import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
-import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
-import ExchangeIcon from '@/components/icons/ExchangeIcon';
-import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRoundedIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
+import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRoundedIcon';
+import { LoginRequiredModal } from '@/components/login-required-modal';
 import { ProductCard } from '@/components/product-card';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
@@ -69,6 +69,8 @@ function estimateLabel(value: string) {
 export default function ProductScreen() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const galleryHeight = screenHeight + insets.top + insets.bottom;
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [colorProducts, setColorProducts] = useState<Product[]>([]);
@@ -90,10 +92,7 @@ export default function ProductScreen() {
   const [imageIndex, setImageIndex] = useState(0);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
-  const [detailsY, setDetailsY] = useState(0);
-  const [buttonLayout, setButtonLayout] = useState<{ y: number; height: number } | null>(null);
   const [scrollY, setScrollY] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
   const [postalCode, setPostalCode] = useState('');
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingQuotes, setShippingQuotes] = useState<ShippingQuote[]>([]);
@@ -277,10 +276,8 @@ export default function ProductScreen() {
     void addProduct();
   }
 
-  const buttonVisible = buttonLayout
-    ? detailsY + buttonLayout.y - scrollY < viewportHeight && detailsY + buttonLayout.y + buttonLayout.height - scrollY > 0
-    : true;
-  const showFloatingButton = Boolean(product && buttonLayout && viewportHeight > 0 && !buttonVisible);
+  const floatingButtonThreshold = screenHeight * 0.2;
+  const showFloatingButton = Boolean(product && scrollY > floatingButtonThreshold);
   const currentPrice = activeVariant?.price ?? product?.price ?? null;
   const currentListPrice = activeVariant?.listPrice ?? product?.listPrice ?? null;
 
@@ -292,11 +289,10 @@ export default function ProductScreen() {
         {product && (
           <ScrollView
             contentContainerStyle={[styles.content, showFloatingButton && styles.contentWithFloating]}
-            onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
             onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)}
             scrollEventThrottle={16}>
             {galleryImages.length > 0 && (
-              <View style={[styles.galleryArea, { height: screenHeight }] }>
+              <View style={[styles.galleryArea, { height: galleryHeight }] }>
                 <FlatList
                   ref={galleryListRef}
                   key={activeVariant?.itemId ?? product.id}
@@ -313,29 +309,34 @@ export default function ProductScreen() {
                         setViewerIndex(index);
                         setImageViewerVisible(true);
                       }}
-                      style={[styles.heroImagePressable, { width: screenWidth, height: screenHeight }]}
+                      style={[styles.heroImagePressable, { width: screenWidth, height: galleryHeight }]}
                     >
-                      <Image source={{ uri: item }} style={[styles.mainImage, { width: screenWidth, height: screenHeight }]} contentFit="cover" />
+                      <Image source={{ uri: item }} style={[styles.mainImage, { width: screenWidth, height: galleryHeight }]} contentFit="cover" />
                     </Pressable>
                   )}
                 />
                 <LinearGradient
                   pointerEvents="none"
-                  colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.7)']}
+                  colors={['rgba(255, 0, 0, 0)', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.7)']}
                   locations={[0, 0.46, 1]}
                   style={styles.heroShade}
                 />
                 {galleryImages.length > 1 && <View pointerEvents="none" style={styles.heroDots}>{galleryImages.map((_, index) => <View key={index} style={[styles.dot, imageIndex === index && styles.activeDot]} />)}</View>}
                 <View style={styles.heroProductInfo}>
-                  <View style={styles.heroProductCopy}>
-                    <ThemedText numberOfLines={2} style={styles.heroProductName}>{product.name}</ThemedText>
-                    {currentPrice !== null && <ThemedText type="smallBold" style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
+                  <View style={styles.heroProductRow}>
+                    <View style={styles.heroProductCopy}>
+                      <ThemedText numberOfLines={2} style={styles.heroProductName}>{product.name}</ThemedText>
+                      {currentPrice !== null && <ThemedText type="smallBold" style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
+                    </View>
+                    <Pressable accessibilityLabel="Comprar" onPress={() => setQuickViewVisible(true)} style={styles.heroBuyButton}>
+                      <ThemedText type="smallBold" style={styles.heroBuyButtonText}>Comprar</ThemedText>
+                    </Pressable>
                   </View>
                 </View>
               </View>
             )}
 
-            <View style={styles.details} onLayout={(event) => setDetailsY(event.nativeEvent.layout.y)}>
+            <View style={styles.details}>
               <View style={styles.productHeading}>
                 <View style={styles.headingText}>
                   <ThemedText style={styles.productName}>{product.name}</ThemedText>
@@ -379,7 +380,7 @@ export default function ProductScreen() {
               ))}
               {!!selectionMessage && <ThemedText style={styles.selectionMessage}>{selectionMessage}</ThemedText>}
 
-              <Pressable disabled={adding} onLayout={(event) => setButtonLayout({ y: event.nativeEvent.layout.y, height: event.nativeEvent.layout.height })} onPress={addProduct} style={styles.mainAddButton}>
+              <Pressable disabled={adding} onPress={addProduct} style={[styles.mainAddButton, styles.mainAddButtonHidden]}>
                 {/*<ShoppingBagIcon size={18} color="#FFFFFF" />*/}
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
@@ -757,9 +758,12 @@ const styles = StyleSheet.create({
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.7)' },
   activeDot: { width: 28, backgroundColor: '#FFFFFF' },
   heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 35 },
-  heroProductCopy: { gap: 3 },
+  heroProductRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.three },
+  heroProductCopy: { flex: 1, gap: 3 },
   heroProductName: { color: '#FFFFFF', fontSize: 14, lineHeight: 18 },
   heroProductPrice: { color: '#FFFFFF', fontSize: 14 },
+  heroBuyButton: { minWidth: 86, minHeight: 44, paddingHorizontal: Spacing.three, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  heroBuyButtonText: { color: '#231f20' },
   viewer: { flex: 1, backgroundColor: '#fff' },
   viewerList: { flex: 1, backgroundColor: '#fff' },
   viewerListContent: { backgroundColor: '#fff' },
@@ -794,6 +798,7 @@ const styles = StyleSheet.create({
   unavailableVariantText: { textDecorationLine: 'line-through' },
   selectionMessage: { marginTop: -Spacing.two, color: '#B42318', fontWeight: '600' },
   mainAddButton: { minHeight: 50, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  mainAddButtonHidden: { display: 'none' },
   mainAddText: { color: '#FFFFFF', fontWeight: '700' },
   disabled: { opacity: 0.45 },
   successText: { color: '#26734d', fontWeight: '600' },
@@ -813,7 +818,7 @@ const styles = StyleSheet.create({
   accordionText: { color: '#625d57', lineHeight: 21 },
   dropdownChevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
   dropdownChevronOpen: { transform: [{ rotate: '-90deg' }] },
-  floatingBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 92, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
+  floatingBar: { position: 'absolute', left: 10, right: 10, bottom: 20, minHeight: 50, borderRadius: 50, paddingHorizontal: 20, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
   floatingInfo: { flex: 1, gap: 2 },
   floatingName: { fontSize: 12 },
   floatingButton: { minWidth: 122, minHeight: 46, paddingHorizontal: Spacing.three, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
