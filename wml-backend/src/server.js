@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const app = express();
 const port = Number(process.env.PORT || 6001);
@@ -15,9 +17,23 @@ const wishlistSchema = process.env.VTEX_WISHLIST_SCHEMA || 'wishlist';
 const wishlistEntities = [...new Set([wishlistEntity, 'wishlist', 'WL', 'wl', 'WI', 'wi'])];
 const customerVtexSessions = new Map();
 const wishlistIoStrategyByEmail = new Map();
+const backendSourceDirectory = path.dirname(fileURLToPath(import.meta.url));
+const cmsDirectory = process.env.CMS_SCHEMAS_DIR
+  ? path.resolve(process.env.CMS_SCHEMAS_DIR)
+  : path.resolve(backendSourceDirectory, '../../wml-store/public/cms');
 
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
 app.use(express.json({ limit: '1mb' }));
+
+// Schemas usados pelo projeto Custom do Headless CMS. O diretório pode ser
+// sobrescrito com CMS_SCHEMAS_DIR quando o backend for publicado sozinho.
+app.use('/cms', express.static(cmsDirectory, {
+  extensions: ['json'],
+  fallthrough: false,
+  setHeaders(response) {
+    response.setHeader('Cache-Control', 'public, max-age=300');
+  },
+}));
 
 function vtexHeaders() {
   const headers = { Accept: 'application/json' };
@@ -1163,4 +1179,4 @@ app.get('/customer/orders/:orderId', async (request, response) => {
   }
 });
 
-app.listen(port, () => console.log(`LojaBL backend running on http://localhost:${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`wml-backend running on port ${port}`));
