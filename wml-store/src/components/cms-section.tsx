@@ -573,9 +573,9 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#fcfaf5' },
+  section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#ffffff' },
   // O hero escapa do padding horizontal usado pelos demais blocos da home.
-  heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#fcfaf5' },
+  heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#ffffff' },
   heroViewport: { position: 'relative', width: '100%', height: Dimensions.get('window').height },
   heroCarousel: { flex: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
   selectedTab: { backgroundColor: '#111111' },
   selectedTabText: { color: '#FFFFFF' },
   productList: { gap: 12 },
-  plpSection: { gap: Spacing.three, backgroundColor: '#fcfaf5' },
+  plpSection: { gap: Spacing.three, backgroundColor: '#ffffff' },
   plpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   plpHeading: { flex: 1 },
   plpTitle: { fontSize: 18 },

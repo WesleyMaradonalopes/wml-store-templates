@@ -739,7 +739,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, position: 'relative' },
   header: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 20, elevation: 0 },
   heroHeader: { borderBottomWidth: 0, backgroundColor: 'transparent' },
-  scrolledHeader: { borderBottomWidth: 1, borderBottomColor: '#ece8e2', backgroundColor: '#fbfaf7' },
+  scrolledHeader: { borderBottomWidth: 1, borderBottomColor: '#ece8e2', backgroundColor: '#ffffff' },
   headerSide: { width: 80, flexDirection: 'row', alignItems: 'center' },
   headerActions: { justifyContent: 'flex-end', gap: Spacing.one },
   headerButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },

@@ -32,7 +32,7 @@ import UserIcon from '@/components/icons/UserIcon';
 type AccountView = 'home' | 'access' | 'password' | 'email' | 'code' | 'register' | 'personal';
 type CustomerProfile = NonNullable<OrderForm['clientProfileData']> & { gender?: string; birthDate?: string; homePhone?: string };
 
-const userEmail = 'wesley.lopes@hopelingerie.com.br';
+const userEmail = 'wesley.lopes@grupohope.com.br';
 const googleClientIdPlaceholder = 'not-configured.apps.googleusercontent.com';
 const googleRedirectUri = makeRedirectUri({ scheme: 'lojahr', path: 'oauthredirect' });
 
