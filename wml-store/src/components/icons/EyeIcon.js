@@ -1,7 +1,7 @@
 import React from 'react';
 import { Svg, Path, Circle } from 'react-native-svg';
 
-export default function EyeIcon({ color = '#000', size = 20, off = false }) {
+export default function EyeIcon({ color = '#0a0a0a', size = 20, off = false }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path

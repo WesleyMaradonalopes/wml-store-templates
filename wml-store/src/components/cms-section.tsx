@@ -159,7 +159,7 @@ export function ProductShelf({ data }: { data: Record<string, unknown> }) {
           )}
         />
       )}
-      {loading && <ActivityIndicator color="#000000" />}
+      {loading && <ActivityIndicator color="#0a0a0a" />}
       {!loading && products.length === 0 && (
         <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>
       )}
@@ -256,7 +256,7 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
         </View>
         <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
       </View>
-      {loading && <ActivityIndicator color="#000000" />}
+      {loading && <ActivityIndicator color="#0a0a0a" />}
       {!loading && products.length === 0 && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
       <View style={styles.productGrid}>
         {products.map((product) => (
@@ -325,7 +325,7 @@ function CategoryRow({ category, router }: { category: Record<string, unknown>; 
       onPress={() => openCmsAction(router, category.action, title)}
       style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}>
       <ThemedText style={styles.categoryRowTitle}>{title}</ThemedText>
-      <ArrowRightAIcon color="#1e120d" size={20} />
+      <ArrowRightAIcon color="#0a0a0a" size={20} />
     </Pressable>
   );
 }
@@ -358,7 +358,7 @@ function CategoryGroup({
             accessibilityLabel="Voltar para categorias"
             onPress={() => router.back()}
             style={styles.categoryGroupBack}>
-            <ArrowLeftIAIcon color="#1e120d" size={20} />
+            <ArrowLeftIAIcon color="#0a0a0a" size={20} />
           </Pressable>
         )}
         <ThemedText style={styles.categoryGroupTitle}>{title}</ThemedText>
@@ -379,7 +379,7 @@ function CategoryGroup({
               style={styles.subcategoryHeader}>
               <ThemedText style={styles.subcategoryHeading}>{subcategoryHeading}</ThemedText>
               <View style={[styles.subcategoryChevron, expanded && styles.subcategoryChevronExpanded]}>
-                <ChevronRightIcon color="#1e120d" size={18} />
+                <ChevronRightIcon color="#0a0a0a" size={18} />
               </View>
             </Pressable>
           )}
@@ -594,22 +594,22 @@ const styles = StyleSheet.create({
   filterButtonText: { fontSize: 12 },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   gridProductCard: { width: '48.7%', marginBottom: Spacing.three },
-  loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
   categoryList: { gap: 0, overflow: 'hidden', borderRadius: 24, backgroundColor: '#FFFFFF' },
   categoryGroupsList: { gap: 12, overflow: 'visible', backgroundColor: 'transparent' },
   categoryRow: { minHeight: 72, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
-  categoryRowTitle: { fontSize: 22, lineHeight: 28, color: '#1e120d', fontWeight: '500' },
+  categoryRowTitle: { fontSize: 22, lineHeight: 28, color: '#0a0a0a', fontWeight: '500' },
   categoryGroup: { gap: 14, padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF' },
   categoryGroupHeader: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   categoryGroupBack: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
-  categoryGroupTitle: { flex: 1, fontSize: 24, lineHeight: 30, color: '#1e120d' },
+  categoryGroupTitle: { flex: 1, fontSize: 24, lineHeight: 30, color: '#0a0a0a' },
   seeAllButton: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: '#6d6862', alignItems: 'center', justifyContent: 'center' },
-  seeAllButtonText: { fontSize: 13, lineHeight: 18, color: '#1e120d' },
+  seeAllButtonText: { fontSize: 13, lineHeight: 18, color: '#0a0a0a' },
   subcategoryBlock: { borderTopWidth: 1, borderTopColor: '#eeeae5' },
   subcategoryHeader: { minHeight: 52, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  subcategoryHeading: { fontSize: 16, lineHeight: 22, color: '#1e120d', fontWeight: '700' },
+  subcategoryHeading: { fontSize: 16, lineHeight: 22, color: '#0a0a0a', fontWeight: '700' },
   subcategoryChevron: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   subcategoryChevronExpanded: { transform: [{ rotate: '90deg' }] },
   subcategoryList: { gap: 10 },
@@ -635,5 +635,5 @@ const styles = StyleSheet.create({
   contentCardImage: { width: 170, height: 130, borderRadius: 10 },
   scheduleCard: { flex: 1, minWidth: 130, gap: 6, padding: 12, borderRadius: 14, backgroundColor: '#FFFFFF' },
   couponCard: { gap: 6, padding: 14, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e0ddd7' },
-  couponCode: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#1e120d', color: '#FFFFFF', fontWeight: '700' },
+  couponCode: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0a0a0a', color: '#FFFFFF', fontWeight: '700' },
 });

@@ -51,10 +51,10 @@ export default function HomeScreen() {
         </ScrollView>
         <View style={[styles.header, { paddingTop: insets.top, minHeight: 48 + insets.top }, transparentHeader ? styles.heroHeader : styles.scrolledHeader]}>
           <Pressable accessibilityLabel="Voltar ao topo" onPress={() => { scrollRef.current?.scrollTo({ y: 0, animated: true }); setHidden(false); }} style={styles.brandButton}>
-            <HopeLogoIcon color="#231f20" width={76} height={20} />
+            <HopeLogoIcon color="#0a0a0a" width={76} height={20} />
           </Pressable>
           <View style={styles.headerActions}>
-            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, transparentHeader && styles.heroHeaderAction]}><SearchIcon size={20} color="#231f20" /></Pressable>
+            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, transparentHeader && styles.heroHeaderAction]}><SearchIcon size={20} color="#0a0a0a" /></Pressable>
             <CartIconButton style={[styles.headerAction, transparentHeader && styles.heroHeaderAction]} />
           </View>
         </View>

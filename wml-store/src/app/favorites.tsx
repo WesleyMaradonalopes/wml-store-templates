@@ -55,7 +55,7 @@ export default function FavoritesScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} />
-        {loadingFavorites && <ActivityIndicator color="#000000" />}
+        {loadingFavorites && <ActivityIndicator color="#0a0a0a" />}
         <FlatList
           data={favorites}
           numColumns={2}
@@ -107,6 +107,6 @@ const styles = StyleSheet.create({
   card: { width: '48.7%' },
   emptyState: { gap: Spacing.three, paddingVertical: Spacing.two },
   emptyMessage: { fontSize: 14 },
-  homeButton: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  homeButton: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   homeButtonText: { color: '#FFFFFF', fontWeight: '700' },
 });

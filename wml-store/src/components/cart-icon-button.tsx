@@ -48,7 +48,7 @@ export function CartCountBadge({ count, variant = 'top' }: CartCountBadgeProps) 
   return <View style={[styles.topBadge, bottomTab && styles.bottomTabBadge]}><Text style={[styles.topBadgeText, bottomTab && styles.bottomTabBadgeText]}>{count > 99 ? '99+' : count}</Text></View>;
 }
 
-export function CartIconButton({ onPress, color = '#231f20', size = 20, style }: Props) {
+export function CartIconButton({ onPress, color = '#0a0a0a', size = 20, style }: Props) {
   const router = useRouter();
   const count = useCartItemCount();
 
@@ -65,8 +65,8 @@ export function CartIconButton({ onPress, color = '#231f20', size = 20, style }:
 
 const styles = StyleSheet.create({
   button: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  topBadge: { position: 'absolute', top: 0, right: -1, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
+  topBadge: { position: 'absolute', top: 0, right: -1, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   topBadgeText: { color: '#FFFFFF', fontSize: 9, lineHeight: 12, fontWeight: '700', fontFamily: Fonts.bold },
   bottomTabBadge: { top: -5, right: -7, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: '#FFFFFF' },
-  bottomTabBadgeText: { color: '#000000', fontSize: 9, lineHeight: 12, fontFamily: Fonts.bold },
+  bottomTabBadgeText: { color: '#0a0a0a', fontSize: 9, lineHeight: 12, fontFamily: Fonts.bold },
 });

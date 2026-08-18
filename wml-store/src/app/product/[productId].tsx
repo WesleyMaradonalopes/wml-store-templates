@@ -284,7 +284,7 @@ export default function ProductScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-        {loading && <ActivityIndicator color="#000000" style={styles.loader} />}
+        {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
         {error && <ThemedText style={styles.errorText}>Produto não encontrado.</ThemedText>}
         {product && (
           <ScrollView
@@ -386,7 +386,7 @@ export default function ProductScreen() {
               </Pressable>
               <View style={styles.helperButtons}>
                 <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><ThemedText>♧</ThemedText><ThemedText type="smallBold">Provador Virtual</ThemedText></Pressable>
-                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon color="#231f20" size={17} /><ThemedText type="smallBold">Tabela de medidas</ThemedText></Pressable>
+                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon color="#0a0a0a" size={17} /><ThemedText type="smallBold">Tabela de medidas</ThemedText></Pressable>
               </View>
 
               <View style={styles.shippingSection}>
@@ -408,12 +408,12 @@ export default function ProductScreen() {
                 {!product.composition && !product.care && <ThemedText style={styles.accordionText}>Informações não cadastradas.</ThemedText>}
               </Accordion>
 
-              {lookLoading && <ActivityIndicator color="#000000" />}
+              {lookLoading && <ActivityIndicator color="#0a0a0a" />}
               {!lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} />}
 
               <View style={styles.similarSection}>
                 <ThemedText type="subtitle">Produtos similares</ThemedText>
-                {similarLoading && <ActivityIndicator color="#000000" />}
+                {similarLoading && <ActivityIndicator color="#0a0a0a" />}
                 {!similarLoading && similarProducts.length > 0 && <FlatList data={similarProducts} horizontal nestedScrollEnabled snapToInterval={232} decelerationRate="fast" disableIntervalMomentum showsHorizontalScrollIndicator={false} keyExtractor={(item) => item.id} contentContainerStyle={styles.similarList} renderItem={({ item }) => <ProductCard product={item} style={styles.similarCard} />} />}
               </View>
             </View>
@@ -639,7 +639,7 @@ function CompleteLook({ products }: { products: Product[] }) {
         <View key={product.id} style={[styles.lookRow, openSize === product.id && styles.lookRowOpen]}>
           <View style={styles.lookImageWrap}>
             {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.lookImage} contentFit="cover" />}
-            {index === 0 ? <View style={styles.lookTag}><ThemedText style={styles.lookTagText}>Você está vendo</ThemedText></View> : <Pressable disabled={recommendations.length < 2} onPress={() => { setReplacementIndex((value) => (value + 1) % recommendations.length); setOpenSize(null); setMessage(''); }} style={[styles.lookTag, styles.lookTagInteractive, recommendations.length < 2 && styles.lookTagDisabled]}><ExchangeIcon color="#231f20" size={14} /><ThemedText style={styles.lookTagText}>Trocar</ThemedText></Pressable>}
+            {index === 0 ? <View style={styles.lookTag}><ThemedText style={styles.lookTagText}>Você está vendo</ThemedText></View> : <Pressable disabled={recommendations.length < 2} onPress={() => { setReplacementIndex((value) => (value + 1) % recommendations.length); setOpenSize(null); setMessage(''); }} style={[styles.lookTag, styles.lookTagInteractive, recommendations.length < 2 && styles.lookTagDisabled]}><ExchangeIcon color="#0a0a0a" size={14} /><ThemedText style={styles.lookTagText}>Trocar</ThemedText></Pressable>}
           </View>
           <View style={styles.lookInfo}>
             <ThemedText numberOfLines={2} style={styles.lookName}>{product.name}</ThemedText>
@@ -655,7 +655,7 @@ function CompleteLook({ products }: { products: Product[] }) {
               </View>
             )}
             <Pressable disabled={addingId === product.id} onPress={() => addLookProduct(product)} style={styles.lookAddButton}>
-              {addingId === product.id ? <ActivityIndicator size="small" color="#231f20" /> : <ThemedText type="smallBold">Adicionar à sacola</ThemedText>}
+              {addingId === product.id ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold">Adicionar à sacola</ThemedText>}
             </Pressable>
           </View>
         </View>
@@ -664,7 +664,7 @@ function CompleteLook({ products }: { products: Product[] }) {
         <ThemedText>Leve os {rows.length} produtos por:</ThemedText>
         <ThemedText type="subtitle" style={styles.lookTotal}>{money(total)}</ThemedText>
         <Pressable disabled={buyingTogether} onPress={buyTogether} style={styles.lookBuyButton}>
-          {buyingTogether ? <ActivityIndicator size="small" color="#231f20" /> : <ThemedText type="smallBold">Comprar junto</ThemedText>}
+          {buyingTogether ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold">Comprar junto</ThemedText>}
         </Pressable>
       </View>
       {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
@@ -679,15 +679,15 @@ function PdpHeader({ scrolled, onBack, onLogo, onSearch, onCart }: { scrolled: b
     <View style={[styles.header, { paddingTop: insets.top, minHeight: 52 + insets.top }, heroMode ? styles.heroHeader : styles.scrolledHeader]}>
       <View style={styles.headerSide}>
         <Pressable accessibilityLabel="Voltar" onPress={onBack} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
-          <ArrowLeftIAIcon color="#231f20" size={21} />
+          <ArrowLeftIAIcon color="#0a0a0a" size={21} />
         </Pressable>
       </View>
-      {heroMode ? <View style={styles.logoPlaceholder} /> : <Pressable accessibilityLabel="Ir para o início" onPress={onLogo} style={styles.logoButton}><HopeLogoIcon color="#231f20" width={76} height={20} /></Pressable>}
+      {heroMode ? <View style={styles.logoPlaceholder} /> : <Pressable accessibilityLabel="Ir para o início" onPress={onLogo} style={styles.logoButton}><HopeLogoIcon color="#0a0a0a" width={76} height={20} /></Pressable>}
       <View style={[styles.headerSide, styles.headerActions]}>
         <Pressable accessibilityLabel="Buscar" onPress={onSearch} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
-          <SearchIcon size={21} color="#231f20" />
+          <SearchIcon size={21} color="#0a0a0a" />
         </Pressable>
-        <CartIconButton color="#231f20" onPress={onCart} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
+        <CartIconButton color="#0a0a0a" onPress={onCart} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
       </View>
     </View>
   );
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
   heroProductName: { color: '#FFFFFF', fontSize: 14, lineHeight: 18 },
   heroProductPrice: { color: '#FFFFFF', fontSize: 14 },
   heroBuyButton: { minWidth: 86, minHeight: 44, paddingHorizontal: Spacing.three, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  heroBuyButtonText: { color: '#231f20' },
+  heroBuyButtonText: { color: '#0a0a0a' },
   viewer: { flex: 1, backgroundColor: '#fff' },
   viewerList: { flex: 1, backgroundColor: '#fff' },
   viewerListContent: { backgroundColor: '#fff' },
@@ -773,7 +773,7 @@ const styles = StyleSheet.create({
   viewerCounter: { minWidth: 48, height: 36, paddingHorizontal: Spacing.three, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
   viewerClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
   viewerText: { color: '#FFFFFF', fontSize: 14, lineHeight: 18, fontWeight: '600' },
-  viewerCloseText: { color: '#000000', fontSize: 24, lineHeight: 28, fontWeight: '400' },
+  viewerCloseText: { color: '#0a0a0a', fontSize: 24, lineHeight: 28, fontWeight: '400' },
   viewerDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 5 },
   viewerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fff' },
   viewerDotActive: { width: 20, backgroundColor: '#fff' },
@@ -786,18 +786,18 @@ const styles = StyleSheet.create({
   selectorGroup: { gap: Spacing.two },
   colorList: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
   colorOption: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: '#d7d2ca', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  selectedColorOption: { borderWidth: 2, borderColor: '#1e120d' },
+  selectedColorOption: { borderWidth: 2, borderColor: '#0a0a0a' },
   colorCircle: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: '#d7d2ca' },
   moreColorsButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 19, borderWidth: 1, borderColor: '#d7d2ca', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   moreColorsText: { fontSize: 12 },
   variantOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   variantOption: { minWidth: 42, height: 42, paddingHorizontal: Spacing.three, borderRadius: 21, borderWidth: 1, borderColor: '#d7d3cc', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  selectedVariant: { backgroundColor: '#1e120d', borderColor: '#1e120d' },
+  selectedVariant: { backgroundColor: '#0a0a0a', borderColor: '#0a0a0a' },
   selectedVariantText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableVariant: { opacity: 0.35, backgroundColor: '#eeeae4' },
   unavailableVariantText: { textDecorationLine: 'line-through' },
   selectionMessage: { marginTop: -Spacing.two, color: '#B42318', fontWeight: '600' },
-  mainAddButton: { minHeight: 50, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  mainAddButton: { minHeight: 50, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   mainAddButtonHidden: { display: 'none' },
   mainAddText: { color: '#FFFFFF', fontWeight: '700' },
   disabled: { opacity: 0.45 },
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, lineHeight: 23 },
   shippingRow: { minHeight: 48, flexDirection: 'row' },
   shippingInput: { flex: 1, paddingHorizontal: Spacing.three, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
-  shippingButton: { minWidth: 108, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#1e120d' },
+  shippingButton: { minWidth: 108, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#0a0a0a' },
   shippingButtonText: { color: '#FFFFFF', fontWeight: '700' },
   shippingQuote: { padding: Spacing.three, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#f7f4ef' },
   accordion: { marginHorizontal: -Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
@@ -818,10 +818,10 @@ const styles = StyleSheet.create({
   accordionText: { color: '#625d57', lineHeight: 21 },
   dropdownChevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
   dropdownChevronOpen: { transform: [{ rotate: '-90deg' }] },
-  floatingBar: { position: 'absolute', left: 10, right: 10, bottom: 20, minHeight: 50, borderRadius: 50, paddingHorizontal: 20, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
+  floatingBar: { position: 'absolute', left: 10, right: 10, bottom: 20, minHeight: 50, borderRadius: 50, paddingHorizontal: 20, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#0a0a0a', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
   floatingInfo: { flex: 1, gap: 2 },
   floatingName: { fontSize: 12 },
-  floatingButton: { minWidth: 122, minHeight: 46, paddingHorizontal: Spacing.three, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
+  floatingButton: { minWidth: 122, minHeight: 46, paddingHorizontal: Spacing.three, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   floatingButtonText: { color: '#FFFFFF' },
   lookSection: { gap: Spacing.three, paddingTop: Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
   lookTitle: { fontSize: 25, lineHeight: 31, fontFamily: Fonts.semibold },
@@ -840,24 +840,24 @@ const styles = StyleSheet.create({
   lookSelect: { minHeight: 54, paddingHorizontal: Spacing.three, borderRadius: 6, borderWidth: 1, borderColor: '#d2ccc4', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   lookSelectError: { borderColor: '#D92D20' },
   lookSelectorWrap: { position: 'relative', zIndex: 10 },
-  lookOptions: { position: 'absolute', left: 0, right: 0, top: 56, paddingVertical: Spacing.one, borderWidth: 1, borderColor: '#d2ccc4', borderRadius: 6, backgroundColor: '#FFFFFF', zIndex: 30, shadowColor: '#000000', shadowOpacity: 0.14, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
+  lookOptions: { position: 'absolute', left: 0, right: 0, top: 56, paddingVertical: Spacing.one, borderWidth: 1, borderColor: '#d2ccc4', borderRadius: 6, backgroundColor: '#FFFFFF', zIndex: 30, shadowColor: '#0a0a0a', shadowOpacity: 0.14, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
   lookOption: { minHeight: 34, paddingHorizontal: Spacing.three, justifyContent: 'center' },
   lookUnavailable: { opacity: 0.45 },
   lookUnavailableText: { textDecorationLine: 'line-through' },
   lookSelectionError: { color: '#D92D20', fontSize: 13, lineHeight: 18 },
-  lookAddButton: { minHeight: 42, borderRadius: 8, borderWidth: 1, borderColor: '#231f20', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  lookAddButton: { minHeight: 42, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   lookSummary: { gap: Spacing.three, padding: Spacing.four, borderRadius: 20, alignItems: 'center', backgroundColor: '#f0efed' },
   lookTotal: { fontSize: 24, lineHeight: 30 },
-  lookBuyButton: { minWidth: 166, minHeight: 44, paddingHorizontal: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#231f20', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  lookBuyButton: { minWidth: 166, minHeight: 44, paddingHorizontal: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   colorModal: { flex: 1, backgroundColor: '#FFFFFF' },
   colorModalSafeArea: { flex: 1 },
   colorModalHeader: { minHeight: 64, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e8e3dc' },
   colorModalClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  colorModalCloseText: { fontSize: 24, lineHeight: 28, color: '#000000', fontWeight: '400' },
+  colorModalCloseText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
   colorModalList: { padding: Spacing.three, paddingBottom: Spacing.five },
   colorModalRow: { gap: Spacing.two },
   colorModalItem: { width: '31.5%', minWidth: 0, marginBottom: Spacing.three, padding: 3, borderRadius: 10, borderWidth: 1, borderColor: 'transparent', backgroundColor: '#FFFFFF' },
-  selectedColorModalItem: { borderColor: '#1e120d' },
+  selectedColorModalItem: { borderColor: '#0a0a0a' },
   colorModalImage: { width: '100%', aspectRatio: 0.72, borderRadius: 8, backgroundColor: '#e8e8ea' },
   colorModalName: { minHeight: 34, paddingTop: Spacing.one, fontSize: 11, lineHeight: 15 },
   similarSection: { gap: Spacing.three, marginTop: Spacing.three },

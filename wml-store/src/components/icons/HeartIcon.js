@@ -1,7 +1,7 @@
 import React from 'react';
 import { Svg, Path } from 'react-native-svg';
 
-export default function HeartIcon({ color = '#121212', size = 24, filled = false }) {
+export default function HeartIcon({ color = '#0a0a0a', size = 24, filled = false }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       {filled ? (

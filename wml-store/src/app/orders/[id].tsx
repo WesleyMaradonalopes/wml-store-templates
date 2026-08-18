@@ -9,7 +9,7 @@ import { Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { CustomerOrder, getCustomerOrder } from '@/services/orders';
 
-const ActivityIndicator = () => <NativeActivityIndicator color="#000000" />;
+const ActivityIndicator = () => <NativeActivityIndicator color="#0a0a0a" />;
 
 type Address = { street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string; postalCode?: string };
 type Payment = { paymentSystemName?: string; value?: number; installments?: number };
