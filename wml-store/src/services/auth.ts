@@ -4,8 +4,8 @@ import { storeConfig } from '@/config/store';
 
 export type AccountSession = { email: string; loggedAt: string };
 
-const SESSION_KEY = 'lojabl:account-session';
-const AUTH_TOKEN_KEY = 'lojabl_vtex_user_token';
+const SESSION_KEY = 'lojahr:account-session';
+const AUTH_TOKEN_KEY = 'lojahr_vtex_user_token';
 
 let accountSessionCache: AccountSession | null | undefined;
 let accountSessionRequest: Promise<AccountSession | null> | null = null;
@@ -140,7 +140,7 @@ export function getGoogleEmailFromIdToken(idToken: string) {
 }
 
 export async function startVtexAuthentication() {
-  const fingerprint = `lojabl-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const fingerprint = `lojahr-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const response = await fetch(`${authUrl('start')}?scope=${encodeURIComponent(storeConfig.account)}&fingerprint=${encodeURIComponent(fingerprint)}`);
   if (!response.ok) throw new Error('Não foi possível iniciar a autenticação VTEX.');
   const data = await response.json() as StartAuthResponse;

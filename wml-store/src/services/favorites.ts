@@ -4,7 +4,7 @@ import { getStoredJson, setStoredJson } from './storage';
 import { storeConfig } from '@/config/store';
 
 function cacheKey(email: string) {
-  return `lojabl:favorites:${email.toLowerCase()}`;
+  return `lojahr:favorites:${email.toLowerCase()}`;
 }
 
 async function getCachedIds(email: string) {

@@ -1,4 +1,4 @@
-# LojaBL Backend local
+# lojahr Backend local
 
 Este serviço é o intermediário seguro entre o app Expo e a VTEX.
 

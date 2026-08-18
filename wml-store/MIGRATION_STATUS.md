@@ -1,9 +1,9 @@
-# Migração LojaBL para Expo
+# Migração do app lojahr para Expo
 
 ## Estado atual
 
 - Expo Router configurado para iOS, Android e web.
-- Integração de leitura com o VTEX Headless CMS (`appdev`).
+- Integração de leitura com o VTEX Headless CMS (`lojahr-mobile-app`).
 - Home, categorias e landing pages carregadas do CMS.
 - Busca de produtos usando Intelligent Search API v1.
 - Detalhe de produto e prateleiras conectados ao catálogo.

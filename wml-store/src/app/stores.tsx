@@ -39,7 +39,7 @@ export default function StoresScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <ThemedView style={styles.card}>
-              <ThemedText type="smallBold">{item.name || 'Loja LojaBL'}</ThemedText>
+              <ThemedText type="smallBold">{item.name || 'Loja lojahr'}</ThemedText>
               <ThemedText themeColor="textSecondary">
                 {[item.address, item.city, item.state].filter(Boolean).join(', ')}
               </ThemedText>

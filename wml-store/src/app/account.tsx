@@ -34,7 +34,7 @@ type CustomerProfile = NonNullable<OrderForm['clientProfileData']> & { gender?: 
 
 const userEmail = 'wesley.lopes@hopelingerie.com.br';
 const googleClientIdPlaceholder = 'not-configured.apps.googleusercontent.com';
-const googleRedirectUri = makeRedirectUri({ scheme: 'lojabl', path: 'oauthredirect' });
+const googleRedirectUri = makeRedirectUri({ scheme: 'lojahr', path: 'oauthredirect' });
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -237,7 +237,7 @@ export default function AccountScreen() {
 }
 
 function GuestAccount({ onEnter, onRegister }: { onEnter: () => void; onRegister: () => void }) {
-  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} /><Preference /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by LojaBL</ThemedText></>;
+  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} /><Preference /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
 }
 
 type AccountTileData = { label: string; icon: ReactNode; onPress?: () => void };
@@ -356,7 +356,7 @@ function LoggedAccountV2({ email, notifications, setNotifications, onLogout, log
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#313235" size={18} /> },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#313235" size={18} /> },
   ];
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}>{logoutLoading ? <ActivityIndicator size="small" color="#231f20" /> : <ThemedText style={styles.logoutText}>Sair</ThemedText>}</Pressable><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by LojaBL</ThemedText></>;
+  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}>{logoutLoading ? <ActivityIndicator size="small" color="#231f20" /> : <ThemedText style={styles.logoutText}>Sair</ThemedText>}</Pressable><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
 }
 
 function PersonalData({ email, profile, profileMessage, onSaved, onBack }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void }) {

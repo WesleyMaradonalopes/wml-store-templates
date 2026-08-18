@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "LojaBL",
-    "slug": "lojabl-store",
+    "name": "lojahr",
+    "slug": "lojahr-store",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "lojabl",
+    "scheme": "lojahr",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "br.com.lojabl.store"
+      "bundleIdentifier": "br.com.lojahr.store"
     },
     "android": {
-      "package": "br.com.lojabl.store",
+      "package": "br.com.lojahr.store",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
