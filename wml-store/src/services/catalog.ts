@@ -13,6 +13,18 @@ export type ProductVariant = {
   variations: Record<string, string>;
 };
 
+export type ProductKitItem = ProductVariant & {
+  productId: string;
+  productName: string;
+  amount: number;
+};
+
+export type ProductKitGroup = {
+  productId: string;
+  productName: string;
+  items: ProductKitItem[];
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -31,6 +43,8 @@ export type Product = {
   listPrice: number | null;
   collection: string;
   gender: string;
+  isKit: boolean;
+  kitGroups: ProductKitGroup[];
   raw?: Record<string, unknown>;
   variants: ProductVariant[];
 };
@@ -61,6 +75,23 @@ type FacetPayload = {
   }>;
 };
 
+type ProductItemPayload = {
+  itemId?: string;
+  name?: string;
+  nameComplete?: string;
+  images?: Array<{ imageUrl?: string }>;
+  // A busca inteligente retorna objetos; a API pública de catálogo retorna
+  // apenas os nomes e publica os valores em campos como `Tamanho: ['P']`.
+  variations?: Array<{ name?: string; values?: string[] } | string>;
+  isKit?: boolean;
+  kitItems?: Array<{ itemId?: string; amount?: number }>;
+  sellers?: Array<{
+    sellerId?: string;
+    commertialOffer?: { Price?: number; ListPrice?: number; AvailableQuantity?: number; IsAvailable?: boolean };
+  }>;
+  [key: string]: unknown;
+};
+
 type ProductPayload = {
     productId?: string;
     productName?: string;
@@ -71,15 +102,7 @@ type ProductPayload = {
     properties?: Array<{ name?: string; values?: string[] }>;
     specificationGroups?: unknown;
     allSpecificationsValues?: Record<string, unknown>;
-    items?: Array<{
-      itemId?: string;
-      images?: Array<{ imageUrl?: string }>;
-      variations?: Array<{ name?: string; values?: string[] }>;
-      sellers?: Array<{
-        sellerId?: string;
-        commertialOffer?: { Price?: number; ListPrice?: number; AvailableQuantity?: number; IsAvailable?: boolean };
-      }>;
-    }>;
+    items?: ProductItemPayload[];
     [key: string]: unknown;
 };
 
@@ -341,15 +364,48 @@ function getSpecificationValue(product: ProductPayload, names: string[], fieldId
   return readSpecGroupValue(raw, targetNames) || readAllSpecificationsValue(raw, targetNames) || readRawObjectValue(raw, targetNames) || '';
 }
 
+function getSizeValue(variant: ProductVariant) {
+  return Object.entries(variant.variations).find(([name]) => isSizeVariationName(name))?.[1] ?? '';
+}
+
+function kitGroupPriority(name: string) {
+  const normalized = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/(top|sutia|regata|cropped|blusa|camisa|body)/.test(normalized)) return 0;
+  if (/(calcinha|calca|bermuda|short|saia)/.test(normalized)) return 1;
+  return 2;
+}
+
+function directVariationValue(variant: ProductItemPayload, name: string) {
+  const value = variant[name];
+  if (Array.isArray(value)) return value[0] ? String(value[0]).trim() : '';
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeVariantVariations(variant: ProductItemPayload) {
+  const entries = (variant.variations ?? []).flatMap((variation) => {
+    if (typeof variation === 'string') {
+      const value = directVariationValue(variant, variation);
+      return value ? [[variation, value] as const] : [];
+    }
+    const value = variation.values?.[0] || (variation.name ? directVariationValue(variant, variation.name) : '');
+    return variation.name && value ? [[variation.name, value] as const] : [];
+  });
+
+  // Mantém a leitura resiliente caso a VTEX omita o array `variations`, mas
+  // ainda envie os campos de especificação do SKU diretamente no item.
+  if (entries.length > 0) return Object.fromEntries(entries);
+  return Object.fromEntries(Object.entries(variant)
+    .filter(([name, value]) => isSizeVariationName(name) && (typeof value === 'string' || Array.isArray(value)))
+    .map(([name]) => [name, directVariationValue(variant, name)])
+    .filter(([, value]) => value));
+}
+
 function normalizeProduct(product: ProductPayload): Product {
   const variants = (product.items ?? []).map((variant) => {
     const seller = variant.sellers?.find((item) => item.commertialOffer?.IsAvailable !== false && (item.commertialOffer?.AvailableQuantity ?? 1) > 0) ?? variant.sellers?.[0];
     const variantOffer = seller?.commertialOffer;
     const variantImages = (variant.images ?? []).map((image) => image.imageUrl ?? '').filter(Boolean);
-    const variations = Object.fromEntries((variant.variations ?? []).flatMap((variation) => {
-      const value = variation.values?.[0];
-      return variation.name && value ? [[variation.name, value]] : [];
-    }));
+    const variations = normalizeVariantVariations(variant);
     return {
       itemId: variant.itemId ?? '',
       sellerId: seller?.sellerId ?? '1',
@@ -366,6 +422,7 @@ function normalizeProduct(product: ProductPayload): Product {
   const color = getSpecificationValue(product, ['cor', 'cor principal', 'atributo de produto', 'color'], 21) || specificationValues(product, 'Cor')[0] || '';
   const collection = getSpecificationValue(product, ['colecao', 'coleção', 'collection'], 19) || specificationValues(product, 'Coleção')[0] || '';
   const gender = getSpecificationValue(product, ['genero', 'gênero', 'gender'], 46) || specificationValues(product, 'Gênero')[0] || '';
+  const isKit = product.items?.some((item) => Boolean(item.isKit || item.kitItems?.length)) ?? false;
 
   return {
     id: product.productId ?? '',
@@ -385,9 +442,68 @@ function normalizeProduct(product: ProductPayload): Product {
     listPrice: defaultVariant?.listPrice ?? null,
     collection,
     gender,
+    isKit,
+    kitGroups: [],
     raw: rawProduct(product),
     variants,
   };
+}
+
+async function getProductPayloadBySkuId(itemId: string) {
+  const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/search/`);
+  url.searchParams.set('fq', `skuId:${itemId}`);
+  url.searchParams.set('_from', '0');
+  url.searchParams.set('_to', '1');
+  url.searchParams.set('sc', storeConfig.salesChannel);
+  const products = await getJson<ProductPayload[]>(url.toString());
+  return products.find((item) => item.items?.some((variant) => variant.itemId === itemId)) ?? products[0];
+}
+
+async function hydrateKitGroups(product: ProductPayload): Promise<ProductKitGroup[]> {
+  const references = (product.items ?? []).flatMap((item) => item.kitItems ?? [])
+    .map((item) => ({ itemId: item.itemId ?? '', amount: item.amount ?? 1 }))
+    .filter((item) => item.itemId);
+  if (references.length === 0) return [];
+
+  const uniqueReferences = Array.from(references.reduce((result, reference) => {
+    const current = result.get(reference.itemId);
+    result.set(reference.itemId, { itemId: reference.itemId, amount: (current?.amount ?? 0) + reference.amount });
+    return result;
+  }, new Map<string, { itemId: string; amount: number }>()).values());
+
+  const resolvedReferences = await Promise.allSettled(uniqueReferences.map(async (reference) => {
+    const componentPayload = await getProductPayloadBySkuId(reference.itemId);
+    if (!componentPayload) return null;
+    const component = normalizeProduct(componentPayload);
+    const variant = component.variants.find((item) => item.itemId === reference.itemId);
+    if (!variant) return null;
+    return {
+      ...variant,
+      productId: component.id,
+      productName: component.name,
+      amount: reference.amount,
+    } satisfies ProductKitItem;
+  }));
+
+  const groups = new Map<string, ProductKitGroup>();
+  resolvedReferences.forEach((result) => {
+    if (result.status !== 'fulfilled' || !result.value) return;
+    const item = result.value;
+    const group = groups.get(item.productId) ?? {
+      productId: item.productId,
+      productName: item.productName,
+      items: [],
+    };
+    if (!group.items.some((current) => current.itemId === item.itemId)) group.items.push(item);
+    groups.set(item.productId, group);
+  });
+
+  return Array.from(groups.values())
+    .sort((left, right) => kitGroupPriority(left.productName) - kitGroupPriority(right.productName))
+    .map((group) => ({
+      ...group,
+      items: [...group.items].sort((left, right) => compareSizes(getSizeValue(left), getSizeValue(right))),
+    }));
 }
 
 async function loadProduct(productId: string): Promise<Product> {
@@ -397,7 +513,9 @@ async function loadProduct(productId: string): Promise<Product> {
   url.searchParams.set('sc', storeConfig.salesChannel);
 
   const product = await getJson<ProductPayload>(url.toString());
-  return normalizeProduct(product);
+  const normalized = normalizeProduct(product);
+  if (!normalized.isKit) return normalized;
+  return { ...normalized, kitGroups: await hydrateKitGroups(product) };
 }
 
 // Evita que cards, favoritos e recomendações baixem os mesmos detalhes de

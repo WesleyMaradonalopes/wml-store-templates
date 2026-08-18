@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { CartIconButton } from '@/components/cart-icon-button';
+import { KitSelector, emptyKitSelection, type KitSelection } from '@/components/kit-selector';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import ExchangeIcon from '@/components/icons/ExchangeIcon';
@@ -86,6 +87,7 @@ export default function ProductScreen() {
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [kitSelection, setKitSelection] = useState<KitSelection>(emptyKitSelection);
   const [selectionMessage, setSelectionMessage] = useState('');
   const [quickViewVisible, setQuickViewVisible] = useState(false);
   const [colorsVisible, setColorsVisible] = useState(false);
@@ -101,13 +103,15 @@ export default function ProductScreen() {
   const [compositionOpen, setCompositionOpen] = useState(false);
   const galleryListRef = useRef<FlatList<string>>(null);
 
-  const variantGroups = useMemo(() => buildVariationGroups(product), [product]);
+  const variantGroups = useMemo(() => product?.isKit ? {} : buildVariationGroups(product), [product]);
   const variationNames = Object.keys(variantGroups);
-  const activeVariant = product?.variants.find((variant) => (
-    variationNames.length === 0
-      ? variant.available
-      : variationNames.every((name) => selectedOptions[name] && variant.variations[name] === selectedOptions[name])
-  ));
+  const activeVariant = product?.isKit
+    ? product.variants.find((variant) => variant.available) ?? product.variants[0]
+    : product?.variants.find((variant) => (
+      variationNames.length === 0
+        ? variant.available
+        : variationNames.every((name) => selectedOptions[name] && variant.variations[name] === selectedOptions[name])
+    ));
   const galleryImages = Array.from(new Set([...(activeVariant?.images ?? []), ...(product?.images ?? [])].filter(Boolean)));
   const visibleColorProducts = colorProducts.slice(0, 5);
   const hiddenColorCount = Math.max(0, colorProducts.length - visibleColorProducts.length);
@@ -122,6 +126,7 @@ export default function ProductScreen() {
     setSimilarProducts([]);
     setLookProducts([]);
     setSelectedOptions({});
+    setKitSelection(emptyKitSelection());
     setSelectionMessage('');
     setQuickViewVisible(false);
     setColorsVisible(false);
@@ -179,6 +184,39 @@ export default function ProductScreen() {
 
   async function addProduct() {
     if (!product) return;
+    if (product.isKit) {
+      const missing = product.kitGroups.filter((group) => (
+        !kitSelection.checkedProducts[group.productId] || !kitSelection.selectedSizes[group.productId]
+      ));
+      if (missing.length > 0) {
+        setSelectionMessage('Por favor, selecione o tamanho de cada peça.');
+        setCartMessage(null);
+        return;
+      }
+      setAdding(true);
+      setSelectionMessage('');
+      setCartMessage(null);
+      try {
+        let orderForm = await getOrderForm();
+        for (const group of product.kitGroups) {
+          const selectedItem = group.items.find((item) => item.itemId === kitSelection.selectedSizes[group.productId]);
+          if (!selectedItem) continue;
+          orderForm = await addItemToCart({
+            orderFormId: orderForm.orderFormId,
+            itemId: selectedItem.itemId,
+            sellerId: selectedItem.sellerId,
+            quantity: selectedItem.amount,
+          });
+        }
+        setCartMessage('Conjunto adicionado à sacola.');
+      } catch {
+        setSelectionMessage('Não foi possível adicionar o conjunto.');
+        setCartMessage(null);
+      } finally {
+        setAdding(false);
+      }
+      return;
+    }
     if (variationNames.some((name) => !selectedOptions[name])) {
       const hasSize = variationNames.some(isSizeVariationName);
       const selectionError = hasSize ? 'Por favor, selecione um tamanho.' : 'Por favor, selecione uma opção.';
@@ -269,6 +307,10 @@ export default function ProductScreen() {
   }
 
   function handleFloatingAdd() {
+    if (product?.isKit) {
+      setQuickViewVisible(true);
+      return;
+    }
     if (variationNames.some((name) => !selectedOptions[name])) {
       setQuickViewVisible(true);
       return;
@@ -366,7 +408,19 @@ export default function ProductScreen() {
                 </View>
               )}
 
-              {Object.entries(variantGroups).map(([name, values]) => (
+              {product.isKit ? (
+                product.kitGroups.length > 0 ? (
+                  <KitSelector
+                    groups={product.kitGroups}
+                    selection={kitSelection}
+                    onChange={(nextSelection) => {
+                      setKitSelection(nextSelection);
+                      setSelectionMessage('');
+                      setCartMessage(null);
+                    }}
+                  />
+                ) : <ActivityIndicator color="#0a0a0a" />
+              ) : Object.entries(variantGroups).map(([name, values]) => (
                 <View key={name} style={styles.selectorGroup}>
                   <ThemedText type="smallBold">{name}: <ThemedText>{selectedOptions[name] || 'Selecione'}</ThemedText></ThemedText>
                   <View style={styles.variantOptions}>
@@ -433,7 +487,17 @@ export default function ProductScreen() {
             </Pressable>
           </View>
         )}
-        {product && <ProductQuickView product={product} visible={quickViewVisible} onClose={() => setQuickViewVisible(false)} />}
+        {product && <ProductQuickView
+          product={product}
+          visible={quickViewVisible}
+          onClose={() => setQuickViewVisible(false)}
+          kitSelection={product.isKit ? kitSelection : undefined}
+          onKitSelectionChange={(nextSelection) => {
+            setKitSelection(nextSelection);
+            setSelectionMessage('');
+            setCartMessage(null);
+          }}
+        />}
         <ColorOptionsModal
           products={colorProducts}
           visible={colorsVisible}

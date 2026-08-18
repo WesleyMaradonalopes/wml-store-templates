@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleProp, StyleSheet, TextStyle, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { KitSelector, emptyKitSelection, type KitSelection } from '@/components/kit-selector';
 import { Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm } from '@/services/cart';
-import { getProduct, type Product, type ProductVariant } from '@/services/catalog';
+import { getProduct, type Product, type ProductKitGroup, type ProductVariant } from '@/services/catalog';
 import { buildVariationGroups } from '@/utils/product-variations';
 
 import { AddToCartFeedback } from './add-to-cart-feedback';
@@ -18,6 +19,8 @@ type QuickViewProps = {
   visible: boolean;
   onClose: () => void;
   onAdded?: (product: Product) => void;
+  kitSelection?: KitSelection;
+  onKitSelectionChange?: (selection: KitSelection) => void;
 };
 
 type QuickViewButtonProps = {
@@ -38,12 +41,13 @@ function matchesSelection(variant: ProductVariant, selected: Record<string, stri
   return Object.entries(selected).every(([name, value]) => name === ignoredName || variant.variations[name] === value);
 }
 
-export function ProductQuickView({ product, visible, onClose, onAdded }: QuickViewProps) {
+export function ProductQuickView({ product, visible, onClose, onAdded, kitSelection, onKitSelectionChange }: QuickViewProps) {
   const router = useRouter();
   const [details, setDetails] = useState(product);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [localKitSelection, setLocalKitSelection] = useState<KitSelection>(emptyKitSelection);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -51,7 +55,12 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
     let active = true;
     setDetails(product);
     setSelectedOptions({});
+    setLocalKitSelection(kitSelection ?? emptyKitSelection());
     setMessage('');
+    if (product.isKit && product.kitGroups.length > 0) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     getProduct(product.id)
       .then((value) => { if (active) setDetails(value); })
@@ -62,6 +71,8 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
 
   const variationGroups = useMemo(() => buildVariationGroups(details), [details]);
   const variationNames = Object.keys(variationGroups);
+  const isKit = details.isKit;
+  const currentKitSelection = kitSelection ?? localKitSelection;
   const selectionComplete = variationNames.every((name) => Boolean(selectedOptions[name]));
   const selectedVariant = useMemo(() => {
     if (variationNames.length === 0) return details.variants.find((variant) => variant.available) ?? details.variants[0];
@@ -83,7 +94,51 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
     ));
   }
 
+  function updateKitSelection(nextSelection: KitSelection) {
+    if (kitSelection) onKitSelectionChange?.(nextSelection);
+    else setLocalKitSelection(nextSelection);
+  }
+
+  function missingKitGroups(groups: ProductKitGroup[] = details.kitGroups) {
+    return groups.filter((group) => !currentKitSelection.checkedProducts[group.productId] || !currentKitSelection.selectedSizes[group.productId]);
+  }
+
   async function addSelectedProduct() {
+    if (isKit) {
+      if (loading || details.kitGroups.length === 0) {
+        setMessage('Aguarde o carregamento das peças do conjunto.');
+        return;
+      }
+      const missing = missingKitGroups();
+      if (missing.length > 0) {
+        setMessage('Selecione o tamanho de cada peça para adicionar o conjunto.');
+        return;
+      }
+
+      setAdding(true);
+      setMessage('');
+      try {
+        let orderForm = await getOrderForm();
+        for (const group of details.kitGroups) {
+          const selectedItem = group.items.find((item) => item.itemId === currentKitSelection.selectedSizes[group.productId]);
+          if (!selectedItem) continue;
+          orderForm = await addItemToCart({
+            orderFormId: orderForm.orderFormId,
+            itemId: selectedItem.itemId,
+            sellerId: selectedItem.sellerId,
+            quantity: selectedItem.amount,
+          });
+        }
+        setMessage('Conjunto adicionado à sacola.');
+        onAdded?.(details);
+      } catch {
+        setMessage('Não foi possível adicionar o conjunto agora.');
+      } finally {
+        setAdding(false);
+      }
+      return;
+    }
+
     if (variationNames.length > 0 && !selectionComplete) {
       setMessage(`Escolha ${variationNames.map((name) => name.toLowerCase()).join(' e ')}.`);
       return;
@@ -122,7 +177,9 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
         <ThemedView style={styles.sheet}>
           <SafeAreaView edges={['bottom']} style={styles.safeArea}>
             <View style={styles.header}>
-              <ThemedText type="smallBold" numberOfLines={2} style={styles.title}>{details.name}</ThemedText>
+              <ThemedText numberOfLines={2} style={styles.title}>
+                {isKit ? <>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></> : details.name}
+              </ThemedText>
               <Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.closeButton}>
                 <ThemedText style={styles.closeText}>✕</ThemedText>
               </Pressable>
@@ -143,10 +200,12 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
                   renderItem={({ item }) => <Image source={{ uri: item }} style={styles.image} contentFit="cover" />}
                 />
               )}
-              {(selectedVariant?.price ?? details.price) !== null && (
+              {!isKit && (selectedVariant?.price ?? details.price) !== null && (
                 <ThemedText type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
               )}
-              {variationNames.map((name) => (
+              {isKit ? (
+                <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
+              ) : variationNames.map((name) => (
                 <View key={name} style={styles.variationGroup}>
                   <ThemedText type="smallBold">
                     {name}: <ThemedText>{selectedOptions[name] || `Escolha ${name.toLowerCase()}`}</ThemedText>
@@ -170,10 +229,10 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
                 </View>
               ))}
               {!!message && !message.toLowerCase().includes('adicionad') && <ThemedText style={styles.messageText}>{message}</ThemedText>}
-              <Pressable onPress={openProduct} style={styles.productButton}>
+              {!isKit && <Pressable onPress={openProduct} style={styles.productButton}>
                 <ThemedText type="smallBold">Ir para o produto</ThemedText>
-              </Pressable>
-              <Pressable disabled={adding} onPress={addSelectedProduct} style={styles.addButton}>
+              </Pressable>}
+              <Pressable disabled={adding || (isKit && (loading || details.kitGroups.length === 0))} onPress={addSelectedProduct} style={styles.addButton}>
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>}
               </Pressable>
             </ScrollView>
