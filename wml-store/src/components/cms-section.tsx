@@ -329,7 +329,7 @@ function categoryListItems(data: Record<string, unknown>) {
   });
 }
 
-function CategorySwipeCard({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
+function CategorySwipeRow({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
   const title = text(category.title) || 'Categoria';
   const icon = text(category.icon) || text(category.imageUrl);
 
@@ -337,9 +337,10 @@ function CategorySwipeCard({ category, onPress }: { category: Record<string, unk
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.categorySwipeCard, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.categorySwipeRow, pressed && styles.pressed]}>
       {!!icon && <Image source={{ uri: icon }} style={styles.categorySwipeIcon} contentFit="contain" />}
-      <ThemedText style={styles.categorySwipeTitle} numberOfLines={2}>{title}</ThemedText>
+      <ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
+      <ArrowRightAIcon color="#0a0a0a" size={20} />
     </Pressable>
   );
 }
@@ -372,16 +373,15 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
   return (
     <ThemedView style={styles.section}>
       <ThemedText type="subtitle">{sectionTitle || 'Todas categorias'}</ThemedText>
-      <FlatList
-        horizontal
-        data={categories}
-        keyExtractor={(item, index) => `${text(item.title) || 'categoria'}-${index}`}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categorySwipeList}
-        renderItem={({ item }) => (
-          <CategorySwipeCard category={item} onPress={() => openCategory(item)} />
-        )}
-      />
+      <View style={styles.categorySwipePanel}>
+        {categories.map((item, index) => (
+          <CategorySwipeRow
+            key={`${text(item.title) || 'categoria'}-${index}`}
+            category={item}
+            onPress={() => openCategory(item)}
+          />
+        ))}
+      </View>
 
       <Modal
         visible={Boolean(selectedCategory)}
@@ -718,10 +718,10 @@ const styles = StyleSheet.create({
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
-  categorySwipeList: { gap: 10, paddingVertical: 4, paddingRight: 16 },
-  categorySwipeCard: { width: 124, minHeight: 116, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e0ddd7', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  categorySwipeIcon: { width: 38, height: 38, borderRadius: 8 },
-  categorySwipeTitle: { fontSize: 14, lineHeight: 18, color: '#0a0a0a', fontWeight: '600', textAlign: 'center' },
+  categorySwipePanel: { overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: '#eeeae5', backgroundColor: '#FFFFFF' },
+  categorySwipeRow: { minHeight: 68, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: 1, borderBottomColor: '#eeeae5', backgroundColor: '#FFFFFF' },
+  categorySwipeIcon: { width: 28, height: 28, borderRadius: 6 },
+  categorySwipeRowTitle: { flex: 1, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '500', textTransform: 'uppercase' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: '#FFFFFF' },
   categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
   categoryModalBack: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
