@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
@@ -317,6 +317,133 @@ function CouponsList({ data }: { data: Record<string, unknown> }) {
   return <ThemedView style={styles.section}><ThemedText type="subtitle">Cupons</ThemedText>{coupons.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ThemedView key={index} style={styles.couponCard}><ThemedText type="smallBold">{text(value.title) || 'Cupom'}</ThemedText><ThemedText themeColor="textSecondary">{text(value.description)}</ThemedText><ThemedText style={styles.couponCode}>{text(value.code)}</ThemedText>{!!text(value.expiresAt) && <ThemedText themeColor="textSecondary">Válido até {text(value.expiresAt)}</ThemedText>}</ThemedView>; })}</ThemedView>;
 }
 
+function categoryListItems(data: Record<string, unknown>) {
+  const content = Array.isArray(data.content) ? data.content : [];
+  if (content.length > 0) return content;
+
+  const shelves = Array.isArray(data.shelves) ? data.shelves : [];
+  return shelves.flatMap((shelf) => {
+    if (!shelf || typeof shelf !== 'object') return [];
+    const shelfContent = (shelf as Record<string, unknown>).content;
+    return Array.isArray(shelfContent) ? shelfContent : [];
+  });
+}
+
+function CategorySwipeCard({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
+  const title = text(category.title) || 'Categoria';
+  const icon = text(category.icon) || text(category.imageUrl);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.categorySwipeCard, pressed && styles.pressed]}>
+      {!!icon && <Image source={{ uri: icon }} style={styles.categorySwipeIcon} contentFit="contain" />}
+      <ThemedText style={styles.categorySwipeTitle} numberOfLines={2}>{title}</ThemedText>
+    </Pressable>
+  );
+}
+
+function CategorySwipeSection({ data, router }: { data: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
+  const categories = categoryListItems(data).filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
+  const [selectedCategory, setSelectedCategory] = useState<Record<string, unknown> | null>(null);
+  const sectionTitle = text(data.title).trim();
+
+  if (categories.length === 0) return null;
+
+  const openCategory = (category: Record<string, unknown>) => {
+    const subcategories = Array.isArray(category.subcategories) ? category.subcategories : [];
+    if (subcategories.length > 0) {
+      setSelectedCategory(category);
+      return;
+    }
+    openCmsAction(router, category.action, text(category.title) || 'Categoria');
+  };
+
+  const selectedTitle = text(selectedCategory?.title) || 'Categoria';
+  const selectedAction = readCmsAction(selectedCategory?.action);
+  const selectedSubcategories = Array.isArray(selectedCategory?.subcategories)
+    ? selectedCategory.subcategories.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    : [];
+  const selectedActionTarget = selectedAction.value
+    ? selectedAction.value.replace(/\/$/, '')
+    : '';
+
+  return (
+    <ThemedView style={styles.section}>
+      <ThemedText type="subtitle">{sectionTitle || 'Todas categorias'}</ThemedText>
+      <FlatList
+        horizontal
+        data={categories}
+        keyExtractor={(item, index) => `${text(item.title) || 'categoria'}-${index}`}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categorySwipeList}
+        renderItem={({ item }) => (
+          <CategorySwipeCard category={item} onPress={() => openCategory(item)} />
+        )}
+      />
+
+      <Modal
+        visible={Boolean(selectedCategory)}
+        animationType="slide"
+        onRequestClose={() => setSelectedCategory(null)}>
+        <View style={styles.categoryModal}>
+          <View style={styles.categoryModalHeader}>
+            <Pressable
+              accessibilityLabel="Voltar para categorias"
+              onPress={() => setSelectedCategory(null)}
+              style={styles.categoryModalBack}>
+              <ArrowLeftIAIcon color="#0a0a0a" size={22} />
+            </Pressable>
+            <ThemedText style={styles.categoryModalTitle}>{selectedTitle}</ThemedText>
+            <View style={styles.categoryModalBack} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.categoryModalList}>
+            {!!selectedAction.value && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setSelectedCategory(null);
+                  openCmsAction(router, selectedCategory?.action, `Ver tudo em ${selectedTitle}`);
+                }}
+                style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
+                <ThemedText style={styles.categoryModalItemText}>Ver tudo em {selectedTitle}</ThemedText>
+                <ArrowRightAIcon color="#0a0a0a" size={18} />
+              </Pressable>
+            )}
+
+            {selectedSubcategories.map((subcategory, index) => {
+              const subcategoryTitle = text(subcategory.title) || `Subcategoria ${index + 1}`;
+              const fallbackTarget = selectedActionTarget
+                ? `${selectedActionTarget}/${slugPart(subcategoryTitle)}`
+                : subcategoryTitle;
+              const icon = text(subcategory.icon) || text(subcategory.imageUrl);
+
+              return (
+                <Pressable
+                  key={`${subcategoryTitle}-${index}`}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setSelectedCategory(null);
+                    openCmsAction(router, subcategory.action, fallbackTarget);
+                  }}
+                  style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
+                  <View style={styles.categoryModalItemContent}>
+                    {!!icon && <Image source={{ uri: icon }} style={styles.categoryModalIcon} contentFit="contain" />}
+                    <ThemedText style={styles.categoryModalItemText}>{subcategoryTitle}</ThemedText>
+                  </View>
+                  <ArrowRightAIcon color="#0a0a0a" size={18} />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
+    </ThemedView>
+  );
+}
+
 function CategoryRow({ category, router }: { category: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
   const title = text(category.title) || 'Categoria';
   return (
@@ -513,20 +640,18 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     return <ThemedView style={styles.section}><View style={styles.sectionHeader}><ThemedText type="subtitle">{text(data.title) || 'Confira nosso blog'}</ThemedText>{!!text(data.postUrl) && <Pressable onPress={() => Linking.openURL(text(data.postUrl))}><ThemedText style={styles.seeAll}>Ver tudo</ThemedText></Pressable>}</View><View style={styles.contentRow}>{posts.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title) || text(value.name)} description={text(value.description) || text(value.excerpt)} imageUrl={text(value.imageUrl) || text(value.thumbnail)} action={{ type: 'link', value: text(value.link) }} />; })}</View>{posts.length === 0 && <ThemedText themeColor="textSecondary">Os conteúdos do blog aparecerão aqui.</ThemedText>}</ThemedView>;
   }
 
-  if (section.name === 'CategoryListSwipe' || section.name === 'CategoryAccordeon' || section.name === 'CategoryTree') {
-    const content = Array.isArray(data.content) ? data.content : [];
-    const shelves = Array.isArray(data.shelves) ? data.shelves : [];
-    const categories = content.length > 0 ? content : shelves.flatMap((shelf) => {
-      if (!shelf || typeof shelf !== 'object') return [];
-      const items = (shelf as Record<string, unknown>).content;
-      return Array.isArray(items) ? items : [];
-    });
+  if (section.name === 'CategoryListSwipe') {
+    return <CategorySwipeSection data={data} router={router} />;
+  }
+
+  if (section.name === 'CategoryAccordeon' || section.name === 'CategoryTree') {
+    const categories = categoryListItems(data);
     const categoryItems = categories.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
     const hasSubcategories = categoryItems.some((category) => Array.isArray(category.subcategories) && category.subcategories.length > 0);
     const sectionTitle = text(data.title).trim();
     const slugTitle = categoryPageSlug ? categoryTitleFromSlug(categoryPageSlug) : '';
     const configuredParentTitle = text(data.parentTitle) || text(data.categoryTitle);
-    const parentTitle = configuredParentTitle || slugTitle || (section.name === 'CategoryListSwipe' ? sectionTitle : '');
+    const parentTitle = configuredParentTitle || slugTitle || '';
     const isDetailSection = Boolean(categoryItems.length > 0 && !hasSubcategories && section.name !== 'CategoryTree' && (
       section.name === 'CategoryAccordeon' || sectionTitle && !isGenericCategoryTitle(sectionTitle)
     ));
@@ -546,11 +671,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     const configuredSubcategoryHeading = section.name === 'CategoryAccordeon'
       ? sectionTitle
       : text(data.subcategoryTitle);
-    const sectionHeading = !isDetailSection && section.name === 'CategoryListSwipe'
-      ? sectionTitle || 'Todas categorias'
-      : !isDetailSection && section.name === 'CategoryTree'
-        ? sectionTitle
-        : '';
+    const sectionHeading = !isDetailSection && section.name === 'CategoryTree' ? sectionTitle : '';
 
     return (
       <ThemedView style={styles.section}>
@@ -597,6 +718,19 @@ const styles = StyleSheet.create({
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
+  categorySwipeList: { gap: 10, paddingVertical: 4, paddingRight: 16 },
+  categorySwipeCard: { width: 124, minHeight: 116, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e0ddd7', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  categorySwipeIcon: { width: 38, height: 38, borderRadius: 8 },
+  categorySwipeTitle: { fontSize: 14, lineHeight: 18, color: '#0a0a0a', fontWeight: '600', textAlign: 'center' },
+  categoryModal: { flex: 1, padding: 16, backgroundColor: '#FFFFFF' },
+  categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
+  categoryModalBack: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
+  categoryModalTitle: { flex: 1, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700', textAlign: 'center' },
+  categoryModalList: { gap: 10, paddingVertical: 16 },
+  categoryModalItem: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
+  categoryModalItemContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  categoryModalIcon: { width: 28, height: 28, borderRadius: 6 },
+  categoryModalItemText: { flex: 1, fontSize: 16, lineHeight: 22, color: '#0a0a0a' },
   categoryList: { gap: 0, overflow: 'hidden', borderRadius: 24, backgroundColor: '#FFFFFF' },
   categoryGroupsList: { gap: 12, overflow: 'visible', backgroundColor: 'transparent' },
   categoryRow: { minHeight: 72, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
