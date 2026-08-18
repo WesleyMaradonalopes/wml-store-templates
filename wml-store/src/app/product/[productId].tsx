@@ -24,7 +24,7 @@ import { ThemedView } from '@/components/themed-view';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
-import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductVariant } from '@/services/catalog';
+import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductKitGroup, type ProductKitItem, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 import { buildVariationGroups } from '@/utils/product-variations';
 
@@ -627,8 +627,22 @@ function lookSizeInfo(product: Product) {
   };
 }
 
+function kitItemSize(item: ProductKitItem) {
+  return Object.entries(item.variations).find(([name]) => isSizeVariationName(name))?.[1] ?? '';
+}
+
+function lookKitSizeOptions(group: ProductKitGroup) {
+  const values = sortVariationValues('Tamanho', Array.from(new Set(group.items.map(kitItemSize).filter(Boolean))));
+  return values.map((value) => {
+    const item = group.items.find((candidate) => kitItemSize(candidate) === value && candidate.available)
+      ?? group.items.find((candidate) => kitItemSize(candidate) === value);
+    return { value, itemId: item?.itemId ?? '', available: Boolean(item?.available) };
+  }).filter((option) => option.itemId);
+}
+
 function CompleteLook({ products }: { products: Product[] }) {
   const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
+  const [selectedKitSizes, setSelectedKitSizes] = useState<Record<string, Record<string, string>>>({});
   const [openSize, setOpenSize] = useState<string | null>(null);
   const [replacementIndex, setReplacementIndex] = useState(0);
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -643,19 +657,42 @@ function CompleteLook({ products }: { products: Product[] }) {
   const variants = rows.map((product) => {
     const size = lookSizeInfo(product);
     const selected = selectedSizes[product.id];
+    const isKit = product.isKit;
+    const kitSelections = selectedKitSizes[product.id] ?? {};
+    const selectedKitItems = isKit
+      ? product.kitGroups
+        .map((group) => group.items.find((item) => item.itemId === kitSelections[group.productId]))
+        .filter((item): item is ProductKitItem => Boolean(item))
+      : [];
     return {
       product,
       size,
-      selectedVariant: size.name
+      isKit,
+      kitSelections,
+      selectedKitItems,
+      selectionComplete: isKit
+        ? product.kitGroups.length > 0 && selectedKitItems.length === product.kitGroups.length
+        : !size.name || Boolean(product.variants.find((variant) => variant.available && variant.variations[size.name] === selected)),
+      selectedVariant: !isKit && size.name
         ? product.variants.find((variant) => variant.available && variant.variations[size.name] === selected)
-        : product.variants.find((variant) => variant.available) ?? product.variants[0],
+        : !isKit ? product.variants.find((variant) => variant.available) ?? product.variants[0] : undefined,
     };
   });
   const total = variants.reduce((sum, item) => sum + (item.selectedVariant?.price ?? item.product.price ?? 0), 0);
 
+  function selectKitSize(productId: string, groupId: string, itemId: string) {
+    setSelectedKitSizes((current) => ({
+      ...current,
+      [productId]: { ...(current[productId] ?? {}), [groupId]: itemId },
+    }));
+    setSelectionErrors((current) => { const next = { ...current }; delete next[productId]; return next; });
+    setOpenSize(null);
+    setMessage('');
+  }
+
   async function addLookProduct(product: Product) {
     const item = variants.find((value) => value.product.id === product.id);
-    if (!item?.selectedVariant) {
+    if (!item?.selectionComplete) {
       setSelectionErrors((current) => ({ ...current, [product.id]: 'Selecione o tamanho para adicionar à sacola.' }));
       return;
     }
@@ -663,8 +700,19 @@ function CompleteLook({ products }: { products: Product[] }) {
     setSelectionErrors((current) => { const next = { ...current }; delete next[product.id]; return next; });
     setMessage('');
     try {
-      const orderForm = await getOrderForm();
-      await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
+      let orderForm = await getOrderForm();
+      if (item.isKit) {
+        for (const selectedKitItem of item.selectedKitItems) {
+          orderForm = await addItemToCart({
+            orderFormId: orderForm.orderFormId,
+            itemId: selectedKitItem.itemId,
+            sellerId: selectedKitItem.sellerId,
+            quantity: selectedKitItem.amount,
+          });
+        }
+      } else if (item.selectedVariant) {
+        orderForm = await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
+      }
       setMessage('Produto adicionado à sacola.');
     } catch {
       setMessage('Não foi possível adicionar o produto agora.');
@@ -674,9 +722,9 @@ function CompleteLook({ products }: { products: Product[] }) {
   }
 
   async function buyTogether() {
-    const missing = variants.find((item) => !item.selectedVariant);
+    const missing = variants.find((item) => !item.selectionComplete);
     if (missing) {
-      setSelectionErrors(Object.fromEntries(variants.filter((item) => !item.selectedVariant).map((item) => [item.product.id, 'Selecione o tamanho para adicionar à sacola.'])));
+      setSelectionErrors(Object.fromEntries(variants.filter((item) => !item.selectionComplete).map((item) => [item.product.id, 'Selecione o tamanho para adicionar à sacola.'])));
       return;
     }
     setBuyingTogether(true);
@@ -684,8 +732,18 @@ function CompleteLook({ products }: { products: Product[] }) {
     try {
       let orderForm = await getOrderForm();
       for (const item of variants) {
-        if (!item.selectedVariant) continue;
-        orderForm = await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
+        if (item.isKit) {
+          for (const selectedKitItem of item.selectedKitItems) {
+            orderForm = await addItemToCart({
+              orderFormId: orderForm.orderFormId,
+              itemId: selectedKitItem.itemId,
+              sellerId: selectedKitItem.sellerId,
+              quantity: selectedKitItem.amount,
+            });
+          }
+        } else if (item.selectedVariant) {
+          orderForm = await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
+        }
       }
       setMessage('Produtos adicionados à sacola.');
     } catch {
@@ -699,8 +757,11 @@ function CompleteLook({ products }: { products: Product[] }) {
     <View style={styles.lookSection}>
       <ThemedText style={styles.lookTitle}>Complete o look</ThemedText>
       <ThemedText style={styles.lookSubtitle}>Sinta a experiência HOPE completa.</ThemedText>
-      {variants.map(({ product, size, selectedVariant }, index) => (
-        <View key={product.id} style={[styles.lookRow, openSize === product.id && styles.lookRowOpen]}>
+      {variants.map((lookItem, index) => {
+        const { product, size, selectedVariant } = lookItem;
+        const rowOpen = openSize === product.id || openSize?.startsWith(`${product.id}:`);
+        return (
+          <View key={product.id} style={[styles.lookRow, rowOpen && styles.lookRowOpen]}>
           <View style={styles.lookImageWrap}>
             {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.lookImage} contentFit="cover" />}
             {index === 0 ? <View style={styles.lookTag}><ThemedText style={styles.lookTagText}>Você está vendo</ThemedText></View> : <Pressable disabled={recommendations.length < 2} onPress={() => { setReplacementIndex((value) => (value + 1) % recommendations.length); setOpenSize(null); setMessage(''); }} style={[styles.lookTag, styles.lookTagInteractive, recommendations.length < 2 && styles.lookTagDisabled]}><ExchangeIcon color="#0a0a0a" size={14} /><ThemedText style={styles.lookTagText}>Trocar</ThemedText></Pressable>}
@@ -708,7 +769,25 @@ function CompleteLook({ products }: { products: Product[] }) {
           <View style={styles.lookInfo}>
             <ThemedText numberOfLines={2} style={styles.lookName}>{product.name}</ThemedText>
             <ThemedText type="subtitle" style={styles.lookPrice}>{money(selectedVariant?.price ?? product.price)}</ThemedText>
-            {!!size.name && (
+            {lookItem.isKit ? (
+              <View style={styles.lookKitSelectors}>
+                {product.kitGroups.map((group) => {
+                  const selectorKey = `${product.id}:${group.productId}`;
+                  const selectedItem = group.items.find((item) => item.itemId === lookItem.kitSelections[group.productId]);
+                  const options = lookKitSizeOptions(group);
+                  return (
+                    <View key={group.productId} style={[styles.lookSelectorWrap, openSize === selectorKey && styles.lookSelectorOpen]}>
+                      <Pressable onPress={() => setOpenSize(openSize === selectorKey ? null : selectorKey)} style={[styles.lookSelect, selectionErrors[product.id] && styles.lookSelectError]}>
+                        <ThemedText>{selectedItem ? kitItemSize(selectedItem) : 'Tamanho'}</ThemedText>
+                        <DropdownChevron open={openSize === selectorKey} />
+                      </Pressable>
+                      {openSize === selectorKey && <View style={styles.lookOptions}>{options.map((option) => <Pressable key={option.itemId} disabled={!option.available} onPress={() => selectKitSize(product.id, group.productId, option.itemId)} style={[styles.lookOption, !option.available && styles.lookUnavailable]}><ThemedText style={!option.available && styles.lookUnavailableText}>{option.value}</ThemedText></Pressable>)}</View>}
+                    </View>
+                  );
+                })}
+                {!!selectionErrors[product.id] && <ThemedText style={styles.lookSelectionError}>{selectionErrors[product.id]}</ThemedText>}
+              </View>
+            ) : !!size.name && (
               <View style={styles.lookSelectorWrap}>
                 <Pressable onPress={() => setOpenSize(openSize === product.id ? null : product.id)} style={[styles.lookSelect, selectionErrors[product.id] && styles.lookSelectError]}>
                   <ThemedText>{selectedSizes[product.id] || 'Tamanho'}</ThemedText>
@@ -723,7 +802,8 @@ function CompleteLook({ products }: { products: Product[] }) {
             </Pressable>
           </View>
         </View>
-      ))}
+        );
+      })}
       <View style={styles.lookSummary}>
         <ThemedText>Leve os {rows.length} produtos por:</ThemedText>
         <ThemedText type="subtitle" style={styles.lookTotal}>{money(total)}</ThemedText>
@@ -903,7 +983,9 @@ const styles = StyleSheet.create({
   lookPrice: { fontSize: 20, lineHeight: 24 },
   lookSelect: { minHeight: 54, paddingHorizontal: Spacing.three, borderRadius: 6, borderWidth: 1, borderColor: '#d2ccc4', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   lookSelectError: { borderColor: '#D92D20' },
+  lookKitSelectors: { gap: Spacing.two },
   lookSelectorWrap: { position: 'relative', zIndex: 10 },
+  lookSelectorOpen: { zIndex: 40, elevation: 12 },
   lookOptions: { position: 'absolute', left: 0, right: 0, top: 56, paddingVertical: Spacing.one, borderWidth: 1, borderColor: '#d2ccc4', borderRadius: 6, backgroundColor: '#FFFFFF', zIndex: 30, shadowColor: '#0a0a0a', shadowOpacity: 0.14, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
   lookOption: { minHeight: 34, paddingHorizontal: Spacing.three, justifyContent: 'center' },
   lookUnavailable: { opacity: 0.45 },

@@ -688,6 +688,9 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
     const validated: Product[] = [];
     for (const candidate of await hydrate(dedupe(products).slice(0, count * 4))) {
       if (validated.length >= count) break;
+      // Conjuntos devem completar o look com outro conjunto; não misture as
+      // peças avulsas que a mesma coleção também costuma retornar.
+      if (product.isKit && !candidate.isKit) continue;
       if (candidate.variants.length === 0 || candidate.variants.some((variant) => variant.available)) validated.push(candidate);
     }
     return validated;
@@ -712,7 +715,10 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
         .map(normalizeProduct)
         .filter((item) => item.id && item.id !== product.id)
         .map((item) => [item.id, item])).values());
-      if (products.length > 0) return validate(products);
+      if (products.length > 0) {
+        const validated = await validate(products);
+        if (validated.length > 0) return validated;
+      }
     } catch {
       // Continua tentando as demais relações configuradas no catálogo VTEX.
     }
@@ -720,7 +726,10 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
 
   try {
     const fallback = await getSimilarProducts(product, count + 1);
-    if (fallback.length > 0) return validate(fallback);
+    if (fallback.length > 0) {
+      const validated = await validate(fallback);
+      if (validated.length > 0) return validated;
+    }
   } catch {
     // A busca de fallback é opcional para a seção.
   }
