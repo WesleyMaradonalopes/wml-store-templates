@@ -1,7 +1,7 @@
 import Eitri from 'eitri-bifrost'
 
 const STORE_ID = '111609'
-const STORE_URL = 'https://www.lojabl.com.br'
+const STORE_URL = 'https://www.lojahr.com.br'
 
 let cachedPromise = null
 
