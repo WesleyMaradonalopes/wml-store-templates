@@ -892,8 +892,13 @@
 		"requiredScopes": [],
 		"schema": {
 			"title": "Lista de categorias com swipe",
+			"description": "Lista horizontal de categorias para a home e páginas do app",
 			"type": "object",
 			"properties": {
+				"title": {
+					"title": "Título (opcional)",
+					"type": "string"
+				},
 				"content": {
 					"title": "Categorias",
 					"type": "array",
@@ -908,9 +913,7 @@
 							"icon": {
 								"title": "Ícone (opcional)",
 								"type": "string",
-								"widget": {
-									"ui:widget": "media-gallery"
-								}
+								"description": "URL do ícone da categoria"
 							},
 							"action": {
 								"title": "Destino da ação (Opcional)",
@@ -978,9 +981,7 @@
 									"banner": {
 										"title": "Banner de destino (opcional)",
 										"type": "string",
-										"widget": {
-											"ui:widget": "media-gallery"
-										}
+										"description": "URL do banner de destino"
 									}
 								}
 							},
@@ -998,9 +999,7 @@
 										"icon": {
 											"title": "Ícone (opcional)",
 											"type": "string",
-											"widget": {
-												"ui:widget": "media-gallery"
-											}
+											"description": "URL do ícone da subcategoria"
 										},
 										"action": {
 											"title": "Destino da ação",
@@ -1012,12 +1011,11 @@
 														"Nenhum",
 														"Abrir Link",
 														"Abrir Produto",
-														"Abrir Coleção",
-														"Abrir Categoria",
-														"Abrir Busca",
-														"Abrir Página",
-														"Abrir WML App",
-														"Abrir Path",
+															"Abrir Coleção",
+															"Abrir Categoria",
+															"Abrir Busca",
+															"Abrir Página",
+															"Abrir Path",
 														"Abrir Marca"
 													],
 													"enum": [
@@ -1027,9 +1025,8 @@
 														"collection",
 														"category",
 														"search",
-														"page",
-									"path",
-														"path",
+																"page",
+																"path",
 														"brand"
 													],
 													"default": "none"
@@ -1043,12 +1040,10 @@
 													"description": "Apenas se diferente do nome da categoria",
 													"type": "string"
 												},
-												"banner": {
-													"title": "Banner de destino (opcional)",
-													"type": "string",
-													"widget": {
-														"ui:widget": "media-gallery"
-													}
+													"banner": {
+														"title": "Banner de destino (opcional)",
+														"type": "string",
+														"description": "URL do banner de destino"
 												}
 											}
 										}
