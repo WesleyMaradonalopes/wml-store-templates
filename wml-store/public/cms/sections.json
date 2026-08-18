@@ -892,13 +892,8 @@
 		"requiredScopes": [],
 		"schema": {
 			"title": "Lista de categorias com swipe",
-			"description": "Lista horizontal de categorias para a home e páginas do app",
 			"type": "object",
 			"properties": {
-				"title": {
-					"title": "Título (opcional)",
-					"type": "string"
-				},
 				"content": {
 					"title": "Categorias",
 					"type": "array",
@@ -913,7 +908,9 @@
 							"icon": {
 								"title": "Ícone (opcional)",
 								"type": "string",
-								"description": "URL do ícone da categoria"
+								"widget": {
+									"ui:widget": "media-gallery"
+								}
 							},
 							"action": {
 								"title": "Destino da ação (Opcional)",
@@ -978,10 +975,12 @@
 										"title": "Título (opcional)",
 										"type": "string"
 									},
-									"banner": {
-										"title": "Banner de destino (opcional)",
-										"type": "string",
-										"description": "URL do banner de destino"
+								"banner": {
+									"title": "Banner de destino (opcional)",
+									"type": "string",
+									"widget": {
+										"ui:widget": "media-gallery"
+									}
 									}
 								}
 							},
@@ -999,7 +998,9 @@
 										"icon": {
 											"title": "Ícone (opcional)",
 											"type": "string",
-											"description": "URL do ícone da subcategoria"
+											"widget": {
+												"ui:widget": "media-gallery"
+											}
 										},
 										"action": {
 											"title": "Destino da ação",
@@ -1010,12 +1011,12 @@
 													"enumNames": [
 														"Nenhum",
 														"Abrir Link",
-														"Abrir Produto",
-															"Abrir Coleção",
-															"Abrir Categoria",
-															"Abrir Busca",
-															"Abrir Página",
-															"Abrir Path",
+																"Abrir Produto",
+																"Abrir Coleção",
+																"Abrir Categoria",
+																"Abrir Busca",
+																"Abrir Página",
+																"Abrir Path",
 														"Abrir Marca"
 													],
 													"enum": [
@@ -1040,11 +1041,13 @@
 													"description": "Apenas se diferente do nome da categoria",
 													"type": "string"
 												},
-													"banner": {
-														"title": "Banner de destino (opcional)",
-														"type": "string",
-														"description": "URL do banner de destino"
-												}
+																"banner": {
+																	"title": "Banner de destino (opcional)",
+																	"type": "string",
+																	"widget": {
+																		"ui:widget": "media-gallery"
+																	}
+																}
 											}
 										}
 									}
