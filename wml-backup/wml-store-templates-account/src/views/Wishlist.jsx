@@ -65,7 +65,7 @@ export default function Wishlist(props) {
 		} catch (e) {}
 		const raw = `${name}|${productIds}|${skuIds}`
 		const encoded = btoa(unescape(encodeURIComponent(raw)))
-		const url = `https://www.lojabl.com.br/favoritos?tag=${encoded}`
+		const url = `https://www.lojahr.com.br/favoritos?tag=${encoded}`
 		Eitri.share.link({ url })
 	}
 

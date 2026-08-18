@@ -38,12 +38,12 @@ export function LoginRequiredModal({ visible, onClose, onLogin }: LoginRequiredM
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(0, 0, 0, 0.52)' },
-  card: { width: '100%', maxWidth: 380, gap: Spacing.three, padding: Spacing.five, borderRadius: 18, backgroundColor: '#FFFFFF', elevation: 8, shadowColor: '#000000', shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
+  card: { width: '100%', maxWidth: 380, gap: Spacing.three, padding: Spacing.five, borderRadius: 18, backgroundColor: '#FFFFFF', elevation: 8, shadowColor: '#0a0a0a', shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   header: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { flex: 1 },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  closeText: { color: '#000000', fontSize: 24, lineHeight: 28, fontWeight: '400' },
+  closeText: { color: '#0a0a0a', fontSize: 24, lineHeight: 28, fontWeight: '400' },
   message: { color: '#393531', fontSize: 15, lineHeight: 23 },
-  loginButton: { minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  loginButton: { minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loginText: { color: '#FFFFFF', fontWeight: '700' },
 });

@@ -5,7 +5,7 @@ const CACHE = new Map()
 const BASELINE_TTL_MS = 24 * 60 * 60 * 1000
 const SEARCH_TTL_MS = 10 * 60 * 1000
 
-const DEFAULT_VTEX_BASE_URL = 'https://lojabl.myvtex.com'
+const DEFAULT_VTEX_BASE_URL = 'https://lojahr.myvtex.com'
 const STORES_PATH = '/api/dataentities/OS/search?_fields=phone,city,name,address,state,country,is_franchise,whatsapp_link'
 
 const isPrimitiveStore = (store) => !!store && typeof store === 'object'

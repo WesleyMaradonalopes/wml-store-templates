@@ -66,7 +66,7 @@ export default function Similars(props) {
 								onClick={() => handleColorClick(product)}
 								style={{
 									backgroundColor: '#ccc',
-									backgroundImage: `url("https://lojabl.vtexassets.com/arquivos/${colorName}.gif")`,
+									backgroundImage: `url("https://lojahr.vtexassets.com/arquivos/${colorName}.gif")`,
 									backgroundSize: 'cover',
 									backgroundPosition: 'center',
 									backgroundRepeat: 'no-repeat',

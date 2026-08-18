@@ -2,7 +2,7 @@ import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
 export default function ShoppingBagIcon({
-  color = '#1E120D',
+  color = '#0a0a0a',
   size = 24,
 }) {
   return (

@@ -34,12 +34,12 @@ export default function CmsPageScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader back={!isCategoryPage} />
         <Pressable onPress={() => router.back()} style={styles.hiddenBack}>
-          <ArrowLeftIAIcon color="#231f20" size={16} />
+          <ArrowLeftIAIcon color="#0a0a0a" size={16} />
           <ThemedText type="link">Voltar</ThemedText>
         </Pressable>
         <ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
           {!isCategoryPage && <ThemedText type="subtitle">{page?.name ?? slug}</ThemedText>}
-          {loading && <ActivityIndicator color="#000000" />}
+          {loading && <ActivityIndicator color="#0a0a0a" />}
           {error && <ThemedText themeColor="textSecondary">Não foi possível carregar esta página.</ThemedText>}
           {!loading && !error && page?.sections.length === 0 && (
             <ThemedText themeColor="textSecondary">Nenhuma seção publicada nesta página.</ThemedText>

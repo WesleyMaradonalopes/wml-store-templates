@@ -103,7 +103,7 @@ type VtexOrderForm = {
   };
 };
 
-const ORDER_FORM_ID_KEY = 'lojabl:orderFormId';
+const ORDER_FORM_ID_KEY = 'lojahr:orderFormId';
 
 async function userTokenHeaders(): Promise<Record<string, string>> {
   const token = await getVtexUserToken();

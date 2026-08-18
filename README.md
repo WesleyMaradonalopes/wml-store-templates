@@ -1,6 +1,6 @@
 # wml-store-templates
 
-Aplicativo LojaBL para iOS e Android com React Native e Expo, integrado à VTEX.
+Aplicativo lojahr para iOS e Android com React Native e Expo, integrado à VTEX.
 
 ## Estrutura
 

@@ -54,7 +54,7 @@ function FloatingTabList({ hidden, ...props }: TabListProps & { hidden?: boolean
 
 const styles = StyleSheet.create({
   outer: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: Spacing.three },
-  inner: { width: '100%', maxWidth: 520, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 5, paddingHorizontal: 5, borderRadius: 30, backgroundColor: 'rgba(125, 125, 125, 0.78)', shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  inner: { width: '100%', maxWidth: 520, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 5, paddingHorizontal: 5, borderRadius: 30, backgroundColor: 'rgba(125, 125, 125, 0.78)', shadowColor: '#0a0a0a', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   tabButton: { flex: 1 },
   tabButtonView: { minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingVertical: 3, paddingHorizontal: 2, borderRadius: 22 },
   selectedTabButton: { backgroundColor: 'rgba(255, 255, 255, 0.16)', borderRadius: 22 },

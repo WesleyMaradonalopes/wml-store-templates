@@ -128,7 +128,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded }: QuickVi
               </Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-              {loading && <ActivityIndicator color="#000000" />}
+              {loading && <ActivityIndicator color="#0a0a0a" />}
               {gallery.length > 0 && (
                 <FlatList
                   data={gallery}
@@ -209,20 +209,20 @@ const styles = StyleSheet.create({
   header: { minHeight: 64, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#ece8e2' },
   title: { flex: 1, paddingRight: Spacing.three },
   closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 24, lineHeight: 28, color: '#000000', fontWeight: '400' },
+  closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
   content: { gap: Spacing.three, padding: Spacing.four, paddingBottom: Spacing.five },
   gallery: { gap: 12, paddingRight: Spacing.four },
   image: { width: 160, height: 220, borderRadius: 8, backgroundColor: '#e8e8ea' },
   variationGroup: { gap: Spacing.two },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   option: { minWidth: 42, minHeight: 42, paddingHorizontal: Spacing.three, borderRadius: 21, borderWidth: 1, borderColor: '#d6d0c8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  selectedOption: { borderColor: '#1e120d', backgroundColor: '#1e120d' },
+  selectedOption: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
   selectedOptionText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableOption: { opacity: 0.35, backgroundColor: '#eeeae4' },
   unavailableText: { textDecorationLine: 'line-through' },
   messageText: { color: '#B42318', fontWeight: '600' },
-  productButton: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#1e120d', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  addButton: { minHeight: 50, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  productButton: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  addButton: { minHeight: 50, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   addButtonText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.5 },

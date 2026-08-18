@@ -1,10 +1,12 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const app = express();
 const port = Number(process.env.PORT || 6001);
-const account = process.env.VTEX_ACCOUNT || 'lojabl';
+const account = process.env.VTEX_ACCOUNT || 'lojahr';
 const domain = process.env.VTEX_STORE_DOMAIN || `${account}.myvtex.com`;
 const vtexBaseUrl = `https://${domain}`;
 const vtexPaymentsBaseUrl = `https://${account}.vtexpayments.com.br`;
@@ -15,9 +17,23 @@ const wishlistSchema = process.env.VTEX_WISHLIST_SCHEMA || 'wishlist';
 const wishlistEntities = [...new Set([wishlistEntity, 'wishlist', 'WL', 'wl', 'WI', 'wi'])];
 const customerVtexSessions = new Map();
 const wishlistIoStrategyByEmail = new Map();
+const backendSourceDirectory = path.dirname(fileURLToPath(import.meta.url));
+const cmsDirectory = process.env.CMS_SCHEMAS_DIR
+  ? path.resolve(process.env.CMS_SCHEMAS_DIR)
+  : path.resolve(backendSourceDirectory, '../../wml-store/public/cms');
 
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
 app.use(express.json({ limit: '1mb' }));
+
+// Schemas usados pelo projeto Custom do Headless CMS. O diretório pode ser
+// sobrescrito com CMS_SCHEMAS_DIR quando o backend for publicado sozinho.
+app.use('/cms', express.static(cmsDirectory, {
+  extensions: ['json'],
+  fallthrough: false,
+  setHeaders(response) {
+    response.setHeader('Cache-Control', 'public, max-age=300');
+  },
+}));
 
 function vtexHeaders() {
   const headers = { Accept: 'application/json' };
@@ -485,7 +501,11 @@ async function readVtexIoWishlist(email, token) {
     '/api/io/_v/wishlist/products',
     '/api/io/wishlist/pub/products',
   ];
-  const bases = [...new Set([vtexBaseUrl, 'https://www.lojabl.com.br'])];
+  const publicStoreDomain = String(process.env.VTEX_PUBLIC_STORE_DOMAIN || '').trim().replace(/\/$/, '');
+  const publicStoreBaseUrl = publicStoreDomain
+    ? (/^https?:\/\//i.test(publicStoreDomain) ? publicStoreDomain : `https://${publicStoreDomain}`)
+    : vtexBaseUrl;
+  const bases = [...new Set([vtexBaseUrl, publicStoreBaseUrl])];
   const candidates = bases.flatMap((base) => endpoints.map((endpoint) => ({ base, endpoint })));
   const results = await Promise.all(candidates.map(async ({ base, endpoint }) => {
     const url = new URL(`${base}${endpoint}`);
@@ -982,7 +1002,7 @@ app.post('/auth/login', async (request, response) => {
   const password = String(request.body?.password || '');
   if (!email || !password) return response.status(400).json({ ok: false, message: 'E-mail e senha são obrigatórios.' });
   try {
-    const start = await fetch(`${vtexBaseUrl}/api/vtexid/pub/authentication/start?scope=${encodeURIComponent(account)}&fingerprint=lojabl-${Date.now()}`);
+    const start = await fetch(`${vtexBaseUrl}/api/vtexid/pub/authentication/start?scope=${encodeURIComponent(account)}&fingerprint=lojahr-${Date.now()}`);
     const startBody = await start.json().catch(() => ({}));
     if (!start.ok || !startBody.authenticationToken) throw new Error('Não foi possível iniciar a autenticação VTEX.');
     const form = new FormData();
@@ -1163,4 +1183,4 @@ app.get('/customer/orders/:orderId', async (request, response) => {
   }
 });
 
-app.listen(port, () => console.log(`LojaBL backend running on http://localhost:${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`wml-backend running on port ${port}`));

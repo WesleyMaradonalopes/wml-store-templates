@@ -4,7 +4,7 @@ import { SvgXml } from 'react-native-svg';
 const SVG = "<svg width=\"16\" height=\"17\" viewBox=\"0 0 16 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\r\n<path fillRule=\"evenodd\" clipRule=\"evenodd\" d=\"M12.6667 14.1488H11.4478L8.47148 11.1724C8.21108 10.9121 7.78901 10.9121 7.52861 11.1724L4.5523 14.1488H3.33334V5.48218C3.33334 4.37761 4.22878 3.48218 5.33334 3.48218H10.6667C11.7713 3.48218 12.6667 4.3776 12.6667 5.48218V14.1488ZM11.3333 5.48218C11.3333 5.11399 11.0349 4.81551 10.6667 4.81551H5.33334C4.96516 4.81551 4.66668 5.11399 4.66668 5.48218V12.1488L6.58583 10.2296C7.36688 9.44864 8.63321 9.44864 9.41428 10.2296L11.3333 12.1488V5.48218Z\" fill=\"__ICON_COLOR__\" fill-opacity=\"0.6\"/>\r\n</svg>\r\n";
 
 /** Reusable component generated from wishlist.svg. viewBox 0 0 16 17 */
-export default function WishlistIcon({ color = 'black', size = 24 }) {
+export default function WishlistIcon({ color = '#0a0a0a', size = 24 }) {
   const xml = SVG.replace(/__ICON_COLOR__/g, color);
   return <SvgXml xml={xml} width={size * 0.9411764705882353} height={size} />;
 }

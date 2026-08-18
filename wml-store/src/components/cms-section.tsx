@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
@@ -159,7 +159,7 @@ export function ProductShelf({ data }: { data: Record<string, unknown> }) {
           )}
         />
       )}
-      {loading && <ActivityIndicator color="#000000" />}
+      {loading && <ActivityIndicator color="#0a0a0a" />}
       {!loading && products.length === 0 && (
         <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>
       )}
@@ -256,7 +256,7 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
         </View>
         <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
       </View>
-      {loading && <ActivityIndicator color="#000000" />}
+      {loading && <ActivityIndicator color="#0a0a0a" />}
       {!loading && products.length === 0 && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
       <View style={styles.productGrid}>
         {products.map((product) => (
@@ -317,6 +317,133 @@ function CouponsList({ data }: { data: Record<string, unknown> }) {
   return <ThemedView style={styles.section}><ThemedText type="subtitle">Cupons</ThemedText>{coupons.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ThemedView key={index} style={styles.couponCard}><ThemedText type="smallBold">{text(value.title) || 'Cupom'}</ThemedText><ThemedText themeColor="textSecondary">{text(value.description)}</ThemedText><ThemedText style={styles.couponCode}>{text(value.code)}</ThemedText>{!!text(value.expiresAt) && <ThemedText themeColor="textSecondary">Válido até {text(value.expiresAt)}</ThemedText>}</ThemedView>; })}</ThemedView>;
 }
 
+function categoryListItems(data: Record<string, unknown>) {
+  const content = Array.isArray(data.content) ? data.content : [];
+  if (content.length > 0) return content;
+
+  const shelves = Array.isArray(data.shelves) ? data.shelves : [];
+  return shelves.flatMap((shelf) => {
+    if (!shelf || typeof shelf !== 'object') return [];
+    const shelfContent = (shelf as Record<string, unknown>).content;
+    return Array.isArray(shelfContent) ? shelfContent : [];
+  });
+}
+
+function CategorySwipeRow({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
+  const title = text(category.title) || 'Categoria';
+  const icon = text(category.icon) || text(category.imageUrl);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.categorySwipeRow, pressed && styles.pressed]}>
+      {!!icon && <Image source={{ uri: icon }} style={styles.categorySwipeIcon} contentFit="contain" />}
+      <ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
+      <ArrowRightAIcon color="#0a0a0a" size={20} />
+    </Pressable>
+  );
+}
+
+function CategorySwipeSection({ data, router }: { data: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
+  const categories = categoryListItems(data).filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
+  const [selectedCategory, setSelectedCategory] = useState<Record<string, unknown> | null>(null);
+  const sectionTitle = text(data.title).trim();
+
+  if (categories.length === 0) return null;
+
+  const openCategory = (category: Record<string, unknown>) => {
+    const subcategories = Array.isArray(category.subcategories) ? category.subcategories : [];
+    if (subcategories.length > 0) {
+      setSelectedCategory(category);
+      return;
+    }
+    openCmsAction(router, category.action, text(category.title) || 'Categoria');
+  };
+
+  const selectedTitle = text(selectedCategory?.title) || 'Categoria';
+  const selectedAction = readCmsAction(selectedCategory?.action);
+  const selectedSubcategories = Array.isArray(selectedCategory?.subcategories)
+    ? selectedCategory.subcategories.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    : [];
+  const selectedActionTarget = selectedAction.value
+    ? selectedAction.value.replace(/\/$/, '')
+    : '';
+
+  return (
+    <ThemedView style={styles.section}>
+      <ThemedText type="subtitle">{sectionTitle || 'Todas categorias'}</ThemedText>
+      <View style={styles.categorySwipePanel}>
+        {categories.map((item, index) => (
+          <CategorySwipeRow
+            key={`${text(item.title) || 'categoria'}-${index}`}
+            category={item}
+            onPress={() => openCategory(item)}
+          />
+        ))}
+      </View>
+
+      <Modal
+        visible={Boolean(selectedCategory)}
+        animationType="slide"
+        onRequestClose={() => setSelectedCategory(null)}>
+        <View style={styles.categoryModal}>
+          <View style={styles.categoryModalHeader}>
+            <Pressable
+              accessibilityLabel="Voltar para categorias"
+              onPress={() => setSelectedCategory(null)}
+              style={styles.categoryModalBack}>
+              <ArrowLeftIAIcon color="#0a0a0a" size={22} />
+            </Pressable>
+            <ThemedText style={styles.categoryModalTitle}>{selectedTitle}</ThemedText>
+            <View style={styles.categoryModalBack} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.categoryModalList}>
+            {!!selectedAction.value && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setSelectedCategory(null);
+                  openCmsAction(router, selectedCategory?.action, `Ver tudo em ${selectedTitle}`);
+                }}
+                style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
+                <ThemedText style={styles.categoryModalItemText}>Ver tudo em {selectedTitle}</ThemedText>
+                <ArrowRightAIcon color="#0a0a0a" size={18} />
+              </Pressable>
+            )}
+
+            {selectedSubcategories.map((subcategory, index) => {
+              const subcategoryTitle = text(subcategory.title) || `Subcategoria ${index + 1}`;
+              const fallbackTarget = selectedActionTarget
+                ? `${selectedActionTarget}/${slugPart(subcategoryTitle)}`
+                : subcategoryTitle;
+              const icon = text(subcategory.icon) || text(subcategory.imageUrl);
+
+              return (
+                <Pressable
+                  key={`${subcategoryTitle}-${index}`}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setSelectedCategory(null);
+                    openCmsAction(router, subcategory.action, fallbackTarget);
+                  }}
+                  style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
+                  <View style={styles.categoryModalItemContent}>
+                    {!!icon && <Image source={{ uri: icon }} style={styles.categoryModalIcon} contentFit="contain" />}
+                    <ThemedText style={styles.categoryModalItemText}>{subcategoryTitle}</ThemedText>
+                  </View>
+                  <ArrowRightAIcon color="#0a0a0a" size={18} />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
+    </ThemedView>
+  );
+}
+
 function CategoryRow({ category, router }: { category: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
   const title = text(category.title) || 'Categoria';
   return (
@@ -325,7 +452,7 @@ function CategoryRow({ category, router }: { category: Record<string, unknown>; 
       onPress={() => openCmsAction(router, category.action, title)}
       style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}>
       <ThemedText style={styles.categoryRowTitle}>{title}</ThemedText>
-      <ArrowRightAIcon color="#1e120d" size={20} />
+      <ArrowRightAIcon color="#0a0a0a" size={20} />
     </Pressable>
   );
 }
@@ -358,7 +485,7 @@ function CategoryGroup({
             accessibilityLabel="Voltar para categorias"
             onPress={() => router.back()}
             style={styles.categoryGroupBack}>
-            <ArrowLeftIAIcon color="#1e120d" size={20} />
+            <ArrowLeftIAIcon color="#0a0a0a" size={20} />
           </Pressable>
         )}
         <ThemedText style={styles.categoryGroupTitle}>{title}</ThemedText>
@@ -379,7 +506,7 @@ function CategoryGroup({
               style={styles.subcategoryHeader}>
               <ThemedText style={styles.subcategoryHeading}>{subcategoryHeading}</ThemedText>
               <View style={[styles.subcategoryChevron, expanded && styles.subcategoryChevronExpanded]}>
-                <ChevronRightIcon color="#1e120d" size={18} />
+                <ChevronRightIcon color="#0a0a0a" size={18} />
               </View>
             </Pressable>
           )}
@@ -513,20 +640,18 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     return <ThemedView style={styles.section}><View style={styles.sectionHeader}><ThemedText type="subtitle">{text(data.title) || 'Confira nosso blog'}</ThemedText>{!!text(data.postUrl) && <Pressable onPress={() => Linking.openURL(text(data.postUrl))}><ThemedText style={styles.seeAll}>Ver tudo</ThemedText></Pressable>}</View><View style={styles.contentRow}>{posts.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title) || text(value.name)} description={text(value.description) || text(value.excerpt)} imageUrl={text(value.imageUrl) || text(value.thumbnail)} action={{ type: 'link', value: text(value.link) }} />; })}</View>{posts.length === 0 && <ThemedText themeColor="textSecondary">Os conteúdos do blog aparecerão aqui.</ThemedText>}</ThemedView>;
   }
 
-  if (section.name === 'CategoryListSwipe' || section.name === 'CategoryAccordeon' || section.name === 'CategoryTree') {
-    const content = Array.isArray(data.content) ? data.content : [];
-    const shelves = Array.isArray(data.shelves) ? data.shelves : [];
-    const categories = content.length > 0 ? content : shelves.flatMap((shelf) => {
-      if (!shelf || typeof shelf !== 'object') return [];
-      const items = (shelf as Record<string, unknown>).content;
-      return Array.isArray(items) ? items : [];
-    });
+  if (section.name === 'CategoryListSwipe') {
+    return <CategorySwipeSection data={data} router={router} />;
+  }
+
+  if (section.name === 'CategoryAccordeon' || section.name === 'CategoryTree') {
+    const categories = categoryListItems(data);
     const categoryItems = categories.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
     const hasSubcategories = categoryItems.some((category) => Array.isArray(category.subcategories) && category.subcategories.length > 0);
     const sectionTitle = text(data.title).trim();
     const slugTitle = categoryPageSlug ? categoryTitleFromSlug(categoryPageSlug) : '';
     const configuredParentTitle = text(data.parentTitle) || text(data.categoryTitle);
-    const parentTitle = configuredParentTitle || slugTitle || (section.name === 'CategoryListSwipe' ? sectionTitle : '');
+    const parentTitle = configuredParentTitle || slugTitle || '';
     const isDetailSection = Boolean(categoryItems.length > 0 && !hasSubcategories && section.name !== 'CategoryTree' && (
       section.name === 'CategoryAccordeon' || sectionTitle && !isGenericCategoryTitle(sectionTitle)
     ));
@@ -546,11 +671,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     const configuredSubcategoryHeading = section.name === 'CategoryAccordeon'
       ? sectionTitle
       : text(data.subcategoryTitle);
-    const sectionHeading = !isDetailSection && section.name === 'CategoryListSwipe'
-      ? sectionTitle || 'Todas categorias'
-      : !isDetailSection && section.name === 'CategoryTree'
-        ? sectionTitle
-        : '';
+    const sectionHeading = !isDetailSection && section.name === 'CategoryTree' ? sectionTitle : '';
 
     return (
       <ThemedView style={styles.section}>
@@ -573,9 +694,9 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#fcfaf5' },
+  section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#ffffff' },
   // O hero escapa do padding horizontal usado pelos demais blocos da home.
-  heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#fcfaf5' },
+  heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#ffffff' },
   heroViewport: { position: 'relative', width: '100%', height: Dimensions.get('window').height },
   heroCarousel: { flex: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -585,7 +706,7 @@ const styles = StyleSheet.create({
   selectedTab: { backgroundColor: '#111111' },
   selectedTabText: { color: '#FFFFFF' },
   productList: { gap: 12 },
-  plpSection: { gap: Spacing.three, backgroundColor: '#fcfaf5' },
+  plpSection: { gap: Spacing.three, backgroundColor: '#ffffff' },
   plpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   plpHeading: { flex: 1 },
   plpTitle: { fontSize: 18 },
@@ -594,22 +715,35 @@ const styles = StyleSheet.create({
   filterButtonText: { fontSize: 12 },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   gridProductCard: { width: '48.7%', marginBottom: Spacing.three },
-  loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e120d' },
+  loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
+  categorySwipePanel: { overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: '#eeeae5', backgroundColor: '#FFFFFF' },
+  categorySwipeRow: { minHeight: 68, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: 1, borderBottomColor: '#eeeae5', backgroundColor: '#FFFFFF' },
+  categorySwipeIcon: { width: 28, height: 28, borderRadius: 6 },
+  categorySwipeRowTitle: { flex: 1, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '500', textTransform: 'uppercase' },
+  categoryModal: { flex: 1, padding: 16, backgroundColor: '#FFFFFF' },
+  categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
+  categoryModalBack: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
+  categoryModalTitle: { flex: 1, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700', textAlign: 'center' },
+  categoryModalList: { gap: 10, paddingVertical: 16 },
+  categoryModalItem: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
+  categoryModalItemContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  categoryModalIcon: { width: 28, height: 28, borderRadius: 6 },
+  categoryModalItemText: { flex: 1, fontSize: 16, lineHeight: 22, color: '#0a0a0a' },
   categoryList: { gap: 0, overflow: 'hidden', borderRadius: 24, backgroundColor: '#FFFFFF' },
   categoryGroupsList: { gap: 12, overflow: 'visible', backgroundColor: 'transparent' },
   categoryRow: { minHeight: 72, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
-  categoryRowTitle: { fontSize: 22, lineHeight: 28, color: '#1e120d', fontWeight: '500' },
+  categoryRowTitle: { fontSize: 22, lineHeight: 28, color: '#0a0a0a', fontWeight: '500' },
   categoryGroup: { gap: 14, padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF' },
   categoryGroupHeader: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   categoryGroupBack: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
-  categoryGroupTitle: { flex: 1, fontSize: 24, lineHeight: 30, color: '#1e120d' },
+  categoryGroupTitle: { flex: 1, fontSize: 24, lineHeight: 30, color: '#0a0a0a' },
   seeAllButton: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: '#6d6862', alignItems: 'center', justifyContent: 'center' },
-  seeAllButtonText: { fontSize: 13, lineHeight: 18, color: '#1e120d' },
+  seeAllButtonText: { fontSize: 13, lineHeight: 18, color: '#0a0a0a' },
   subcategoryBlock: { borderTopWidth: 1, borderTopColor: '#eeeae5' },
   subcategoryHeader: { minHeight: 52, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  subcategoryHeading: { fontSize: 16, lineHeight: 22, color: '#1e120d', fontWeight: '700' },
+  subcategoryHeading: { fontSize: 16, lineHeight: 22, color: '#0a0a0a', fontWeight: '700' },
   subcategoryChevron: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   subcategoryChevronExpanded: { transform: [{ rotate: '90deg' }] },
   subcategoryList: { gap: 10 },
@@ -635,5 +769,5 @@ const styles = StyleSheet.create({
   contentCardImage: { width: 170, height: 130, borderRadius: 10 },
   scheduleCard: { flex: 1, minWidth: 130, gap: 6, padding: 12, borderRadius: 14, backgroundColor: '#FFFFFF' },
   couponCard: { gap: 6, padding: 14, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e0ddd7' },
-  couponCode: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#1e120d', color: '#FFFFFF', fontWeight: '700' },
+  couponCode: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0a0a0a', color: '#FFFFFF', fontWeight: '700' },
 });

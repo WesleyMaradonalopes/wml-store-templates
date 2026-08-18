@@ -170,7 +170,7 @@ export default function SearchScreen() {
         )}
 
         {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
-        {loading && <ActivityIndicator color="#000000" style={styles.loader} />}
+        {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
         {!loading && (activeQuery || selectedFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
 
         <FlatList
@@ -184,7 +184,7 @@ export default function SearchScreen() {
           onEndReachedThreshold={0.4}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={loadingMore ? <ActivityIndicator color="#000000" style={styles.moreLoader} /> : null}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color="#0a0a0a" style={styles.moreLoader} /> : null}
           renderItem={({ item }) => (
             <ProductCard
               product={item}
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   searchInputWrap: { flex: 1, minHeight: 42, borderRadius: 22, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, backgroundColor: '#f1f1f3' },
   searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#3c3936', fontFamily: Fonts.sans },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 24, lineHeight: 28, color: '#000000', fontWeight: '400' },
+  closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
   body: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.three },
   trending: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, borderWidth: 1, borderColor: '#ebe7e1', backgroundColor: '#FFFFFF' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },

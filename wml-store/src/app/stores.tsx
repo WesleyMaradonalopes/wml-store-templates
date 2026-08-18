@@ -26,7 +26,7 @@ export default function StoresScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader back={false} /><ThemedText type="subtitle">Nossas lojas</ThemedText>
-        {loading && <ActivityIndicator color="#000000" style={styles.loader} />}
+        {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
         {error && <ThemedText themeColor="textSecondary">{error}</ThemedText>}
         {!loading && !error && stores.length === 0 && (
           <ThemedText themeColor="textSecondary">Nenhuma loja encontrada.</ThemedText>
@@ -39,7 +39,7 @@ export default function StoresScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <ThemedView style={styles.card}>
-              <ThemedText type="smallBold">{item.name || 'Loja LojaBL'}</ThemedText>
+              <ThemedText type="smallBold">{item.name || 'Loja lojahr'}</ThemedText>
               <ThemedText themeColor="textSecondary">
                 {[item.address, item.city, item.state].filter(Boolean).join(', ')}
               </ThemedText>

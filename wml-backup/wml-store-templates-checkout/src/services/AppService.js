@@ -5,11 +5,11 @@ import { App } from 'eitri-shopping-vtex-shared'
 export const startConfigure = async () => {
 	await App.tryAutoConfigure({
 		providerInfo: {
-			"account": "lojabl",
-			"domain": "https://www.lojabl.com.br",
+			"account": "lojahr",
+			"domain": "https://www.lojahr.com.br",
 			"faststore": "appdev",
-			"host": "www.lojabl.com.br",
-			"vtexCmsUrl": "https://lojabl.myvtex.com/"
+			"host": "www.lojahr.com.br",
+			"vtexCmsUrl": "https://lojahr.myvtex.com/"
 		},
 		verbose: false,
 		gaVerbose: false,

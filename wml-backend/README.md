@@ -1,4 +1,4 @@
-# LojaBL Backend local
+# lojahr Backend local
 
 Este serviço é o intermediário seguro entre o app Expo e a VTEX.
 
@@ -24,6 +24,20 @@ npm run dev
 ```
 
 O serviço ficará em `http://localhost:6001`.
+
+## Schemas do Headless CMS
+
+O backend também disponibiliza os schemas do projeto Custom em:
+
+```text
+GET /cms/sections.json
+GET /cms/content-types.json
+```
+
+No ambiente local, esses arquivos são lidos de
+`wml-store/public/cms`. Quando o backend for publicado separado do
+monorepo, defina `CMS_SCHEMAS_DIR` apontando para a pasta que contém os dois
+arquivos.
 
 ## Endpoint inicial
 

@@ -53,10 +53,10 @@ To learn more about developing your project with Expo, look at the following res
 O cartão usa a chave pública reCAPTCHA configurada na VTEX. No development
 build, o fluxo tenta primeiro o SDK nativo recomendado para aplicativos móveis.
 No Expo Go ou quando o SDK não aceita a chave, usa uma WebView com a origem
-`https://lojabl.myvtex.com/` como fallback.
+`https://lojahr.myvtex.com/` como fallback.
 
 Para o SDK Android aceitar a chave, ela deve ser criada no Google Cloud como
-tipo Android, permitir o pacote `br.com.lojabl.store` e, nos development builds
+tipo Android, permitir o pacote `br.com.lojahr.store` e, nos development builds
 instalados fora da Play Store, permitir distribuição fora da Google Play.
 
 Para validar o checkout completo, prefira o development build já instalado:
