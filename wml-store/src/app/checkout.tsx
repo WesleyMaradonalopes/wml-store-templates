@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
+import StoreIcon from '@/components/icons/StoreIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import TruckIcon from '@/components/icons/TruckIcon';
 import UserIcon from '@/components/icons/UserIcon';
@@ -83,7 +84,34 @@ function formatExpiry(value: string) {
   return valueDigits.length > 2 ? valueDigits.slice(0, 2) + '/' + valueDigits.slice(2) : valueDigits;
 }
 function isShippingStep(step: Step) { return step === 'shipping'; }
-function shippingOptionKey(sla: ShippingOption) { return sla.id || sla.name || sla.shippingEstimate + '-' + (sla.deliveryChannel || 'delivery'); }
+function isPickupOption(sla: ShippingOption) { return sla.deliveryChannel === 'pickup-in-point' || sla.isPickupInPoint === true; }
+function shippingOptionId(sla: ShippingOption) { return sla.id || sla.name; }
+function shippingOptionKey(sla: ShippingOption) {
+  const pickupKey = isPickupOption(sla)
+    ? sla.pickupPointId || sla.pickupStoreInfo?.address?.addressId || ''
+    : '';
+  return [shippingOptionId(sla) || sla.shippingEstimate, sla.deliveryChannel || 'delivery', pickupKey].join('|');
+}
+function pickupStoreName(option: ShippingOption) {
+  const friendlyName = option.pickupStoreInfo?.friendlyName?.trim();
+  if (friendlyName) return friendlyName;
+
+  const receiverName = option.pickupStoreInfo?.address?.receiverName?.trim();
+  if (receiverName && !/^retirada(?:\s+em\s+loja)?$/i.test(receiverName)) return receiverName;
+
+  const cleanName = (option.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  if (cleanName && !/^retirada(?:\s+em\s+loja)?$/i.test(cleanName)) return cleanName;
+  return 'Retirada em loja';
+}
+function pickupAddressLines(option: ShippingOption) {
+  const address = option.pickupStoreInfo?.address;
+  if (!address) return [];
+  return [
+    [address.street, address.number].filter(Boolean).join(', '),
+    [address.neighborhood, address.city, address.state].filter(Boolean).join(' - '),
+    address.postalCode ? 'CEP: ' + address.postalCode : '',
+  ].filter(Boolean);
+}
 function isCardPayment(method: { name: string; group: string }) {
   const text = (method.name + ' ' + method.group).toLowerCase();
   return text.includes('cart') || text.includes('credit') || text.includes('card');
@@ -132,6 +160,7 @@ function getShippingOptions(orderForm: OrderForm): ShippingOption[] {
       if (existing) {
         existing.price += sla.price;
         if (!existing.shippingEstimate && sla.shippingEstimate) existing.shippingEstimate = sla.shippingEstimate;
+        if (!existing.pickupStoreInfo && sla.pickupStoreInfo) existing.pickupStoreInfo = sla.pickupStoreInfo;
       } else {
         options.set(key, { ...sla });
       }
@@ -142,12 +171,13 @@ function getShippingOptions(orderForm: OrderForm): ShippingOption[] {
 
 function getDefaultShippingOptionId(orderForm: OrderForm, options = getShippingOptions(orderForm)) {
   const current = orderForm.shippingData?.logisticsInfo.find((info) => info.selectedSla)?.selectedSla;
-  if (current && options.some((option) => (option.id || option.name) === current)) return current;
-  return options[0]?.id || options[0]?.name || '';
+  if (current && options.some((option) => shippingOptionId(option) === current)) return current;
+  const firstDelivery = options.find((option) => !isPickupOption(option));
+  return shippingOptionId(firstDelivery || options[0]) || '';
 }
 
 function getShippingSelectionId(orderForm: OrderForm, options: ShippingOption[], selectedId?: string | null) {
-  if (selectedId && options.some((option) => (option.id || option.name) === selectedId)) return selectedId;
+  if (selectedId && options.some((option) => shippingOptionId(option) === selectedId)) return selectedId;
   return getDefaultShippingOptionId(orderForm, options);
 }
 
@@ -174,6 +204,7 @@ export default function CheckoutScreen() {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [selectedSla, setSelectedSla] = useState<string | null>(null);
+  const [pickupSelectionOpen, setPickupSelectionOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
   const [selectedPaymentLabel, setSelectedPaymentLabel] = useState('');
   const [cardPaymentSystem, setCardPaymentSystem] = useState('');
@@ -415,6 +446,13 @@ export default function CheckoutScreen() {
   function chooseShippingLocally(slaId: string) {
     setSelectedSla(slaId);
     setMessage('');
+  }
+
+  function choosePickupStore(option: ShippingOption) {
+    const optionId = shippingOptionId(option);
+    if (!optionId) return;
+    chooseShippingLocally(optionId);
+    setPickupSelectionOpen(false);
   }
 
   async function continueWithShipping() {
@@ -709,6 +747,9 @@ export default function CheckoutScreen() {
   const slas = getShippingOptions(orderForm);
   const selectedShippingId = getShippingSelectionId(orderForm, slas, selectedSla);
   const selectedShipping = slas.find((sla) => (sla.id || sla.name) === selectedShippingId);
+  const deliveryOptions = slas.filter((sla) => !isPickupOption(sla));
+  const pickupOptions = slas.filter(isPickupOption);
+  const selectedPickup = pickupOptions.find((sla) => shippingOptionId(sla) === selectedShippingId);
 
   if (step === 'address' && addressSelectionOpen && customerAddresses.length > 1) {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={() => setAddressSelectionOpen(false)} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
@@ -716,7 +757,7 @@ export default function CheckoutScreen() {
       <View style={styles.addressList}>{customerAddresses.map((address) => {
         const addressId = String(address.id || (address.postalCode || '') + '-' + (address.street || '') + '-' + (address.number || ''));
         const selected = selectedAddressId === addressId;
-        return <Pressable key={addressId} onPress={() => { applyAddress(address); setAddressSelectionOpen(false); }} style={[styles.addressOption, selected && styles.addressOptionSelected]}><Radio selected={selected} /><View style={styles.addressDetails}><ThemedText style={styles.dataLabel}>{address.addressName || (address.street + ', ' + address.number)}</ThemedText><ThemedText>{address.street + ', ' + address.number + (address.complement ? ' - ' + address.complement : '')}</ThemedText><ThemedText themeColor="textSecondary">{address.neighborhood + ' - ' + address.city + '/' + address.state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {address.postalCode}</ThemedText></View></Pressable>;
+        return <Pressable key={addressId} onPress={() => { applyAddress(address); setAddressSelectionOpen(false); }} style={[styles.addressOption, selected && styles.addressOptionSelected]}><Radio selected={selected} /><View style={styles.addressDetails}><ThemedText>{address.street + ', ' + address.number + (address.complement ? ' - ' + address.complement : '')}</ThemedText><ThemedText themeColor="textSecondary">{address.neighborhood + ' - ' + address.city + '/' + address.state}</ThemedText><ThemedText themeColor="textSecondary">CEP: {address.postalCode}</ThemedText></View></Pressable>;
       })}</View>
     </ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithSavedAddress} /><Secondary title="Alterar endereço de entrega" onPress={() => { setAddressSelectionOpen(false); setEditingAddress(true); }} /></View></SafeAreaView></ThemedView>;
   }
@@ -724,8 +765,43 @@ export default function CheckoutScreen() {
   if (isShippingStep(step)) {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Entrega" onBack={back} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
       <ThemedText style={styles.pageTitle}>Como deseja receber seu produto?</ThemedText>
-      <ThemedView style={styles.shippingCard}><View style={styles.shippingAddressRow}><ThemedText style={styles.pinIcon}>⌖</ThemedText><ThemedText style={styles.shippingAddressText}>Envio para {street}{number ? ', ' + number : ''}</ThemedText></View>{slas.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma forma de entrega disponível.</ThemedText>}{slas.map((sla) => { const optionId = sla.id || sla.name; const selected = selectedShippingId === optionId; return <Pressable key={shippingOptionKey(sla)} onPress={() => chooseShippingLocally(optionId)} disabled={saving} style={[styles.shippingOption, selected && styles.shippingOptionSelected]}><Radio selected={selected} /><View style={styles.shippingOptionDetails}><ThemedText style={styles.dataLabel}>{sla.name}{sla.price === 0 ? ' - Grátis' : ''}</ThemedText><ThemedText themeColor="textSecondary">{sla.price === 0 ? 'Grátis' : money(sla.price)} · {sla.shippingEstimate}</ThemedText></View></Pressable>; })}</ThemedView>
-    </ScrollView><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithShipping} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
+      <ThemedView style={styles.shippingCard}>
+        <View style={styles.shippingAddressRow}><ThemedText style={styles.pinIcon}>⌖</ThemedText><ThemedText style={styles.shippingAddressText}>Envio para {street}{number ? ', ' + number : ''}</ThemedText></View>
+
+        {deliveryOptions.length > 0 && <View style={styles.shippingSection}>
+          <ThemedText style={styles.sectionTitle}>Receber em casa</ThemedText>
+          {deliveryOptions.map((sla) => {
+            const optionId = shippingOptionId(sla);
+            const selected = selectedShippingId === optionId;
+            return <Pressable key={shippingOptionKey(sla)} onPress={() => chooseShippingLocally(optionId)} disabled={saving || !optionId} style={[styles.shippingOption, selected && styles.shippingOptionSelected]}>
+              <Radio selected={selected} />
+              <View style={styles.shippingOptionDetails}><ThemedText style={styles.dataLabel}>{sla.name}{sla.price === 0 ? ' - Grátis' : ''}</ThemedText><ThemedText themeColor="textSecondary">{sla.price === 0 ? 'Grátis' : money(sla.price)} · {sla.shippingEstimate || 'Prazo a confirmar'}</ThemedText></View>
+            </Pressable>;
+          })}
+        </View>}
+
+        {pickupOptions.length > 0 && <View style={styles.shippingSection}>
+          <ThemedText style={styles.sectionTitle}>Retirada</ThemedText>
+          {selectedPickup ? <Pressable onPress={() => setPickupSelectionOpen(true)} disabled={saving} style={[styles.pickupSelectedCard, styles.shippingOptionSelected]}>
+            <StoreIcon color="#0a0a0a" size={22} />
+            <View style={styles.shippingOptionDetails}>
+              <ThemedText style={styles.dataLabel}>{pickupStoreName(selectedPickup)}</ThemedText>
+              {pickupAddressLines(selectedPickup).map((line, index) => <ThemedText key={line + index} themeColor="textSecondary">{line}</ThemedText>)}
+              <ThemedText themeColor="textSecondary">{selectedPickup.price === 0 ? 'Grátis' : money(selectedPickup.price)} · {selectedPickup.shippingEstimate || 'Prazo a confirmar'}</ThemedText>
+              <ThemedText style={styles.link}>Alterar loja</ThemedText>
+            </View>
+            <ChevronRightIcon color="#625d57" size={20} />
+          </Pressable> : <Pressable onPress={() => setPickupSelectionOpen(true)} disabled={saving} style={styles.pickupButton}>
+            <StoreIcon color="#0a0a0a" size={22} />
+            <View style={styles.shippingOptionDetails}><ThemedText style={styles.dataLabel}>Retirar em loja</ThemedText><ThemedText themeColor="textSecondary">Escolha uma das {pickupOptions.length} lojas disponíveis</ThemedText></View>
+            <ChevronRightIcon color="#625d57" size={20} />
+          </Pressable>}
+        </View>}
+
+        {slas.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma forma de entrega disponível.</ThemedText>}
+        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
+      </ThemedView>
+    </ScrollView><Modal visible={pickupSelectionOpen} animationType="slide" onRequestClose={() => setPickupSelectionOpen(false)}><ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Retirar em loja" onBack={() => setPickupSelectionOpen(false)} showSearch={false} showCart={false} /><ScrollView contentContainerStyle={styles.content}><ThemedText style={styles.pageTitle}>Escolha a loja para retirada</ThemedText><ThemedText themeColor="textSecondary">Selecione onde deseja retirar seu pedido.</ThemedText>{pickupOptions.map((option) => <PickupStoreCard key={shippingOptionKey(option)} option={option} selected={shippingOptionId(option) === selectedShippingId} disabled={saving} onPress={() => choosePickupStore(option)} />)}</ScrollView></SafeAreaView></ThemedView></Modal><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithShipping} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
   }
 
   if (step === 'address' && addressSaved && !editingAddress) {
@@ -747,11 +823,21 @@ export default function CheckoutScreen() {
     {step === 'address' && (addressSaved && !editingAddress ? <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><ThemedText>{receiverName}</ThemedText><ThemedText>{street + ', ' + number + (complement ? ' - ' + complement : '')}</ThemedText><ThemedText>{neighborhood + ' - ' + city + '/' + state}</ThemedText><ThemedText>CEP: {postalCode}</ThemedText><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></Card> : <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><Field label="CEP" value={postalCode} setValue={lookupCep} required placeholder="00000-000" keyboardType="numeric" error={addressValidationAttempted ? addressErrors.postalCode : ''} /><Field label="Endereço" value={street} setValue={setStreet} required placeholder="Endereço" error={addressValidationAttempted ? addressErrors.street : ''} /><View style={styles.inline}><Field label="Número" value={number} setValue={setNumber} required placeholder="Número" error={addressValidationAttempted ? addressErrors.number : ''} /><Field label="Complemento" value={complement} setValue={setComplement} placeholder="Complemento" /></View><Field label="Bairro" value={neighborhood} setValue={setNeighborhood} required placeholder="Bairro" error={addressValidationAttempted ? addressErrors.neighborhood : ''} /><View style={styles.inline}><Field label="Cidade" value={city} setValue={setCity} required placeholder="Cidade" error={addressValidationAttempted ? addressErrors.city : ''} /><Field label="Estado" value={state} setValue={setState} required placeholder="Estado" error={addressValidationAttempted ? addressErrors.state : ''} /></View><Field label="Quem irá receber?" value={receiverName} setValue={setReceiverName} required placeholder="Nome do recebedor" error={addressValidationAttempted ? addressErrors.receiverName : ''} />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</Card>)}
     {step === 'payment' && <><ThemedText style={styles.pageTitle}>Escolha como pagar</ThemedText><Pressable disabled={saving} onPress={() => openCardPayment(cardMethod || { id: '1', name: 'Cartão de crédito' })} style={styles.paymentCard}><View style={styles.paymentHeader}><CreditCardIcon color="#0a0a0a" size={21} /><ThemedText style={styles.sectionTitle}>Cartão de Crédito</ThemedText></View><View style={styles.paymentDivider} /><ThemedText style={styles.bodyText} themeColor="textSecondary">+ novo cartão</ThemedText></Pressable><View style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>{!voucherOpen ? <Pressable onPress={() => setVoucherOpen(true)} style={styles.voucherTrigger}><ThemedText style={styles.sectionTitle}>{voucherApplied ? 'Vale presente adicionado' : 'Adicionar vale presente'}</ThemedText></Pressable> : <><View style={styles.paymentDivider} /><View style={styles.inline}><TextInput value={voucher} onChangeText={(text) => setVoucher(text.normalize('NFC'))} autoCapitalize="characters" placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} /><Pressable disabled={saving} onPress={applyVoucher} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View>{voucherApplied && <ThemedText style={styles.successText}>Vale-presente adicionado.</ThemedText>}</>}</View>{!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}<Pressable disabled={saving} onPress={() => pixMethod ? choosePayment(pixMethod.id, pixMethod.name || 'Pix') : setMessage('Pix não está disponível para este carrinho.')} style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Pagamento instantâneo</ThemedText><View style={styles.pixInfo}><ThemedText style={styles.pixWord}>pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">O código Pix será exibido na próxima etapa, após a revisão do seu pedido.</ThemedText></View></Pressable></>}
     {step === 'card' && <><View style={styles.creditCardVisual}><ThemedText style={styles.creditCardLabel}>CARTÃO DE CRÉDITO</ThemedText><ThemedText style={styles.creditCardNumber}>{cardNumber ? cardNumber : '•••• •••• •••• ••••'}</ThemedText><View style={styles.creditCardBottom}><ThemedText style={styles.creditCardMeta}>{cardHolder || 'NOME DO TITULAR'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardExpiry || 'MM/AA'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardCvv ? 'CVV' : 'CVV'}</ThemedText></View></View><Card><Field label="Número do cartão" value={cardNumber} setValue={(value) => setCardNumber(formatCardNumber(value))} required placeholder="Insira o número do seu cartão" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.number : ''} /><Field label="Nome impresso no cartão" value={cardHolder} setValue={setCardHolder} required placeholder="Nome impresso no cartão" error={cardValidationAttempted ? cardErrors.holder : ''} /><View style={styles.inline}><Field label="Validade" value={cardExpiry} setValue={(value) => setCardExpiry(formatExpiry(value))} required placeholder="MM/AA" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.expiry : ''} /><Field label="CVV" value={cardCvv} setValue={setCardCvv} required placeholder="CVV" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.cvv : ''} /></View><ThemedText style={styles.cardTitle}>Endereço de cobrança</ThemedText><Pressable onPress={() => undefined} style={styles.billingRow}><View style={styles.billingCheckbox}><ThemedText style={styles.billingCheck}>✓</ThemedText></View><ThemedText style={styles.billingText}>O endereço da fatura é {street + ', ' + number + ' - ' + neighborhood + ', ' + city + ' - ' + state}</ThemedText></Pressable></Card><ThemedText style={styles.acceptedTitle}>Bandeiras aceitas:</ThemedText><View style={styles.brandRow}><BrandBadge label="AMEX" color="#2c77b8" /><BrandBadge label="VISA" color="#1e4c9a" /><BrandBadge label="elo" color="#2e9ba3" /><BrandBadge label="MasterCard" color="#9c2020" /><BrandBadge label="Hipercard" color="#c52b2b" /><BrandBadge label="elo" color="#f2a900" /></View>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
-    {step === 'review' && <><ThemedText style={styles.pageTitle}>Revise e confirme</ThemedText><Summary orderForm={orderForm} shippingPrice={selectedShipping?.price} /><Card><ReviewHeader icon="user" title="DADOS PESSOAIS" /><ThemedText style={styles.bodyText}>{email}</ThemedText><ThemedText style={styles.bodyText}>{firstName + ' ' + lastName}</ThemedText><ThemedText style={styles.bodyText}>{phone}</ThemedText><ThemedText style={styles.bodyText}>{document}</ThemedText><Pressable onPress={() => { setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><View style={styles.reviewDeliveryTop}><ReviewHeader icon="truck" title="ENTREGA" /><ThemedText style={styles.freeText}>{selectedShipping?.price === 0 ? 'Grátis' : money(selectedShipping?.price || 0)}</ThemedText></View><ThemedText style={styles.bodyText}>{selectedShipping?.name || 'Entrega selecionada'}</ThemedText><ThemedText style={styles.deliveryText}>◷ {deliveryEstimate(selectedShipping?.shippingEstimate || '')}</ThemedText><View style={styles.reviewAddress}><ThemedText style={styles.sectionTitle}>Endereço de Entrega</ThemedText><ThemedText style={styles.bodyText}>{street + ', ' + number}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText></View><View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.reviewItemImage} />}<ThemedText style={styles.reviewItemName}>{item.name + ' ' + item.quantity + ' un.'}</ThemedText></View>)}</View><Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><ReviewHeader icon="card" title="PAGAMENTO" /><View style={styles.paymentReview}><ThemedText style={styles.pixWord}>{selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : '▣'}</ThemedText><ThemedText style={styles.bodyText}>{selectedPaymentLabel || 'Pagamento selecionado'}</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">{selectedPaymentLabel.toLowerCase().includes('pix') ? 'Aprovação imediata' : 'Cartão de crédito'}</ThemedText></View><Pressable onPress={() => setStep('payment')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
+    {step === 'review' && <><ThemedText style={styles.pageTitle}>Revise e confirme</ThemedText><Summary orderForm={orderForm} shippingPrice={selectedShipping?.price} /><Card><ReviewHeader icon="user" title="DADOS PESSOAIS" /><ThemedText style={styles.bodyText}>{email}</ThemedText><ThemedText style={styles.bodyText}>{firstName + ' ' + lastName}</ThemedText><ThemedText style={styles.bodyText}>{phone}</ThemedText><ThemedText style={styles.bodyText}>{document}</ThemedText><Pressable onPress={() => { setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><View style={styles.reviewDeliveryTop}><ReviewHeader icon="truck" title="ENTREGA" /><ThemedText style={styles.freeText}>{selectedShipping?.price === 0 ? 'Grátis' : money(selectedShipping?.price || 0)}</ThemedText></View><ThemedText style={styles.bodyText}>{selectedPickup ? pickupStoreName(selectedPickup) : selectedShipping?.name || 'Entrega selecionada'}</ThemedText><ThemedText style={styles.deliveryText}>◷ {selectedPickup ? 'Retire em ' + (selectedShipping?.shippingEstimate || 'prazo a confirmar') : deliveryEstimate(selectedShipping?.shippingEstimate || '')}</ThemedText><View style={styles.reviewAddress}><ThemedText style={styles.sectionTitle}>{selectedPickup ? 'Loja para retirada' : 'Endereço de Entrega'}</ThemedText>{selectedPickup ? pickupAddressLines(selectedPickup).map((line, index) => <ThemedText key={line + index} style={styles.bodyText}>{line}</ThemedText>) : <><ThemedText style={styles.bodyText}>{street + ', ' + number}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText></>}</View><View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.reviewItemImage} />}<ThemedText style={styles.reviewItemName}>{item.name + ' ' + item.quantity + ' un.'}</ThemedText></View>)}</View><Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><ReviewHeader icon="card" title="PAGAMENTO" /><View style={styles.paymentReview}><ThemedText style={styles.pixWord}>{selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : '▣'}</ThemedText><ThemedText style={styles.bodyText}>{selectedPaymentLabel || 'Pagamento selecionado'}</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">{selectedPaymentLabel.toLowerCase().includes('pix') ? 'Aprovação imediata' : 'Cartão de crédito'}</ThemedText></View><Pressable onPress={() => setStep('payment')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
   </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
 }
 
 function Card({ children }: { children: ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
+function PickupStoreCard({ option, selected, disabled, onPress }: { option: ShippingOption; selected: boolean; disabled: boolean; onPress: () => void }) {
+  return <Pressable onPress={onPress} disabled={disabled} style={[styles.pickupStoreCard, selected && styles.shippingOptionSelected]}>
+    <Radio selected={selected} />
+    <View style={styles.shippingOptionDetails}>
+      <ThemedText style={styles.pickupStoreName}>{pickupStoreName(option)}</ThemedText>
+      {pickupAddressLines(option).map((line, index) => <ThemedText key={line + index} themeColor="textSecondary">{line}</ThemedText>)}
+      <ThemedText themeColor="textSecondary">{option.price === 0 ? 'Grátis' : money(option.price)} · {option.shippingEstimate || 'Prazo a confirmar'}</ThemedText>
+    </View>
+  </Pressable>;
+}
 function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '' }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string }) {
   const isFreeText = !keyboardType || keyboardType === 'default';
   const inputMode = isFreeText ? 'text' : keyboardType === 'email-address' ? 'email' : keyboardType === 'phone-pad' ? 'tel' : 'numeric';
@@ -837,9 +923,14 @@ const styles = StyleSheet.create({
   shippingAddressRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   pinIcon: { fontSize: 22, color: '#0a0a0a' },
   shippingAddressText: { flex: 1 },
+  shippingSection: { gap: Spacing.two },
   shippingOption: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.two, borderRadius: 10, borderWidth: 1, borderColor: '#b0a69b', backgroundColor: '#FFFFFF' },
   shippingOptionSelected: { borderColor: '#0a0a0a', borderWidth: 2 },
   shippingOptionDetails: { flex: 1, gap: 4 },
+  pickupButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.two, borderRadius: 10, borderWidth: 1, borderColor: '#b0a69b', backgroundColor: '#FFFFFF' },
+  pickupSelectedCard: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two, padding: Spacing.two, borderRadius: 10, backgroundColor: '#FFFFFF' },
+  pickupStoreCard: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two, padding: Spacing.three, borderRadius: 12, borderWidth: 1, borderColor: '#b0a69b', backgroundColor: '#FFFFFF' },
+  pickupStoreName: { fontFamily: Fonts.bold, fontSize: 14, lineHeight: 20, fontWeight: '700' },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#b0a69b', alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: '#0a0a0a' },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#0a0a0a' },

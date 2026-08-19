@@ -7,7 +7,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { CartIconButton } from '@/components/cart-icon-button';
-import { KitSelector, emptyKitSelection, type KitSelection } from '@/components/kit-selector';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import ExchangeIcon from '@/components/icons/ExchangeIcon';
@@ -16,6 +15,7 @@ import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRoundedIcon';
+import { emptyKitSelection, KitSelector, type KitSelection } from '@/components/kit-selector';
 import { LoginRequiredModal } from '@/components/login-required-modal';
 import { ProductCard } from '@/components/product-card';
 import { ProductQuickView } from '@/components/product-quick-view';
@@ -382,9 +382,8 @@ export default function ProductScreen() {
               <View style={styles.productHeading}>
                 <View style={styles.headingText}>
                   <ThemedText style={styles.productName}>{product.name}</ThemedText>
-                  {!!product.brand && <ThemedText themeColor="textSecondary">{product.brand}</ThemedText>}
                   {currentListPrice !== null && currentPrice !== null && currentListPrice > currentPrice && <ThemedText style={styles.listPrice}>De {money(currentListPrice)}</ThemedText>}
-                  {currentPrice !== null && <ThemedText type="subtitle">{money(currentPrice)}</ThemedText>}
+                  {currentPrice !== null && <ThemedText type="subtitle" style={styles.bestPrice}>{money(currentPrice)}</ThemedText>}
                 </View>
                 <Pressable accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} disabled={favoriteLoading} onPress={changeFavorite} style={styles.favoriteButton}>
                   <HeartIcon size={32} color={favorite ? '#C62828' : '#423d39'} filled={favorite} />
@@ -450,7 +449,7 @@ export default function ProductScreen() {
                   <Pressable disabled={shippingLoading} onPress={calculateShipping} style={styles.shippingButton}><ThemedText style={styles.shippingButtonText}>{shippingLoading ? 'Calculando...' : 'Calcular'}</ThemedText></Pressable>
                 </View>
                 {!!shippingMessage && <ThemedText style={styles.messageText}>{shippingMessage}</ThemedText>}
-                {shippingQuotes.map((quote) => <View key={quote.id} style={styles.shippingQuote}><View><ThemedText type="smallBold">{quote.name}</ThemedText><ThemedText themeColor="textSecondary">Receba em {estimateLabel(quote.shippingEstimate)}</ThemedText></View><ThemedText type="smallBold">{quote.price === 0 ? 'Grátis' : money(quote.price)}</ThemedText></View>)}
+                {shippingQuotes.map((quote) => <View key={`${quote.deliveryChannel || 'delivery'}-${quote.name}`} style={styles.shippingQuote}><View><ThemedText type="smallBold">{quote.name}</ThemedText><ThemedText themeColor="textSecondary">{quote.isPickupInPoint ? 'Retire em ' : 'Receba em '}{estimateLabel(quote.shippingEstimate)}</ThemedText></View><ThemedText type="smallBold">{quote.price === 0 ? 'Grátis' : money(quote.price)}</ThemedText></View>)}
               </View>
 
               <Accordion title="Descrição" open={descriptionOpen} onToggle={() => setDescriptionOpen((value) => !value)}>
@@ -924,9 +923,10 @@ const styles = StyleSheet.create({
   details: { gap: Spacing.four, padding: Spacing.four, backgroundColor: '#FFFFFF' },
   productHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
   headingText: { flex: 1, gap: 4 },
-  productName: { fontSize: 17, lineHeight: 23 },
+  productName: { fontSize: 16, lineHeight: 23 },
   favoriteButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  listPrice: { color: '#8c8781', textDecorationLine: 'line-through' },
+  listPrice: { color: '#8c8781', fontSize: 16, textDecorationLine: 'line-through'  },
+	bestPrice: { color: '#0a0a0a', fontSize: 20},
   selectorGroup: { gap: Spacing.two },
   colorList: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
   colorOption: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: '#d7d2ca', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },

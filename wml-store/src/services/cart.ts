@@ -14,6 +14,27 @@ export type CartItem = {
   price: number;
 };
 
+export type ShippingAddress = {
+  addressType?: string;
+  addressId?: string;
+  receiverName?: string;
+  postalCode?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+};
+
+export type PickupStoreInfo = {
+  isPickupStore?: boolean;
+  friendlyName?: string;
+  additionalInfo?: string;
+  address?: ShippingAddress;
+};
+
 export type OrderForm = {
   orderFormId: string;
   value: number;
@@ -30,7 +51,7 @@ export type OrderForm = {
     birthDate?: string;
   };
   shippingData?: {
-    selectedAddresses?: Array<{ addressType?: string; addressId?: string; receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
+    selectedAddresses?: ShippingAddress[];
     logisticsInfo: Array<{
       itemIndex: number;
       selectedSla?: string;
@@ -41,6 +62,9 @@ export type OrderForm = {
         price: number;
         shippingEstimate: string;
         deliveryChannel?: string;
+        isPickupInPoint?: boolean;
+        pickupPointId?: string;
+        pickupStoreInfo?: PickupStoreInfo;
       }>;
     }>;
   };
@@ -66,7 +90,45 @@ export type ShippingQuote = {
   name: string;
   price: number;
   shippingEstimate: string;
+  deliveryChannel?: string;
+  isPickupInPoint?: boolean;
 };
+
+function isPickupShippingName(name: string) {
+  return /retirada|pickup/i.test(name);
+}
+
+function isTechnicalShippingId(value: string) {
+  return /^\d{6,}$/.test(value)
+    || /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value)
+    || (/^[a-z0-9]{8,}$/i.test(value) && /\d/.test(value));
+}
+
+function normalizeShippingQuoteName(name: string, isPickup: boolean) {
+  if (isPickup) return 'Retirada em loja';
+  const normalizedName = name
+    .replace(/\s*\((?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|\d{6,}|[a-z0-9]{8,})\)\s*$/gi, '')
+    .replace(/\s*[-–—]\s*[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\s*$/gi, '')
+    .trim() || 'Entrega';
+  return isTechnicalShippingId(normalizedName) ? 'Entrega' : normalizedName;
+}
+
+function shippingQuoteGroupKey(quote: ShippingQuote) {
+  const label = quote.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return `${quote.isPickupInPoint ? 'pickup' : quote.deliveryChannel || 'delivery'}|${label}`;
+}
+
+function estimateInMinutes(estimate: string) {
+  const amount = Number(estimate.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
+  if (estimate.includes('m')) return amount;
+  if (estimate.includes('h')) return amount * 60;
+  return amount * 24 * 60;
+}
+
+function isBetterShippingQuote(candidate: ShippingQuote, current: ShippingQuote) {
+  if (candidate.price !== current.price) return candidate.price < current.price;
+  return estimateInMinutes(candidate.shippingEstimate) < estimateInMinutes(current.shippingEstimate);
+}
 
 type VtexOrderForm = {
   orderFormId: string;
@@ -84,7 +146,7 @@ type VtexOrderForm = {
   }>;
   clientProfileData?: OrderForm['clientProfileData'];
   shippingData?: {
-    selectedAddresses?: Array<{ addressType?: string; addressId?: string; receiverName?: string; postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string }>;
+    selectedAddresses?: VtexShippingAddress[];
     logisticsInfo?: Array<{
       itemIndex?: number;
       selectedSla?: string;
@@ -95,6 +157,9 @@ type VtexOrderForm = {
         price?: number;
         shippingEstimate?: string;
         deliveryChannel?: string;
+        isPickupInPoint?: boolean;
+        pickupPointId?: string;
+        pickupStoreInfo?: VtexPickupStoreInfo;
       }>;
     }>;
   };
@@ -103,7 +168,36 @@ type VtexOrderForm = {
   };
 };
 
+type VtexShippingAddress = Omit<ShippingAddress, 'number'> & {
+  number?: string | number | null;
+};
+
+type VtexPickupStoreInfo = {
+  isPickupStore?: boolean;
+  friendlyName?: string;
+  additionalInfo?: string;
+  address?: VtexShippingAddress;
+};
+
 const ORDER_FORM_ID_KEY = 'lojahr:orderFormId';
+
+function normalizeShippingAddress(address?: VtexShippingAddress): ShippingAddress | undefined {
+  if (!address) return undefined;
+  return {
+    ...address,
+    number: address.number === undefined || address.number === null ? undefined : String(address.number),
+  };
+}
+
+function normalizePickupStoreInfo(info?: VtexPickupStoreInfo): PickupStoreInfo | undefined {
+  if (!info) return undefined;
+  return {
+    isPickupStore: info.isPickupStore,
+    friendlyName: info.friendlyName,
+    additionalInfo: info.additionalInfo,
+    address: normalizeShippingAddress(info.address),
+  };
+}
 
 async function userTokenHeaders(): Promise<Record<string, string>> {
   const token = await getVtexUserToken();
@@ -140,7 +234,7 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
     })).filter((item) => item.quantity > 0),
     clientProfileData: orderForm.clientProfileData,
     shippingData: {
-      selectedAddresses: (orderForm.shippingData?.selectedAddresses ?? []).map((address) => ({ ...address })),
+      selectedAddresses: (orderForm.shippingData?.selectedAddresses ?? []).map((address) => normalizeShippingAddress(address) ?? {}),
       logisticsInfo: (orderForm.shippingData?.logisticsInfo ?? []).map((info) => ({
         itemIndex: info.itemIndex ?? 0,
         selectedSla: info.selectedSla,
@@ -151,6 +245,9 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
           price: (sla.price ?? 0) / 100,
           shippingEstimate: sla.shippingEstimate ?? '',
           deliveryChannel: sla.deliveryChannel,
+          isPickupInPoint: sla.isPickupInPoint ?? sla.deliveryChannel === 'pickup-in-point',
+          pickupPointId: sla.pickupPointId,
+          pickupStoreInfo: normalizePickupStoreInfo(sla.pickupStoreInfo),
         })),
       })),
     },
@@ -289,7 +386,7 @@ export async function selectShippingOption({
           return {
             itemIndex: info.itemIndex,
             selectedSla: selected?.id ?? slaId,
-            deliveryChannel: selected?.deliveryChannel ?? 'delivery',
+            deliveryChannel: selected?.deliveryChannel ?? (selected?.isPickupInPoint ? 'pickup-in-point' : 'delivery'),
           };
         }),
       }),
@@ -532,16 +629,29 @@ export async function simulateProductShipping({
   );
   if (!response.ok) throw new Error(`Não foi possível calcular o frete (HTTP ${response.status}).`);
   const payload = await response.json() as {
-    logisticsInfo?: Array<{ slas?: Array<{ id?: string; name?: string; price?: number; shippingEstimate?: string }> }>;
+    logisticsInfo?: Array<{ slas?: Array<{ id?: string; name?: string; price?: number; shippingEstimate?: string; deliveryChannel?: string; isPickupInPoint?: boolean }> }>;
   };
-  return Array.from(new Map((payload.logisticsInfo ?? [])
+  const quotes = (payload.logisticsInfo ?? [])
     .flatMap((info) => info.slas ?? [])
-    .map((sla) => ({
-      id: sla.id ?? sla.name ?? '',
-      name: sla.name ?? sla.id ?? 'Entrega',
-      price: (sla.price ?? 0) / 100,
-      shippingEstimate: sla.shippingEstimate ?? '',
-    }))
-    .filter((sla) => sla.id)
-    .map((sla) => [sla.id, sla])).values());
+    .map((sla) => {
+      const rawName = sla.name ?? '';
+      const isPickup = sla.isPickupInPoint === true || sla.deliveryChannel === 'pickup-in-point' || isPickupShippingName(rawName);
+      return {
+        id: sla.id ?? rawName,
+        name: normalizeShippingQuoteName(rawName, isPickup),
+        price: (sla.price ?? 0) / 100,
+        shippingEstimate: sla.shippingEstimate ?? '',
+        deliveryChannel: isPickup ? 'pickup-in-point' : sla.deliveryChannel || 'delivery',
+        isPickupInPoint: isPickup,
+      } satisfies ShippingQuote;
+    })
+    .filter((quote) => quote.id);
+
+  const uniqueQuotes = new Map<string, ShippingQuote>();
+  for (const quote of quotes) {
+    const key = shippingQuoteGroupKey(quote);
+    const current = uniqueQuotes.get(key);
+    if (!current || isBetterShippingQuote(quote, current)) uniqueQuotes.set(key, quote);
+  }
+  return [...uniqueQuotes.values()];
 }
