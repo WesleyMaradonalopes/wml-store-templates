@@ -419,9 +419,9 @@ function normalizeProduct(product: ProductPayload): Product {
 
   const defaultVariant = variants.find((variant) => variant.available) ?? variants[0];
   const images = defaultVariant?.images ?? [];
-  const color = getSpecificationValue(product, ['cor', 'cor principal', 'atributo de produto', 'color'], 21) || specificationValues(product, 'Cor')[0] || '';
-  const collection = getSpecificationValue(product, ['colecao', 'coleção', 'collection'], 19) || specificationValues(product, 'Coleção')[0] || '';
-  const gender = getSpecificationValue(product, ['genero', 'gênero', 'gender'], 46) || specificationValues(product, 'Gênero')[0] || '';
+  const color = getSpecificationValue(product, ['cor', 'cor principal', 'Cor em Atributo de Produto', 'color'], 261) || specificationValues(product, 'Cor em Atributo de Produto')[0] || '';
+  const collection = getSpecificationValue(product, ['colecao', 'coleção', 'collection'], 269) || specificationValues(product, 'Coleção')[0] || '';
+  const gender = getSpecificationValue(product, ['genero', 'gênero', 'gender'], 289) || specificationValues(product, 'Gênero')[0] || '';
   const isKit = product.items?.some((item) => Boolean(item.isKit || item.kitItems?.length)) ?? false;
 
   return {

@@ -10,12 +10,12 @@ const CONJUNTO_CATEGORY_FQ = 'C:163'
 const CATEGORY_MAP = {
 	'/Conjuntos/': '163',
 	'/Meias/': '46/181',
-	'/Sutiãs/': '2',
-	'/Calcinhas/': '1',
+	'/Tops/': '112',
+	'/Biquínis/': '70',
 }
 
 // IDs das 3 categorias de acessórios — buscados em sequência quando o produto for um acessório.
-const ACCESSORY_CATEGORY_IDS = new Set(['230', '186', '227'])
+const ACCESSORY_CATEGORY_IDS = new Set(['132'])
 
 function isAccessoryProduct(product) {
 	return ACCESSORY_CATEGORY_IDS.has(String(product?.categoryId))
