@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import { getProductById, getProductKit, searchProductsByFq } from '../../services/productService'
 
@@ -9,7 +9,7 @@ const CONJUNTO_CATEGORY_FQ = 'C:163'
 // Produtos nessas categorias sugerem apenas outros produtos da mesma categoria.
 const CATEGORY_MAP = {
 	'/Conjuntos/': '163',
-	'/Meias/': '46/186/190',
+	'/Meias/': '46/181',
 	'/Sutiãs/': '2',
 	'/Calcinhas/': '1',
 }
@@ -58,7 +58,7 @@ async function collectKitCandidates(product) {
 	let accumulated = []
 
 	const strategies = [
-		...(gender ? [[`specificationFilter_99:${gender}`, CONJUNTO_CATEGORY_FQ]] : []),
+		...(gender ? [[`specificationFilter_289:${gender}`, CONJUNTO_CATEGORY_FQ]] : []),
 		[CONJUNTO_CATEGORY_FQ],
 	]
 
@@ -90,20 +90,20 @@ async function collectCandidates(product) {
 
 		const strategies = [
 			withCategory([
-				gender && `specificationFilter_99:${gender}`,
-				collection && `specificationFilter_46:${collection}`,
-				color && `specificationFilter_45:${color}`,
+				gender && `specificationFilter_289:${gender}`,
+				collection && `specificationFilter_269:${collection}`,
+				color && `specificationFilter_261:${color}`,
 			]),
 			withCategory([
-				gender && `specificationFilter_99:${gender}`,
-				collection && `specificationFilter_46:${collection}`,
+				gender && `specificationFilter_289:${gender}`,
+				collection && `specificationFilter_269:${collection}`,
 			]),
 			withCategory([
-				gender && `specificationFilter_99:${gender}`,
-				color && `specificationFilter_45:${color}`,
+				gender && `specificationFilter_289:${gender}`,
+				color && `specificationFilter_261:${color}`,
 			]),
-			withCategory([collection && `specificationFilter_46:${collection}`]),
-			withCategory([color && `specificationFilter_45:${color}`]),
+			withCategory([collection && `specificationFilter_269:${collection}`]),
+			withCategory([color && `specificationFilter_261:${color}`]),
 		]
 
 		for (const fqFilters of strategies) {
@@ -116,7 +116,7 @@ async function collectCandidates(product) {
 	if (accumulated.length < MAX_CANDIDATES && gender) {
 		for (const fq of categoryFqList) {
 			if (accumulated.length >= MAX_CANDIDATES) break
-			const fqFilters = [`specificationFilter_99:${gender}`, ...(fq ? [fq] : [])]
+			const fqFilters = [`specificationFilter_289:${gender}`, ...(fq ? [fq] : [])]
 			const results = await searchProductsByFq(fqFilters, { from: 0, to: 10, orderBy: 'OrderByTopSaleDESC' })
 			accumulated = [...accumulated, ...dedupeAgainst(results, currentProductId, accumulated)]
 		}

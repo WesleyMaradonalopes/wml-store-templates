@@ -653,9 +653,9 @@ export async function getSimilarProducts(productOrId: Product | string, count = 
 
 export async function getCompleteLookProducts(product: Product, count = 2): Promise<Product[]> {
   const buildSpecFilter = (fieldId: number, value: string) => value.trim() ? `specificationFilter_${fieldId}:${value.trim()}` : '';
-  const collectionFilter = buildSpecFilter(19, product.collection);
-  const colorFilter = buildSpecFilter(21, product.color);
-  const genderFilter = buildSpecFilter(46, product.gender);
+  const collectionFilter = buildSpecFilter(269, product.collection);
+  const colorFilter = buildSpecFilter(261, product.color);
+  const genderFilter = buildSpecFilter(289, product.gender);
   const strategies = [
     [collectionFilter, colorFilter, genderFilter],
     [collectionFilter, colorFilter],
