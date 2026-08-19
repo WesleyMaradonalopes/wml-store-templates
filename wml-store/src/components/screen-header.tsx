@@ -13,12 +13,13 @@ type ScreenHeaderProps = {
   title?: string;
   titleAlign?: 'center' | 'left';
   onBack?: () => void;
+  onSearch?: () => void;
   showSearch?: boolean;
   showCart?: boolean;
   titleStyle?: StyleProp<TextStyle>;
 };
 
-export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, showSearch = true, showCart = true, titleStyle }: ScreenHeaderProps) {
+export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, onSearch, showSearch = true, showCart = true, titleStyle }: ScreenHeaderProps) {
   const router = useRouter();
   const goBack = onBack ?? (() => router.back());
   return (
@@ -26,7 +27,7 @@ export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack
       {back ? <Pressable onPress={goBack} style={styles.side}><ArrowLeftIAIcon color="#0a0a0a" size={21} /></Pressable> : title && titleAlign === 'left' ? null : <View style={styles.side} />}
       <View pointerEvents="box-none" style={titleAlign === 'left' && title ? styles.leftTitle : styles.center}>{title ? <ThemedTitle style={titleStyle}>{title}</ThemedTitle> : <Pressable accessibilityLabel="Ir para o início" onPress={() => router.replace('/')} style={styles.logoButton}><HopeLogoIcon color="#0a0a0a" width={76} height={20} /></Pressable>}</View>
       <View style={styles.actions}>
-        {showSearch && <Pressable accessibilityLabel="Buscar" onPress={() => router.push('/search')} style={styles.action}><SearchIcon size={20} color="#0a0a0a" /></Pressable>}
+        {showSearch && <Pressable accessibilityLabel="Buscar" onPress={onSearch ?? (() => router.push('/search'))} style={styles.action}><SearchIcon size={20} color="#0a0a0a" /></Pressable>}
         {showCart && <CartIconButton style={styles.action} />}
       </View>
     </View>

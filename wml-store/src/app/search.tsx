@@ -7,6 +7,7 @@ import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import { ProductCard } from '@/components/product-card';
 import { FilterGlyph, ProductFilterModal } from '@/components/product-filter-modal';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
@@ -27,8 +28,10 @@ export default function SearchScreen() {
   const initialFacets = parseCmsRouteFacets(paramText(facetsParam));
   const initialSort = paramText(sortParam) || 'score:desc';
   const initialTitle = paramText(titleParam);
+  const initialHasListingContext = Boolean(initialQuery || initialFacets.length > 0 || initialTitle);
   const [term, setTerm] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
+  const [searchOpen, setSearchOpen] = useState(!initialHasListingContext);
   const [products, setProducts] = useState<Product[]>([]);
   const [facets, setFacets] = useState<CatalogFacet[]>([]);
   const [selectedFacets, setSelectedFacets] = useState<SelectedFacet[]>([]);
@@ -45,12 +48,27 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const nextQuery = paramText(q).trim();
+    const nextFacets = parseCmsRouteFacets(paramText(facetsParam));
+    const nextTitle = paramText(titleParam);
     setTerm(nextQuery);
     setActiveQuery(nextQuery);
-    setSelectedFacets(parseCmsRouteFacets(paramText(facetsParam)));
+    setSearchOpen(!(nextQuery || nextFacets.length > 0 || nextTitle));
+    setSelectedFacets(nextFacets);
     setSort(paramText(sortParam) || 'score:desc');
-    setListingTitle(paramText(titleParam));
+    setListingTitle(nextTitle);
   }, [facetsParam, q, sortParam, titleParam]);
+
+  useEffect(() => {
+    const value = term.trim();
+    if (value === activeQuery) return;
+    const timer = setTimeout(() => {
+      setSelectedFacets([]);
+      setSort('score:desc');
+      setListingTitle('');
+      setActiveQuery(value);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [activeQuery, term]);
 
   useEffect(() => {
     if (!activeQuery && selectedFacets.length === 0) {
@@ -103,11 +121,23 @@ export default function SearchScreen() {
 
   function search() {
     const value = term.trim();
-    if (!value) return;
+    if (!value) {
+      clearSearch();
+      return;
+    }
     setSelectedFacets([]);
     setSort('score:desc');
     setListingTitle('');
     setActiveQuery(value);
+  }
+
+  function clearSearch() {
+    setTerm('');
+    setSelectedFacets([]);
+    setSort('score:desc');
+    setListingTitle('');
+    setActiveQuery('');
+    setMessage(null);
   }
 
   function openPopular(value: string) {
@@ -136,18 +166,23 @@ export default function SearchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.searchHeader}>
-          <Pressable accessibilityLabel="Voltar" onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeftIAIcon color="#4b4743" size={19} />
-          </Pressable>
-          <View style={styles.searchInputWrap}>
-            <SearchIcon size={17} color="#8b8782" />
-            <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder="O que você procura?" returnKeyType="search" style={styles.searchInput} />
+        {searchOpen ? (
+          <View style={styles.searchHeader}>
+            <Pressable accessibilityLabel="Voltar" onPress={() => router.back()} style={styles.backButton}>
+              <ArrowLeftIAIcon color="#4b4743" size={19} />
+            </Pressable>
+            <View style={styles.searchInputWrap}>
+              <SearchIcon size={17} color="#8b8782" />
+              <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder="O que você procura?" returnKeyType="search" style={styles.searchInput} />
+              {!!term && <Pressable accessibilityLabel="Limpar busca" onPress={clearSearch} style={styles.clearButton}><ThemedText style={styles.clearText}>✕</ThemedText></Pressable>}
+            </View>
+            <Pressable accessibilityLabel="Fechar busca" onPress={() => router.back()} style={styles.closeButton}>
+              <ThemedText style={styles.closeText}>✕</ThemedText>
+            </Pressable>
           </View>
-          <Pressable accessibilityLabel="Fechar busca" onPress={() => router.back()} style={styles.closeButton}>
-            <ThemedText style={styles.closeText}>✕</ThemedText>
-          </Pressable>
-        </View>
+        ) : (
+          <ScreenHeader onSearch={() => setSearchOpen(true)} />
+        )}
         <View style={styles.body}>
 
         {!activeQuery && selectedFacets.length === 0 && (
@@ -218,6 +253,8 @@ const styles = StyleSheet.create({
   backButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   searchInputWrap: { flex: 1, minHeight: 42, borderRadius: 22, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, backgroundColor: '#f1f1f3' },
   searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#3c3936', fontFamily: Fonts.sans },
+  clearButton: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  clearText: { fontSize: 14, lineHeight: 18, color: '#625d57', fontWeight: '500' },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
   body: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.three },
