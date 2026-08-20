@@ -105,7 +105,10 @@ const Recaptcha = forwardRef<RecaptchaHandle, RecaptchaProps>(({ siteKey }, ref)
       try {
         await readyPromiseRef.current;
         const client = window.grecaptcha;
-        if (client.enterprise) return await client.enterprise.execute(siteKey, { action: 'submit' });
+        if (client.enterprise) {
+          const token = await client.enterprise.execute(siteKey, { action: 'submit' });
+          return token ? { token, siteKey } : null;
+        }
         if (widgetIdRef.current === null || !client.execute) return null;
 
         return await new Promise<string | null>((resolve) => {
@@ -123,7 +126,7 @@ const Recaptcha = forwardRef<RecaptchaHandle, RecaptchaProps>(({ siteKey }, ref)
               resolve(null);
             });
           }
-        });
+        }).then((token) => token ? { token, siteKey } : null);
       } catch {
         return null;
       }

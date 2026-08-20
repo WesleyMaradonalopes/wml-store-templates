@@ -57,7 +57,14 @@ No Expo Go ou quando o SDK não aceita a chave, usa uma WebView com a origem
 
 Para o SDK Android aceitar a chave, ela deve ser criada no Google Cloud como
 tipo Android, permitir o pacote `br.com.lojahr.store` e, nos development builds
-instalados fora da Play Store, permitir distribuição fora da Google Play.
+instalados fora da Play Store, permitir distribuição fora da Google Play. Para
+iOS, a chave deve ser do tipo iOS e permitir o Bundle ID `br.com.lojahr.store`.
+
+As chaves ficam separadas por plataforma: `EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY`
+é a chave Web usada pelo fallback; `EXPO_PUBLIC_VTEX_RECAPTCHA_ANDROID_SITE_KEY`
+e `EXPO_PUBLIC_VTEX_RECAPTCHA_IOS_SITE_KEY` são usadas pelos SDKs nativos. As
+chaves mobile também precisam estar cadastradas na configuração de reCAPTCHA
+do Checkout da VTEX com o projeto e a Google API key correspondentes.
 
 Para validar o checkout completo, prefira o development build já instalado:
 
@@ -76,10 +83,9 @@ npm run android:native
 npx expo run:ios
 ```
 
-O `clientId`/site key é público e pode ficar em
-`EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY`. O `clientSecret`, a API key e outras
-credenciais permanecem somente na configuração da VTEX/backend e nunca devem
-ser colocados em `EXPO_PUBLIC_*`.
+Os `clientId`/site keys são públicos e podem ficar em `EXPO_PUBLIC_*`. O
+`clientSecret`, a Google API key e outras credenciais permanecem somente na
+configuração da VTEX/backend e nunca devem ser colocados em `EXPO_PUBLIC_*`.
 
 ## Join the community
 

@@ -1,14 +1,31 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { NativeModules, StyleSheet, View } from 'react-native';
+import { NativeModules, Platform, StyleSheet, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { executeAction, initializeRecaptcha } from 'react-native-recaptcha-enterprise';
 
 import { storeConfig } from '@/config/store';
 import type { RecaptchaHandle, RecaptchaProps } from './recaptcha';
 
-// Public site key used by the working app-test-one checkout. This is safe to
-// bundle in the app; API keys/client secrets must remain on the server.
-const DEFAULT_SITE_KEY = '6LeYIh0qAAAAANOiLphZJNLG5JTHhBZHUPkhJfZU';
+// Site keys are public and can be bundled in the app. Google API keys and
+// client secrets must remain on the server/VTEX configuration.
+const DEFAULT_WEB_SITE_KEY = '6LeYIh0qAAAAANOiLphZJNLG5JTHhBZHUPkhJfZU';
+const configuredWebSiteKey = String(
+  process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || DEFAULT_WEB_SITE_KEY,
+).trim();
+const configuredAndroidSiteKey = String(
+  process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_ANDROID_SITE_KEY || '',
+).trim();
+const configuredIosSiteKey = String(
+  process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_IOS_SITE_KEY || '',
+).trim();
+const configuredNativeSiteKey = Platform.OS === 'android'
+  ? configuredAndroidSiteKey || configuredWebSiteKey
+  : Platform.OS === 'ios'
+    ? configuredIosSiteKey || configuredWebSiteKey
+    : configuredWebSiteKey;
+const mobileSiteKeys = new Set(
+  [configuredAndroidSiteKey, configuredIosSiteKey].filter(Boolean),
+);
 
 type PendingRequest = {
   key: string;
@@ -107,23 +124,14 @@ function buildCaptchaHtml(siteKey: string) {
 }
 
 const Recaptcha = forwardRef<RecaptchaHandle, RecaptchaProps>(({ siteKey }, ref) => {
-  const configuredSiteKey = String(siteKey || process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || DEFAULT_SITE_KEY).trim();
-  const [activeSiteKey, setActiveSiteKey] = useState(configuredSiteKey);
-  const activeSiteKeyRef = useRef(configuredSiteKey);
+  const [activeSiteKey, setActiveSiteKey] = useState(configuredWebSiteKey);
+  const activeSiteKeyRef = useRef(configuredWebSiteKey);
   const webViewRef = useRef<WebView>(null);
   const webViewReadyRef = useRef(false);
   const pendingRequestRef = useRef<PendingRequest | null>(null);
   const nativeSiteKeyRef = useRef('');
   const nativeInitializationRef = useRef<Promise<void> | null>(null);
   const unsupportedNativeKeysRef = useRef(new Set<string>());
-
-  useEffect(() => {
-    const nextSiteKey = String(siteKey || process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || DEFAULT_SITE_KEY).trim();
-    if (!nextSiteKey || nextSiteKey === activeSiteKeyRef.current) return;
-    webViewReadyRef.current = false;
-    activeSiteKeyRef.current = nextSiteKey;
-    setActiveSiteKey(nextSiteKey);
-  }, [siteKey]);
 
   useEffect(() => () => {
     pendingRequestRef.current?.reject(new Error('reCAPTCHA desmontado.'));
@@ -206,15 +214,25 @@ const Recaptcha = forwardRef<RecaptchaHandle, RecaptchaProps>(({ siteKey }, ref)
   }
 
   async function getToken(requestedSiteKey?: string) {
-    const requestedKey = String(requestedSiteKey || activeSiteKeyRef.current || configuredSiteKey || DEFAULT_SITE_KEY).trim();
+    const requestedKey = String(requestedSiteKey || siteKey || configuredNativeSiteKey || configuredWebSiteKey).trim();
     if (!requestedKey) return null;
 
     const nativeToken = await getNativeToken(requestedKey);
-    if (nativeToken) return nativeToken;
+    if (nativeToken) return { token: nativeToken, siteKey: requestedKey };
+
+    // A mobile key is for the native SDK. If the SDK is unavailable (for
+    // example in Expo Go), use the separately configured Web key in the
+    // WebView and return that key together with the token so the backend
+    // validates the matching pair.
+    const webFallbackKey = mobileSiteKeys.has(requestedKey) ? configuredWebSiteKey : requestedKey;
+    if (!webFallbackKey) return null;
     try {
-      const webToken = await getWebViewToken(requestedKey);
-      if (webToken) console.info('[RECAPTCHA] token generated via WebView');
-      return webToken;
+      const webToken = await getWebViewToken(webFallbackKey);
+      if (webToken) {
+        console.info('[RECAPTCHA] token generated via WebView');
+        return { token: webToken, siteKey: webFallbackKey };
+      }
+      return null;
     } catch (error) {
       console.warn(`[RECAPTCHA] WebView unavailable (${nativeErrorSummary(error)})`);
       throw error;

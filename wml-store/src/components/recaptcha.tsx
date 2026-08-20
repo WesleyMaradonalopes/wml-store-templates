@@ -1,7 +1,12 @@
 import { forwardRef, useImperativeHandle } from 'react';
 
+export type RecaptchaToken = {
+  token: string;
+  siteKey: string;
+};
+
 export type RecaptchaHandle = {
-  getToken: (siteKey?: string) => Promise<string | null>;
+  getToken: (siteKey?: string) => Promise<RecaptchaToken | null>;
   reset: () => void;
 };
 

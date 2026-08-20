@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
@@ -24,16 +24,21 @@ type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' |
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
 type ShippingOption = NonNullable<OrderForm['shippingData']>['logisticsInfo'][number]['slas'][number];
 
-const CONFIGURED_RECAPTCHA_SITE_KEY = String(
-  process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || '6LeYIh0qAAAAANOiLphZJNLG5JTHhBZHUPkhJfZU',
+const DEFAULT_WEB_RECAPTCHA_SITE_KEY = '6LeYIh0qAAAAANOiLphZJNLG5JTHhBZHUPkhJfZU';
+const WEB_RECAPTCHA_SITE_KEY = String(
+  process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || DEFAULT_WEB_RECAPTCHA_SITE_KEY,
 ).trim();
+const CONFIGURED_RECAPTCHA_SITE_KEY = Platform.OS === 'android'
+  ? String(process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_ANDROID_SITE_KEY || WEB_RECAPTCHA_SITE_KEY).trim()
+  : Platform.OS === 'ios'
+    ? String(process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_IOS_SITE_KEY || WEB_RECAPTCHA_SITE_KEY).trim()
+    : WEB_RECAPTCHA_SITE_KEY;
 
 function digits(value: string) { return value.replace(/\D/g, ''); }
 function validEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()); }
 function getRecaptchaSiteKey(orderForm?: OrderForm | null) {
-  // A chave cadastrada para o aplicativo é diferente das chaves web que a
-  // VTEX devolve no orderForm. O app-test-one usa esta chave configurada; não
-  // devemos substituí-la por recaptchaKeyV3/recaptchaKey do Checkout web.
+  // Mobile uses the platform key registered in VTEX. Web keeps the existing
+  // VTEX key. The backend must receive the key that generated the token.
   return CONFIGURED_RECAPTCHA_SITE_KEY
     || String(orderForm?.recaptchaKeyV3 || orderForm?.recaptchaKey || '').trim();
 }
@@ -570,7 +575,9 @@ export default function CheckoutScreen() {
       let captchaToken = '';
       if (paymentKind === 'card' && activeRecaptchaSiteKey) {
         try {
-          captchaToken = (await recaptchaRef.current?.getToken(activeRecaptchaSiteKey)) || '';
+          const tokenResult = await recaptchaRef.current?.getToken(activeRecaptchaSiteKey);
+          captchaToken = tokenResult?.token || '';
+          if (tokenResult?.siteKey) activeRecaptchaSiteKey = tokenResult.siteKey;
         } catch {
           setMessage('Não foi possível concluir a verificação de segurança automaticamente. Tente novamente.');
           return;
@@ -626,9 +633,10 @@ export default function CheckoutScreen() {
         activeRecaptchaSiteKey = requestedSiteKey;
         setRecaptchaSiteKey(requestedSiteKey);
         recaptchaRef.current?.reset();
-        const retryToken = (await recaptchaRef.current?.getToken(requestedSiteKey)) || '';
+        const retryResult = await recaptchaRef.current?.getToken(requestedSiteKey);
+        const retryToken = retryResult?.token || '';
         if (!retryToken) throw error;
-        result = await placeOrder(createOrderInput(retryToken, requestedSiteKey));
+        result = await placeOrder(createOrderInput(retryToken, retryResult?.siteKey || requestedSiteKey));
       }
       setOrderResult(result);
       if (result.status === 'completed') {
