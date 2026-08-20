@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
@@ -124,6 +125,12 @@ function isCardPayment(method: { name: string; group: string }) {
 function isPixPayment(method: { name: string; group: string }) {
   return (method.name + ' ' + method.group).toLowerCase().includes('pix');
 }
+type ParsedPixPayment = {
+  code: string;
+  paymentId: string;
+  transactionId: string;
+  imageUri: string;
+};
 function parsePaymentAppPayload(paymentApp?: PaymentAppData | null) {
   if (!paymentApp?.appPayload) return null;
   const raw = paymentApp.appPayload;
@@ -141,7 +148,7 @@ function parsePaymentAppPayload(paymentApp?: PaymentAppData | null) {
     };
   }
   const code = String(parsed.code || parsed.qrCode || parsed.qrCodeText || '').trim();
-  const image = String(parsed.qrCodeBase64Image || parsed.qrCodeBase64 || '').trim();
+  const image = String(parsed.qrCodeBase64Image || parsed.qrCodeBase64 || parsed.qrCodeImage || '').trim();
   const paymentId = String(parsed.paymentId || '').trim();
   const transactionId = String(parsed.transactionId || '').trim();
   return {
@@ -149,7 +156,12 @@ function parsePaymentAppPayload(paymentApp?: PaymentAppData | null) {
     paymentId,
     transactionId,
     imageUri: image ? (image.startsWith('data:') ? image : 'data:image/png;base64,' + image) : '',
-  };
+  } satisfies ParsedPixPayment;
+}
+function formatPixTime(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
 }
 function deliveryEstimate(estimate: string) {
   const match = estimate.match(/\d+/);
@@ -721,6 +733,14 @@ export default function CheckoutScreen() {
     const pixPayload = parsePaymentAppPayload(orderResult.paymentApp);
     const isCompleted = orderResult.status === 'completed';
     const isPending = orderResult.status === 'pending_payment';
+    const isPixResult = selectedPaymentLabel.toLowerCase().includes('pix') || /pix/i.test(orderResult.paymentApp?.appName || '');
+    if (isPending && isPixResult) {
+      return <PixPaymentScreen
+        orderValue={orderForm.value}
+        pixPayload={pixPayload}
+        onBack={() => router.replace('/')}
+      />;
+    }
     const title = isCompleted
       ? 'Pedido realizado'
       : isPending
@@ -833,6 +853,141 @@ export default function CheckoutScreen() {
     {step === 'card' && <><View style={styles.creditCardVisual}><ThemedText style={styles.creditCardLabel}>CARTÃO DE CRÉDITO</ThemedText><ThemedText style={styles.creditCardNumber}>{cardNumber ? cardNumber : '•••• •••• •••• ••••'}</ThemedText><View style={styles.creditCardBottom}><ThemedText style={styles.creditCardMeta}>{cardHolder || 'NOME DO TITULAR'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardExpiry || 'MM/AA'}</ThemedText><ThemedText style={styles.creditCardMeta}>{cardCvv ? 'CVV' : 'CVV'}</ThemedText></View></View><Card><Field label="Número do cartão" value={cardNumber} setValue={(value) => setCardNumber(formatCardNumber(value))} required placeholder="Insira o número do seu cartão" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.number : ''} /><Field label="Nome impresso no cartão" value={cardHolder} setValue={setCardHolder} required placeholder="Nome impresso no cartão" error={cardValidationAttempted ? cardErrors.holder : ''} /><View style={styles.inline}><Field label="Validade" value={cardExpiry} setValue={(value) => setCardExpiry(formatExpiry(value))} required placeholder="MM/AA" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.expiry : ''} /><Field label="CVV" value={cardCvv} setValue={setCardCvv} required placeholder="CVV" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.cvv : ''} /></View><ThemedText style={styles.cardTitle}>Endereço de cobrança</ThemedText><Pressable onPress={() => undefined} style={styles.billingRow}><View style={styles.billingCheckbox}><ThemedText style={styles.billingCheck}>✓</ThemedText></View><ThemedText style={styles.billingText}>O endereço da fatura é {street + ', ' + number + ' - ' + neighborhood + ', ' + city + ' - ' + state}</ThemedText></Pressable></Card><ThemedText style={styles.acceptedTitle}>Bandeiras aceitas:</ThemedText><View style={styles.brandRow}><BrandBadge label="AMEX" color="#2c77b8" /><BrandBadge label="VISA" color="#1e4c9a" /><BrandBadge label="elo" color="#2e9ba3" /><BrandBadge label="MasterCard" color="#9c2020" /><BrandBadge label="Hipercard" color="#c52b2b" /><BrandBadge label="elo" color="#f2a900" /></View>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
     {step === 'review' && <><ThemedText style={styles.pageTitle}>Revise e confirme</ThemedText><Summary orderForm={orderForm} shippingPrice={selectedShipping?.price} /><Card><ReviewHeader icon="user" title="DADOS PESSOAIS" /><ThemedText style={styles.bodyText}>{email}</ThemedText><ThemedText style={styles.bodyText}>{firstName + ' ' + lastName}</ThemedText><ThemedText style={styles.bodyText}>{phone}</ThemedText><ThemedText style={styles.bodyText}>{document}</ThemedText><Pressable onPress={() => { setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><View style={styles.reviewDeliveryTop}><ReviewHeader icon="truck" title="ENTREGA" /><ThemedText style={styles.freeText}>{selectedShipping?.price === 0 ? 'Grátis' : money(selectedShipping?.price || 0)}</ThemedText></View><ThemedText style={styles.bodyText}>{selectedPickup ? pickupStoreName(selectedPickup) : selectedShipping?.name || 'Entrega selecionada'}</ThemedText><ThemedText style={styles.deliveryText}>◷ {selectedPickup ? 'Retire em ' + (selectedShipping?.shippingEstimate || 'prazo a confirmar') : deliveryEstimate(selectedShipping?.shippingEstimate || '')}</ThemedText><View style={styles.reviewAddress}><ThemedText style={styles.sectionTitle}>{selectedPickup ? 'Loja para retirada' : 'Endereço de Entrega'}</ThemedText>{selectedPickup ? pickupAddressLines(selectedPickup).map((line, index) => <ThemedText key={line + index} style={styles.bodyText}>{line}</ThemedText>) : <><ThemedText style={styles.bodyText}>{street + ', ' + number}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText></>}</View><View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.reviewItemImage} />}<ThemedText style={styles.reviewItemName}>{item.name + ' ' + item.quantity + ' un.'}</ThemedText></View>)}</View><Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><ReviewHeader icon="card" title="PAGAMENTO" /><View style={styles.paymentReview}><ThemedText style={styles.pixWord}>{selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : '▣'}</ThemedText><ThemedText style={styles.bodyText}>{selectedPaymentLabel || 'Pagamento selecionado'}</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">{selectedPaymentLabel.toLowerCase().includes('pix') ? 'Aprovação imediata' : 'Cartão de crédito'}</ThemedText></View><Pressable onPress={() => setStep('payment')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
   </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
+}
+
+function PixPaymentScreen({
+  orderValue,
+  pixPayload,
+  onBack,
+}: {
+  orderValue: number;
+  pixPayload: ParsedPixPayment | null;
+  onBack: () => void;
+}) {
+  const [showQrCode, setShowQrCode] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(10 * 60);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRemainingSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 3000);
+    return () => clearTimeout(timeout);
+  }, [copied]);
+
+  async function copyPixCode() {
+    const code = pixPayload?.code?.trim();
+    if (!code) return;
+    try {
+      await Clipboard.setStringAsync(code);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  async function sharePixCode() {
+    const code = pixPayload?.code?.trim();
+    if (!code) return;
+    try {
+      await Share.share({ message: code, title: 'Código Pix' });
+    } catch {
+      // O usuário pode fechar o painel nativo sem concluir o compartilhamento.
+    }
+  }
+
+  const hasCode = Boolean(pixPayload?.code);
+  const hasQrCode = Boolean(pixPayload?.imageUri);
+
+  return <ThemedView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Pagamento PIX" onBack={onBack} showSearch={false} showCart={false} />
+      <View style={styles.pixScreen}>
+        <ScrollView contentContainerStyle={styles.pixContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.pixInfoCard}>
+            <ThemedText style={styles.pixInfoIcon}>◷</ThemedText>
+            <ThemedText style={styles.pixInfoText}>Com o PIX, sua compra é aprovada na hora</ThemedText>
+          </View>
+
+          <View style={styles.pixValueCard}>
+            <ThemedText style={styles.pixValueLabel}>Valor da compra:</ThemedText>
+            <ThemedText style={styles.pixValue}>{money(orderValue)}</ThemedText>
+          </View>
+
+          <View style={styles.pixCodeCard}>
+            <ThemedText style={styles.pixSectionTitle}>Código PIX</ThemedText>
+            <TextInput
+              value={pixPayload?.code || 'Aguardando o código Pix...'}
+              editable={false}
+              selectTextOnFocus={hasCode}
+              numberOfLines={1}
+              scrollEnabled
+              style={[styles.pixCodeField, !hasCode && styles.pixCodePlaceholder]}
+            />
+          </View>
+
+          <View style={styles.pixActionRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Copiar código Pix"
+              disabled={!hasCode}
+              onPress={() => void copyPixCode()}
+              style={[styles.pixActionButton, !hasCode && styles.pixActionButtonDisabled]}
+            >
+              <ThemedText style={styles.pixActionText}>Copiar código</ThemedText>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Compartilhar código Pix"
+              disabled={!hasCode}
+              onPress={() => void sharePixCode()}
+              style={[styles.pixActionButton, !hasCode && styles.pixActionButtonDisabled]}
+            >
+              <ThemedText style={styles.pixActionText}>Compartilhar</ThemedText>
+            </Pressable>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={showQrCode ? 'Ocultar QR Code' : 'Mostrar QR Code'}
+            disabled={!hasQrCode}
+            onPress={() => setShowQrCode((current) => !current)}
+            style={[styles.pixActionButton, styles.pixQrToggle, !hasQrCode && styles.pixActionButtonDisabled]}
+          >
+            <ThemedText style={styles.pixActionText}>{showQrCode ? 'Ocultar QR Code' : 'Mostrar QR Code'}</ThemedText>
+          </Pressable>
+
+          {showQrCode && hasQrCode && <View style={styles.pixQrCard}>
+            <Image source={{ uri: pixPayload?.imageUri }} style={styles.pixQrImage} contentFit="contain" />
+          </View>}
+
+          <View style={styles.pixInstructionsCard}>
+            <ThemedText style={styles.pixSectionTitle}>Como pagar com PIX</ThemedText>
+            <ThemedText style={styles.pixInstruction}>• Acesse seu Internet Banking</ThemedText>
+            <ThemedText style={styles.pixInstruction}>• Escolha o pagamento via PIX</ThemedText>
+            <ThemedText style={styles.pixInstruction}>• Cole o código acima</ThemedText>
+          </View>
+
+          <ThemedText style={styles.pixTimer}>Tempo restante: {formatPixTime(remainingSeconds)}</ThemedText>
+          <ThemedText style={styles.pixConfirmationText}>O pagamento será processado automaticamente após a confirmação</ThemedText>
+        </ScrollView>
+
+        {copied && <View accessibilityLiveRegion="polite" style={styles.pixToast}>
+          <ThemedText style={styles.pixToastCheck}>✓</ThemedText>
+          <ThemedText style={styles.pixToastText}>Código PIX copiado!</ThemedText>
+          <Pressable accessibilityLabel="Fechar aviso" onPress={() => setCopied(false)} style={styles.pixToastClose}>
+            <ThemedText style={styles.pixToastCloseText}>×</ThemedText>
+          </Pressable>
+        </View>}
+      </View>
+    </SafeAreaView>
+  </ThemedView>;
 }
 
 function Card({ children }: { children: ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
@@ -955,6 +1110,33 @@ const styles = StyleSheet.create({
   pixWord: { color: '#4bb5ad', fontSize: 28, lineHeight: 32, fontFamily: Fonts.sans, fontWeight: '400' },
   pixQrImage: { alignSelf: 'center', width: 240, height: 240, marginVertical: Spacing.two },
   pixCodeInput: { minHeight: 92, textAlignVertical: 'top' },
+  pixScreen: { flex: 1, position: 'relative' },
+  pixContent: { gap: Spacing.three, paddingHorizontal: Spacing.one, paddingTop: Spacing.three, paddingBottom: Spacing.six },
+  pixInfoCard: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#f0ece8' },
+  pixInfoIcon: { color: '#8b746b', fontSize: 22, lineHeight: 24 },
+  pixInfoText: { flex: 1, color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20 },
+  pixValueCard: { minHeight: 54, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#f0ece8' },
+  pixValueLabel: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20 },
+  pixValue: { marginLeft: 4, color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, lineHeight: 20 },
+  pixCodeCard: { gap: Spacing.two, padding: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#f0ece8' },
+  pixSectionTitle: { color: '#242321', fontFamily: Fonts.bold, fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  pixCodeField: { minHeight: 44, paddingHorizontal: Spacing.two, borderRadius: 6, backgroundColor: '#fafafa', color: '#77736f', fontFamily: Fonts.mono, fontSize: 12, textAlignVertical: 'center' },
+  pixCodePlaceholder: { color: '#9a9692', fontFamily: Fonts.sans },
+  pixActionRow: { flexDirection: 'row', gap: Spacing.two },
+  pixActionButton: { flex: 1, minHeight: 46, paddingHorizontal: Spacing.two, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
+  pixQrToggle: { flex: 0, alignSelf: 'stretch' },
+  pixActionButtonDisabled: { opacity: 0.45 },
+  pixActionText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  pixQrCard: { alignSelf: 'center', padding: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#f0ece8', elevation: 4 },
+  pixInstructionsCard: { gap: Spacing.one, padding: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#f0ece8' },
+  pixInstruction: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 22 },
+  pixTimer: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  pixConfirmationText: { paddingHorizontal: Spacing.five, color: '#8d8985', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  pixToast: { position: 'absolute', left: Spacing.one, right: Spacing.one, bottom: Spacing.two, minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingLeft: Spacing.three, paddingRight: Spacing.one, borderRadius: 8, backgroundColor: '#53c76b', elevation: 5, zIndex: 10 },
+  pixToastCheck: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 18, lineHeight: 22 },
+  pixToastText: { flex: 1, marginLeft: Spacing.two, color: '#FFFFFF', fontFamily: Fonts.medium, fontSize: 14, lineHeight: 20 },
+  pixToastClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  pixToastCloseText: { color: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 22, lineHeight: 24 },
   creditCardVisual: { minHeight: 155, padding: Spacing.three, borderRadius: 8, backgroundColor: '#344762', justifyContent: 'space-between' },
   creditCardLabel: { color: '#dfe5ee', fontSize: 12, fontFamily: Fonts.sans },
   creditCardNumber: { color: '#FFFFFF', fontSize: 20, letterSpacing: 1, fontFamily: Fonts.sans },

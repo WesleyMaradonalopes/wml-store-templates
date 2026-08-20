@@ -807,19 +807,19 @@ app.post('/checkout/order', async (request, response) => {
       installmentsInterestRate,
       installmentsValue,
       referenceValue: paymentReferenceValue,
+      fields: kind === 'card' ? buildPaymentFields({
+        kind,
+        card: request.body?.card,
+        document,
+        address: request.body?.address,
+        accountId: payment?.accountId || '',
+        bin: payment?.bin || request.body?.card?.bin || '',
+      }) : {},
       ...(kind === 'card' ? {
         hasDefaultBillingAddress: true,
         isLuhnValid: true,
         bin: payment?.bin || request.body?.card?.bin || '',
         isBillingAddressDifferent: false,
-        fields: buildPaymentFields({
-          kind,
-          card: request.body?.card,
-          document,
-          address: request.body?.address,
-          accountId: payment?.accountId || '',
-          bin: payment?.bin || request.body?.card?.bin || '',
-        }),
         chooseToUseNewCard: true,
         isRegexValid: true,
       } : {}),
@@ -849,6 +849,10 @@ app.post('/checkout/order', async (request, response) => {
     });
     const paymentBody = await readResponseBody(paymentResult);
     if (!paymentResult.ok) {
+      console.warn(
+        `[CHECKOUT] payment rejected -> HTTP ${paymentResult.status}`
+          + ` code=${vtexErrorCode(paymentBody) || 'unknown'}`,
+      );
       return response.json({
         ok: true,
         status: 'payment_failed',
