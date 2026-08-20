@@ -10,7 +10,9 @@ const account = process.env.VTEX_ACCOUNT || 'lojahr';
 const domain = process.env.VTEX_STORE_DOMAIN || `${account}.myvtex.com`;
 const vtexBaseUrl = `https://${domain}`;
 const vtexPaymentsBaseUrl = `https://${account}.vtexpayments.com.br`;
-const vtexVaultBaseUrl = 'https://api.vtexvault.com';
+// O endpoint antigo em vtexpayments.com.br deixou de aceitar o envio de
+// pagamentos. O Payments Gateway atual usa o domínio da conta no VTEX Vault.
+const vtexVaultBaseUrl = `https://${account}.vtexvault.com`;
 const allowedOrigins = String(process.env.ALLOWED_ORIGINS || '').split(',').map((item) => item.trim()).filter(Boolean);
 const wishlistEntity = process.env.VTEX_WISHLIST_ENTITY || 'wishlist';
 const wishlistSchema = process.env.VTEX_WISHLIST_SCHEMA || 'wishlist';
@@ -226,27 +228,12 @@ function validateCardFields(card, document) {
   return '';
 }
 
-function paymentGatewayUrl(transactionBody, transactionId, orderGroup) {
-  const candidate = transactionBody?.receiverUri
-    || transactionBody?.merchantTransactions?.[0]?.receiverUri
-    || transactionBody?.merchantTransactions?.[0]?.payments?.[0]?.receiverUri;
-  const expectedHost = `${account}.vtexpayments.com.br`.toLowerCase();
-  if (candidate) {
-    const parsed = new URL(candidate);
-    const allowedHosts = new Set([expectedHost, 'api.vtexvault.com']);
-    if (parsed.protocol !== 'https:' || !allowedHosts.has(parsed.hostname.toLowerCase())) {
-      throw new Error('A VTEX retornou um endereço de pagamento inválido.');
-    }
-    if (parsed.hostname.toLowerCase() === 'api.vtexvault.com') {
-      if (!parsed.searchParams.has('an')) parsed.searchParams.set('an', account);
-      if (!parsed.searchParams.has('orderId')) parsed.searchParams.set('orderId', orderGroup);
-    }
-    return parsed.toString();
-  }
-  if (/^(vault|true)$/i.test(String(process.env.VTEX_PAYMENT_GATEWAY || ''))) {
-    return `${vtexVaultBaseUrl}/api/payments/transactions/${encodeURIComponent(transactionId)}/payments?an=${encodeURIComponent(account)}&orderId=${encodeURIComponent(orderGroup)}`;
-  }
-  return `${vtexPaymentsBaseUrl}/api/pub/transactions/${encodeURIComponent(transactionId)}/payments?orderId=${encodeURIComponent(orderGroup)}`;
+function paymentGatewayUrl(_transactionBody, transactionId) {
+  // A `receiverUri` returned by older Checkout responses can still point to
+  // the retired vtexpayments.com.br/split route. The current Send Payments
+  // endpoint is account-scoped and must be used for both regular and split
+  // marketplace transactions.
+  return `${vtexVaultBaseUrl}/api/payments/transactions/${encodeURIComponent(transactionId)}/payments`;
 }
 
 function extractPaymentApp(...bodies) {
@@ -770,8 +757,6 @@ app.post('/checkout/order', async (request, response) => {
     }
     console.info(`[CHECKOUT] transaction created -> payment=${kind} order=${orderGroup} transaction=${transactionId}`);
 
-    const paymentSystems = orderForm?.paymentData?.paymentSystems || [];
-    const paymentSystemInfo = paymentSystems.find((item) => String(item?.stringId ?? item?.id ?? '') === paymentSystem) || {};
     const transactionPayments = [
       ...(transactionBody?.paymentData?.payments || []),
       ...(transactionBody?.payments || []),
@@ -782,15 +767,6 @@ app.post('/checkout/order', async (request, response) => {
       || transactionBody?.merchantTransactions?.[0]?.payments?.[0]
       || {};
     const merchantSellerPayment = payment?.merchantSellerPayments?.[0] || {};
-    const merchantTransaction = transactionBody?.merchantTransactions?.find((item) =>
-      String(item?.id || '') === String(merchantSellerPayment?.id || '')
-      || item?.payments?.some((itemPayment) => String(itemPayment?.paymentSystem) === paymentSystem),
-    ) || transactionBody?.merchantTransactions?.[0] || {};
-    const paymentGroup = String(
-      paymentSystemInfo?.groupName
-        || paymentSystemInfo?.group
-        || (kind === 'pix' ? 'instantPaymentPaymentGroup' : 'creditCardPaymentGroup'),
-    );
     const installments = Number(merchantSellerPayment?.installments || payment?.installments || 1);
     const installmentsInterestRate = Number(merchantSellerPayment?.interestRate ?? payment?.installmentsInterestRate ?? 0);
     const installmentsValue = Number(merchantSellerPayment?.installmentValue ?? payment?.installmentsValue ?? payment?.value ?? orderValue);
@@ -798,9 +774,6 @@ app.post('/checkout/order', async (request, response) => {
     const paymentReferenceValue = Number(merchantSellerPayment?.referenceValue ?? payment?.referenceValue ?? orderValue);
     const paymentPayload = [{
       paymentSystem: normalizePaymentSystem(payment?.paymentSystem ?? paymentSystem),
-      paymentSystemName: String(paymentSystemInfo?.name || (kind === 'pix' ? 'Pix' : 'Cartão de crédito')),
-      group: paymentGroup,
-      groupName: paymentGroup,
       installments,
       currencyCode: 'BRL',
       value: paymentValue,
@@ -823,14 +796,10 @@ app.post('/checkout/order', async (request, response) => {
         chooseToUseNewCard: true,
         isRegexValid: true,
       } : {}),
-      id: merchantTransaction?.id || merchantSellerPayment?.id || payment?.id || '',
-      interestRate: installmentsInterestRate,
-      installmentValue: installmentsValue,
       transaction: {
-        id: merchantTransaction?.transactionId || transactionId,
-        merchantName: merchantTransaction?.merchantName || payment?.merchantName || account,
+        id: transactionId,
+        merchantName: account,
       },
-      originalPaymentIndex: 0,
     }];
 
     let paymentUrl;
