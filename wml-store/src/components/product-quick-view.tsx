@@ -10,7 +10,7 @@ import { addItemToCart, getOrderForm } from '@/services/cart';
 import { getProduct, type Product, type ProductKitGroup, type ProductVariant } from '@/services/catalog';
 import { buildVariationGroups } from '@/utils/product-variations';
 
-import { AddToCartFeedback } from './add-to-cart-feedback';
+import { AddedToCartModal, type AddedProductInfo } from './added-to-cart-modal';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -49,6 +49,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [localKitSelection, setLocalKitSelection] = useState<KitSelection>(emptyKitSelection);
   const [message, setMessage] = useState('');
+  const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -103,6 +104,13 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
     return groups.filter((group) => !currentKitSelection.checkedProducts[group.productId] || !currentKitSelection.selectedSizes[group.productId]);
   }
 
+  function showAddedModal(addedProduct: AddedProductInfo) {
+    setMessage('');
+    setAddedItem(addedProduct);
+    onAdded?.(details);
+    onClose();
+  }
+
   async function addSelectedProduct() {
     if (isKit) {
       if (loading || details.kitGroups.length === 0) {
@@ -129,8 +137,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
             quantity: selectedItem.amount,
           });
         }
-        setMessage('Conjunto adicionado à sacola.');
-        onAdded?.(details);
+        showAddedModal({ product: details, price: details.price });
       } catch {
         setMessage('Não foi possível adicionar o conjunto agora.');
       } finally {
@@ -156,8 +163,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
         itemId: selectedVariant.itemId,
         sellerId: selectedVariant.sellerId,
       });
-      setMessage('Produto adicionado à sacola.');
-      onAdded?.(details);
+      showAddedModal({ product: details, variant: selectedVariant, selectedOptions });
     } catch {
       setMessage('Não foi possível adicionar o produto agora.');
     } finally {
@@ -171,76 +177,86 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Pressable accessibilityLabel="Fechar visualização rápida" onPress={onClose} style={styles.dismissArea} />
-        <ThemedView style={styles.sheet}>
-          <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-            <View style={styles.header}>
-              <ThemedText numberOfLines={2} style={styles.title}>
-                {isKit ? <>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></> : details.name}
-              </ThemedText>
-              <Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.closeButton}>
-                <ThemedText style={styles.closeText}>✕</ThemedText>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-              {loading && <ActivityIndicator color="#0a0a0a" />}
-              {gallery.length > 0 && (
-                <FlatList
-                  data={gallery}
-                  horizontal
-                  nestedScrollEnabled
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(image, index) => `${image}-${index}`}
-                  contentContainerStyle={styles.gallery}
-                  snapToInterval={172}
-                  decelerationRate="fast"
-                  disableIntervalMomentum
-                  renderItem={({ item }) => <Image source={{ uri: item }} style={styles.image} contentFit="cover" />}
-                />
-              )}
-              {!isKit && (selectedVariant?.price ?? details.price) !== null && (
-                <ThemedText type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
-              )}
-              {isKit ? (
-                <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
-              ) : variationNames.map((name) => (
-                <View key={name} style={styles.variationGroup}>
-                  <ThemedText type="smallBold">
-                    {name}: <ThemedText>{selectedOptions[name] || `Escolha ${name.toLowerCase()}`}</ThemedText>
-                  </ThemedText>
-                  <View style={styles.options}>
-                    {variationGroups[name].map((value) => {
-                      const available = optionAvailable(name, value);
-                      const selected = selectedOptions[name] === value;
-                      return (
-                        <Pressable
-                          key={value}
-                          disabled={!available}
-                          accessibilityState={{ disabled: !available, selected }}
-                          onPress={() => { setMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }}
-                          style={[styles.option, selected && styles.selectedOption, !available && styles.unavailableOption]}>
-                          <ThemedText style={[selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
-                        </Pressable>
-                      );
-                    })}
+    <>
+      <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+        <View style={styles.backdrop}>
+          <Pressable accessibilityLabel="Fechar visualização rápida" onPress={onClose} style={styles.dismissArea} />
+          <ThemedView style={styles.sheet}>
+            <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+              <View style={styles.header}>
+                <ThemedText numberOfLines={2} style={styles.title}>
+                  {isKit ? <>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></> : details.name}
+                </ThemedText>
+                <Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.closeButton}>
+                  <ThemedText style={styles.closeText}>✕</ThemedText>
+                </Pressable>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+                {loading && <ActivityIndicator color="#0a0a0a" />}
+                {gallery.length > 0 && (
+                  <FlatList
+                    data={gallery}
+                    horizontal
+                    nestedScrollEnabled
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(image, index) => `${image}-${index}`}
+                    contentContainerStyle={styles.gallery}
+                    snapToInterval={172}
+                    decelerationRate="fast"
+                    disableIntervalMomentum
+                    renderItem={({ item }) => <Image source={{ uri: item }} style={styles.image} contentFit="cover" />}
+                  />
+                )}
+                {!isKit && (selectedVariant?.price ?? details.price) !== null && (
+                  <ThemedText type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
+                )}
+                {isKit ? (
+                  <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
+                ) : variationNames.map((name) => (
+                  <View key={name} style={styles.variationGroup}>
+                    <ThemedText type="smallBold">
+                      {name}: <ThemedText>{selectedOptions[name] || `Escolha ${name.toLowerCase()}`}</ThemedText>
+                    </ThemedText>
+                    <View style={styles.options}>
+                      {variationGroups[name].map((value) => {
+                        const available = optionAvailable(name, value);
+                        const selected = selectedOptions[name] === value;
+                        return (
+                          <Pressable
+                            key={value}
+                            disabled={!available}
+                            accessibilityState={{ disabled: !available, selected }}
+                            onPress={() => { setMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }}
+                            style={[styles.option, selected && styles.selectedOption, !available && styles.unavailableOption]}>
+                            <ThemedText style={[selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </View>
-                </View>
-              ))}
-              {!!message && !message.toLowerCase().includes('adicionad') && <ThemedText style={styles.messageText}>{message}</ThemedText>}
-              {!isKit && <Pressable onPress={openProduct} style={styles.productButton}>
-                <ThemedText type="smallBold">Ir para o produto</ThemedText>
-              </Pressable>}
-              <Pressable disabled={adding || (isKit && (loading || details.kitGroups.length === 0))} onPress={addSelectedProduct} style={styles.addButton}>
-                {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>}
-              </Pressable>
-            </ScrollView>
-            <AddToCartFeedback message={message} />
-          </SafeAreaView>
-        </ThemedView>
-      </View>
-    </Modal>
+                ))}
+                {!!message && !message.toLowerCase().includes('adicionad') && <ThemedText style={styles.messageText}>{message}</ThemedText>}
+                {!isKit && <Pressable onPress={openProduct} style={styles.productButton}>
+                  <ThemedText type="smallBold">Ir para o produto</ThemedText>
+                </Pressable>}
+                <Pressable disabled={adding || (isKit && (loading || details.kitGroups.length === 0))} onPress={addSelectedProduct} style={styles.addButton}>
+                  {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>}
+                </Pressable>
+              </ScrollView>
+            </SafeAreaView>
+          </ThemedView>
+        </View>
+      </Modal>
+      <AddedToCartModal
+        item={addedItem}
+        visible={Boolean(addedItem)}
+        onClose={() => setAddedItem(null)}
+        onViewCart={() => {
+          setAddedItem(null);
+          router.push('/checkout');
+        }}
+      />
+    </>
   );
 }
 

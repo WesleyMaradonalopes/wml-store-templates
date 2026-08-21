@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, Style
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
+import { AddedToCartModal, type AddedProductInfo } from '@/components/added-to-cart-modal';
 import { CartIconButton } from '@/components/cart-icon-button';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
@@ -83,6 +84,7 @@ export default function ProductScreen() {
   const [error, setError] = useState(false);
   const [adding, setAdding] = useState(false);
   const [cartMessage, setCartMessage] = useState<string | null>(null);
+  const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
@@ -182,6 +184,11 @@ export default function ProductScreen() {
     )) ?? false;
   }
 
+  function showCartFeedback(message: string) {
+    setCartMessage(null);
+    setTimeout(() => setCartMessage(message), 0);
+  }
+
   async function addProduct() {
     if (!product) return;
     if (product.isKit) {
@@ -208,7 +215,7 @@ export default function ProductScreen() {
             quantity: selectedItem.amount,
           });
         }
-        setCartMessage('Conjunto adicionado à sacola.');
+        setAddedItem({ product, price: product.price });
       } catch {
         setSelectionMessage('Não foi possível adicionar o conjunto.');
         setCartMessage(null);
@@ -242,7 +249,7 @@ export default function ProductScreen() {
     try {
       const orderForm = await getOrderForm();
       await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: activeVariant.itemId, sellerId: activeVariant.sellerId });
-      setCartMessage('Produto adicionado à sacola.');
+      setAddedItem({ product, variant: activeVariant, selectedOptions });
     } catch {
       setSelectionMessage('Não foi possível adicionar o produto.');
       setCartMessage(null);
@@ -462,7 +469,7 @@ export default function ProductScreen() {
               </Accordion>
 
               {lookLoading && <ActivityIndicator color="#0a0a0a" />}
-              {!lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} />}
+              {!lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onFeedback={showCartFeedback} />}
 
               <View style={styles.similarSection}>
                 <ThemedText type="subtitle">Produtos similares</ThemedText>
@@ -524,6 +531,15 @@ export default function ProductScreen() {
           onLogin={() => {
             setLoginModalVisible(false);
             router.push('/account?view=access' as never);
+          }}
+        />
+        <AddedToCartModal
+          item={addedItem}
+          visible={Boolean(addedItem)}
+          onClose={() => setAddedItem(null)}
+          onViewCart={() => {
+            setAddedItem(null);
+            router.push('/checkout');
           }}
         />
         <AddToCartFeedback message={cartMessage} />
@@ -639,7 +655,7 @@ function lookKitSizeOptions(group: ProductKitGroup) {
   }).filter((option) => option.itemId);
 }
 
-function CompleteLook({ products }: { products: Product[] }) {
+function CompleteLook({ products, onFeedback }: { products: Product[]; onFeedback: (message: string) => void }) {
   const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
   const [selectedKitSizes, setSelectedKitSizes] = useState<Record<string, Record<string, string>>>({});
   const [openSize, setOpenSize] = useState<string | null>(null);
@@ -712,7 +728,7 @@ function CompleteLook({ products }: { products: Product[] }) {
       } else if (item.selectedVariant) {
         orderForm = await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
       }
-      setMessage('Produto adicionado à sacola.');
+      onFeedback('Produto adicionado à sacola.');
     } catch {
       setMessage('Não foi possível adicionar o produto agora.');
     } finally {
@@ -744,7 +760,7 @@ function CompleteLook({ products }: { products: Product[] }) {
           orderForm = await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
         }
       }
-      setMessage('Produtos adicionados à sacola.');
+      onFeedback('Produtos adicionados à sacola.');
     } catch {
       setMessage('Não foi possível adicionar o conjunto agora.');
     } finally {
@@ -810,7 +826,7 @@ function CompleteLook({ products }: { products: Product[] }) {
           {buyingTogether ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold">Comprar junto</ThemedText>}
         </Pressable>
       </View>
-      {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
+      {!!message && <ThemedText style={styles.messageText}>{message}</ThemedText>}
     </View>
   );
 }
@@ -945,7 +961,6 @@ const styles = StyleSheet.create({
   mainAddButtonHidden: { display: 'none' },
   mainAddText: { color: '#FFFFFF', fontWeight: '700' },
   disabled: { opacity: 0.45 },
-  successText: { color: '#26734d', fontWeight: '600' },
   messageText: { color: '#B42318' },
   helperButtons: { flexDirection: 'row', gap: Spacing.two },
   helperButton: { flex: 1, minHeight: 44, paddingHorizontal: Spacing.two, borderRadius: 8, borderWidth: 1, borderColor: '#bdb6ad', flexDirection: 'row', gap: Spacing.one, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
