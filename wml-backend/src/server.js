@@ -52,8 +52,9 @@ function checkoutHeaders(userToken = '', contentType = false, cookie = '') {
     headers.VtexIdclientAutCookie = userToken;
     cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
-  if (cookie) cookies.push(cookie);
-  if (cookies.length) headers.Cookie = cookies.join('; ');
+  const sessionCookie = sessionCookieForToken(userToken);
+  const cookieHeader = mergeCookieHeaders(cookies.join('; '), sessionCookie, cookie);
+  if (cookieHeader) headers.Cookie = cookieHeader;
   return headers;
 }
 
@@ -65,8 +66,9 @@ function publicCheckoutHeaders(userToken = '', contentType = false, cookie = '')
     headers.VtexIdclientAutCookie = userToken;
     cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
-  if (cookie) cookies.push(cookie);
-  if (cookies.length) headers.Cookie = cookies.join('; ');
+  const sessionCookie = sessionCookieForToken(userToken);
+  const cookieHeader = mergeCookieHeaders(cookies.join('; '), sessionCookie, cookie);
+  if (cookieHeader) headers.Cookie = cookieHeader;
   return headers;
 }
 
@@ -289,6 +291,31 @@ function normalizeCookieHeader(raw) {
 function tokenFromCookie(cookieHeader) {
   const match = String(cookieHeader || '').match(/VtexIdclientAutCookie(?:_[^=]+)?=([^;]+)/i);
   return match?.[1] || '';
+}
+
+function mergeCookieHeaders(...values) {
+  const cookies = new Map();
+  for (const value of values) {
+    for (const part of String(value || '').split(';')) {
+      const separator = part.indexOf('=');
+      if (separator <= 0) continue;
+      const name = part.slice(0, separator).trim();
+      const cookieValue = part.slice(separator + 1).trim();
+      if (name && cookieValue) cookies.set(name, `${name}=${cookieValue}`);
+    }
+  }
+  return [...cookies.values()].join('; ');
+}
+
+function sessionCookieForToken(token = '') {
+  const requestedToken = String(token || '').trim();
+  if (!requestedToken) return '';
+  for (const stored of customerVtexSessions.values()) {
+    if (stored?.authToken === requestedToken || tokenFromCookie(stored?.cookieHeader) === requestedToken) {
+      return stored?.cookieHeader || '';
+    }
+  }
+  return '';
 }
 
 function sessionHeaders(email, token = '') {
@@ -735,7 +762,8 @@ app.post('/checkout/order', async (request, response) => {
         `[CHECKOUT] transaction rejected -> HTTP ${transactionResult.status}`
           + ` code=${transactionErrorCode || 'unknown'}`
           + ` recaptcha=${Boolean(requestedRecaptchaKey)}`
-          + ` tokenSent=${Boolean(transactionPayload.recaptchaToken)}`,
+          + ` tokenSent=${Boolean(transactionPayload.recaptchaToken)}`
+          + ` sessionCookie=${Boolean(sessionCookieForToken(userToken))}`,
       );
       return response.status(502).json({
         ok: false,
