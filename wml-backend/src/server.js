@@ -206,9 +206,12 @@ function paymentSystemKind(orderForm, paymentSystem, requestedKind) {
     ...(orderForm?.paymentData?.payments || []),
   ].find((item) => String(item.stringId ?? item.id ?? item.paymentSystem ?? '') === String(paymentSystem));
   const label = `${system?.name || ''} ${system?.groupName || ''} ${system?.group || ''}`.toLowerCase();
-  if (label.includes('pix') || label.includes('instant')) return 'pix';
-  if (label.includes('cart') || label.includes('card') || label.includes('credit')) return 'card';
-  return requested === 'pix' || requested === 'card' ? requested : '';
+  const compactLabel = label.replace(/[\s_-]/g, '');
+  if (compactLabel.includes('giftcard') || label.includes('vale-presente') || label.includes('vale presente') || label.includes('voucher')) return 'giftcard';
+  if (label.includes('pix') || compactLabel.includes('instantpayment')) return 'pix';
+  if (compactLabel.includes('creditcard') || label.includes('cartão de crédito') || label.includes('cartao de credito') || label.includes('credit card')) return 'card';
+  if (!system) return requested === 'pix' || requested === 'card' ? requested : '';
+  return '';
 }
 
 function buildPaymentFields({ kind, card, document, address, accountId = '', bin = '' }) {
@@ -727,6 +730,10 @@ app.post('/checkout/order', async (request, response) => {
     if (!kind) {
       return response.status(400).json({ ok: false, message: 'Não foi possível identificar a forma de pagamento.' });
     }
+    if (kind === 'giftcard') {
+      return response.status(400).json({ ok: false, message: 'O vale-presente deve ser aplicado no carrinho antes de finalizar o pedido.' });
+    }
+    console.info(`[CHECKOUT] payment selected -> id=${paymentSystem} kind=${kind}`);
     const document = String(request.body?.document || '');
     if (kind === 'card') {
       const cardError = validateCardFields(request.body?.card, document);

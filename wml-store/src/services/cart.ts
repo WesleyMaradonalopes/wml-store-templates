@@ -69,7 +69,7 @@ export type OrderForm = {
     }>;
   };
   paymentData?: {
-    paymentSystems: Array<{ id: string; name: string; group: string }>;
+    paymentSystems: Array<{ id: string; stringId: string; name: string; group: string }>;
   };
 };
 
@@ -164,7 +164,7 @@ type VtexOrderForm = {
     }>;
   };
   paymentData?: {
-    paymentSystems?: Array<{ id?: string; name?: string; groupName?: string }>;
+    paymentSystems?: Array<{ id?: string | number; stringId?: string | null; name?: string; groupName?: string }>;
   };
 };
 
@@ -253,7 +253,8 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
     },
     paymentData: {
       paymentSystems: (orderForm.paymentData?.paymentSystems ?? []).map((system) => ({
-        id: system.id ?? '',
+        id: String(system.stringId ?? system.id ?? '').trim(),
+        stringId: String(system.stringId ?? '').trim(),
         name: system.name ?? '',
         group: system.groupName ?? '',
       })),
