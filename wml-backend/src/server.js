@@ -81,9 +81,13 @@ async function requestCheckout(url, {
   fallbackToAppAuth = false,
   singleAttempt = false,
   } = {}) {
+  // O login é mantido somente no backend. Quando o token recebido do app
+  // corresponde a uma sessão armazenada, encaminhamos o cookie completo nas
+  // tentativas desta chamada sem expô-lo ao cliente.
+  const requestCookie = mergeCookieHeaders(sessionCookieForToken(userToken), cookie);
   const init = {
     method,
-    headers: publicCheckoutHeaders(userToken, contentType, cookie),
+    headers: publicCheckoutHeaders(userToken, contentType, requestCookie),
     ...(body === undefined ? {} : { body }),
   };
   let result = await fetch(url, init);
@@ -94,14 +98,19 @@ async function requestCheckout(url, {
   if (!singleAttempt && !result.ok && result.status === 401 && userToken) {
     result = await fetch(url, {
       ...init,
-      headers: publicCheckoutHeaders('', contentType, cookie),
+      headers: publicCheckoutHeaders('', contentType, requestCookie),
     });
     fallbackUserToken = '';
   }
-  if (!singleAttempt && !result.ok && [401, 403].includes(result.status) && fallbackToAppAuth && hasVtexPaymentCredentials()) {
+  // Para chamadas com token reCAPTCHA de uso único, um 403 não pode gerar
+  // uma segunda tentativa. Um 401, porém, indica rejeição da identidade e
+  // pode usar a autenticação segura do backend uma única vez.
+  const canFallbackToAppAuth = !singleAttempt || result.status === 401;
+  if (canFallbackToAppAuth && !result.ok && [401, 403].includes(result.status) && fallbackToAppAuth && hasVtexPaymentCredentials()) {
+    const appAuthUserToken = singleAttempt ? '' : fallbackUserToken;
     result = await fetch(url, {
       ...init,
-      headers: checkoutHeaders(fallbackUserToken, contentType, cookie),
+      headers: checkoutHeaders(appAuthUserToken, contentType, requestCookie),
     });
   }
   return result;
@@ -747,9 +756,11 @@ app.post('/checkout/order', async (request, response) => {
         // Guests still make a public request because userToken is empty.
         userToken,
         contentType: true,
-        // PIX pode refazer apenas a autenticação porque não carrega token de
-        // uso único. Cartão deve fazer exatamente uma chamada por token.
-        fallbackToAppAuth: kind === 'pix',
+        // A primeira tentativa preserva a sessão do cliente. Se a VTEX
+        // rejeitar essa identidade com 401, o backend tenta uma única vez
+        // usando suas credenciais protegidas. Um 403 não é repetido para não
+        // reutilizar o token reCAPTCHA de uso único.
+        fallbackToAppAuth: true,
         singleAttempt: kind === 'card',
         body: JSON.stringify(transactionPayload),
       },
@@ -763,7 +774,8 @@ app.post('/checkout/order', async (request, response) => {
           + ` code=${transactionErrorCode || 'unknown'}`
           + ` recaptcha=${Boolean(requestedRecaptchaKey)}`
           + ` tokenSent=${Boolean(transactionPayload.recaptchaToken)}`
-          + ` sessionCookie=${Boolean(sessionCookieForToken(userToken))}`,
+          + ` sessionCookie=${Boolean(sessionCookieForToken(userToken))}`
+          + ` appAuthConfigured=${hasVtexPaymentCredentials()}`,
       );
       return response.status(502).json({
         ok: false,
