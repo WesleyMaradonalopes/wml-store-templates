@@ -35,6 +35,20 @@ export type PickupStoreInfo = {
   address?: ShippingAddress;
 };
 
+export type InstallmentChoice = {
+  count: number;
+  hasInterestRate: boolean;
+  interestRate: number;
+  value: number;
+  total: number;
+};
+
+export type InstallmentOption = {
+  paymentSystem: string;
+  value: number;
+  installments: InstallmentChoice[];
+};
+
 export type OrderForm = {
   orderFormId: string;
   value: number;
@@ -76,6 +90,7 @@ export type OrderForm = {
       group: string;
       validator?: { regex?: string };
     }>;
+    installmentOptions?: InstallmentOption[];
   };
 };
 
@@ -177,7 +192,22 @@ type VtexOrderForm = {
       groupName?: string;
       validator?: { regex?: string | null } | null;
     }>;
+    installmentOptions?: VtexInstallmentOption[];
   };
+};
+
+type VtexInstallment = {
+  count?: number;
+  hasInterestRate?: boolean;
+  interestRate?: number;
+  value?: number;
+  total?: number;
+};
+
+type VtexInstallmentOption = {
+  paymentSystem?: string | number | null;
+  value?: number;
+  installments?: VtexInstallment[];
 };
 
 type VtexShippingAddress = Omit<ShippingAddress, 'number'> & {
@@ -208,6 +238,20 @@ function normalizePickupStoreInfo(info?: VtexPickupStoreInfo): PickupStoreInfo |
     friendlyName: info.friendlyName,
     additionalInfo: info.additionalInfo,
     address: normalizeShippingAddress(info.address),
+  };
+}
+
+function normalizeInstallmentOption(option?: VtexInstallmentOption | null): InstallmentOption {
+  return {
+    paymentSystem: String(option?.paymentSystem ?? '').trim(),
+    value: (option?.value ?? 0) / 100,
+    installments: (option?.installments ?? []).map((installment) => ({
+      count: Number(installment.count ?? 1),
+      hasInterestRate: Boolean(installment.hasInterestRate),
+      interestRate: Number(installment.interestRate ?? 0),
+      value: (installment.value ?? 0) / 100,
+      total: (installment.total ?? installment.value ?? 0) / 100,
+    })).filter((installment) => installment.count > 0 && installment.value > 0),
   };
 }
 
@@ -271,6 +315,7 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
         group: system.groupName ?? '',
         validator: { regex: String(system.validator?.regex ?? '').trim() },
       })),
+      installmentOptions: (orderForm.paymentData?.installmentOptions ?? []).map(normalizeInstallmentOption),
     },
   };
 }
@@ -419,10 +464,14 @@ export async function selectPaymentMethod({
   orderFormId,
   paymentSystem,
   value,
+  installments = 1,
+  installmentsInterestRate = 0,
 }: {
   orderFormId: string;
   paymentSystem: string;
   value: number;
+  installments?: number;
+  installmentsInterestRate?: number;
 }): Promise<OrderForm> {
   const response = await checkoutFetch(
     `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${orderFormId}/attachments/paymentData`,
@@ -430,7 +479,13 @@ export async function selectPaymentMethod({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        payments: [{ paymentSystem, referenceValue: Math.round(value * 100), value: Math.round(value * 100), installments: 1 }],
+        payments: [{
+          paymentSystem,
+          referenceValue: Math.round(value * 100),
+          value: Math.round(value * 100),
+          installments: Math.max(1, Math.round(installments)),
+          installmentsInterestRate: Number(installmentsInterestRate || 0),
+        }],
       }),
     },
   );
@@ -439,6 +494,19 @@ export async function selectPaymentMethod({
   const orderForm = (await response.json()) as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   return normalizeOrderForm(orderForm);
+}
+
+export async function getPaymentInstallments({ orderFormId, paymentSystem }: { orderFormId: string; paymentSystem: string }): Promise<InstallmentChoice[]> {
+  const response = await checkoutFetch(
+    `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/installments?paymentSystem=${encodeURIComponent(paymentSystem)}`,
+  );
+  if (!response.ok) throw new Error(`Unable to load payment installments: ${response.status}`);
+  const payload = await response.json() as VtexInstallmentOption | VtexInstallmentOption[];
+  const options = Array.isArray(payload) ? payload : [payload];
+  const normalizedOptions = options.map(normalizeInstallmentOption);
+  return normalizedOptions.find((option) => option.paymentSystem === String(paymentSystem))?.installments
+    ?? normalizedOptions[0]?.installments
+    ?? [];
 }
 
 async function loadOrderForm(orderFormId?: string): Promise<OrderForm> {
