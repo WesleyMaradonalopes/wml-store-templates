@@ -90,9 +90,10 @@ function formatExpiry(value: string) {
   return valueDigits.length > 2 ? valueDigits.slice(0, 2) + '/' + valueDigits.slice(2) : valueDigits;
 }
 function isShippingStep(step: Step) { return step === 'shipping'; }
-function isPickupOption(sla: ShippingOption) { return sla.deliveryChannel === 'pickup-in-point' || sla.isPickupInPoint === true; }
-function shippingOptionId(sla: ShippingOption) { return sla.id || sla.name; }
-function shippingOptionKey(sla: ShippingOption) {
+function isPickupOption(sla?: ShippingOption | null) { return sla?.deliveryChannel === 'pickup-in-point' || sla?.isPickupInPoint === true; }
+function shippingOptionId(sla?: ShippingOption | null) { return sla?.id || sla?.name || ''; }
+function shippingOptionKey(sla?: ShippingOption | null) {
+  if (!sla) return '';
   const pickupKey = isPickupOption(sla)
     ? sla.pickupPointId || sla.pickupStoreInfo?.address?.addressId || ''
     : '';
@@ -171,7 +172,8 @@ function deliveryEstimate(estimate: string) {
 function getShippingOptions(orderForm: OrderForm): ShippingOption[] {
   const options = new Map<string, ShippingOption>();
   for (const info of orderForm.shippingData?.logisticsInfo ?? []) {
-    for (const sla of info.slas) {
+    for (const sla of info.slas ?? []) {
+      if (!sla) continue;
       const key = shippingOptionKey(sla);
       const existing = options.get(key);
       if (existing) {
@@ -190,7 +192,7 @@ function getDefaultShippingOptionId(orderForm: OrderForm, options = getShippingO
   const current = orderForm.shippingData?.logisticsInfo.find((info) => info.selectedSla)?.selectedSla;
   if (current && options.some((option) => shippingOptionId(option) === current)) return current;
   const firstDelivery = options.find((option) => !isPickupOption(option));
-  return shippingOptionId(firstDelivery || options[0]) || '';
+  return shippingOptionId(firstDelivery ?? options[0]);
 }
 
 function getShippingSelectionId(orderForm: OrderForm, options: ShippingOption[], selectedId?: string | null) {
@@ -774,7 +776,7 @@ export default function CheckoutScreen() {
 
   const slas = getShippingOptions(orderForm);
   const selectedShippingId = getShippingSelectionId(orderForm, slas, selectedSla);
-  const selectedShipping = slas.find((sla) => (sla.id || sla.name) === selectedShippingId);
+  const selectedShipping = slas.find((sla) => shippingOptionId(sla) === selectedShippingId);
   const deliveryOptions = slas.filter((sla) => !isPickupOption(sla));
   const pickupOptions = slas.filter(isPickupOption);
   const selectedPickup = pickupOptions.find((sla) => shippingOptionId(sla) === selectedShippingId);

@@ -714,11 +714,11 @@ app.post('/checkout/order', async (request, response) => {
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/transaction`,
       {
         method: 'POST',
-        // PIX não exige reCAPTCHA e precisa conservar a identidade que já era
-        // usada pelo orderForm; removê-la faz a VTEX responder ORD062. Para
-        // cartão mantemos a chamada pública, como no app-test-one, evitando
-        // que um cookie expirado bloqueie a validação antes do reCAPTCHA.
-        userToken: kind === 'pix' ? userToken : '',
+        // Preserve the authenticated VTEX identity for both payment types.
+        // A logged-in customer may be using a newly entered address; removing
+        // the token makes Checkout reject the transaction with a login error.
+        // Guests still make a public request because userToken is empty.
+        userToken,
         contentType: true,
         // PIX pode refazer apenas a autenticação porque não carrega token de
         // uso único. Cartão deve fazer exatamente uma chamada por token.
