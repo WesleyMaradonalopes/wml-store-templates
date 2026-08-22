@@ -172,15 +172,30 @@ function normalizePaymentSystem(value) {
   return /^\d+$/.test(stringValue) ? Number(stringValue) : stringValue;
 }
 
-function paymentSystemMatches(orderForm, paymentSystem) {
+function paymentSystemEntry(orderForm, paymentSystem) {
   const requested = String(paymentSystem);
   const systems = [
     ...(orderForm?.paymentData?.paymentSystems || []),
     ...(orderForm?.paymentData?.payments || []),
   ];
-  return systems.some((system) => String(
+  return systems.find((system) => String(
     system.stringId ?? system.id ?? system.paymentSystem ?? '',
   ) === requested);
+}
+
+function paymentSystemMatches(orderForm, paymentSystem) {
+  return Boolean(paymentSystemEntry(orderForm, paymentSystem));
+}
+
+function paymentSystemMatchesCardNumber(orderForm, paymentSystem, cardNumber) {
+  const system = paymentSystemEntry(orderForm, paymentSystem);
+  const expression = String(system?.validator?.regex || '').trim();
+  if (!expression) return true;
+  try {
+    return new RegExp(expression).test(digits(cardNumber));
+  } catch {
+    return false;
+  }
 }
 
 function normalizeAddress(address) {
@@ -201,10 +216,7 @@ function normalizeAddress(address) {
 
 function paymentSystemKind(orderForm, paymentSystem, requestedKind) {
   const requested = String(requestedKind || '').toLowerCase();
-  const system = [
-    ...(orderForm?.paymentData?.paymentSystems || []),
-    ...(orderForm?.paymentData?.payments || []),
-  ].find((item) => String(item.stringId ?? item.id ?? item.paymentSystem ?? '') === String(paymentSystem));
+  const system = paymentSystemEntry(orderForm, paymentSystem);
   const label = `${system?.name || ''} ${system?.groupName || ''} ${system?.group || ''}`.toLowerCase();
   const compactLabel = label.replace(/[\s_-]/g, '');
   if (compactLabel.includes('giftcard') || label.includes('vale-presente') || label.includes('vale presente') || label.includes('voucher')) return 'giftcard';
@@ -733,11 +745,18 @@ app.post('/checkout/order', async (request, response) => {
     if (kind === 'giftcard') {
       return response.status(400).json({ ok: false, message: 'O vale-presente deve ser aplicado no carrinho antes de finalizar o pedido.' });
     }
-    console.info(`[CHECKOUT] payment selected -> id=${paymentSystem} kind=${kind}`);
+    const paymentSystemName = String(paymentSystemEntry(orderForm, paymentSystem)?.name || '').trim();
+    console.info(`[CHECKOUT] payment selected -> id=${paymentSystem} name=${paymentSystemName || 'unknown'} kind=${kind}`);
     const document = String(request.body?.document || '');
     if (kind === 'card') {
       const cardError = validateCardFields(request.body?.card, document);
       if (cardError) return response.status(400).json({ ok: false, message: cardError });
+      if (!paymentSystemMatchesCardNumber(orderForm, paymentSystem, request.body?.card?.cardNumber)) {
+        return response.status(400).json({
+          ok: false,
+          message: 'A bandeira do cartão não corresponde à forma de pagamento selecionada. Revise o número do cartão.',
+        });
+      }
     }
 
     const transactionPayload = {

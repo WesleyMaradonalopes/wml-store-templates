@@ -24,6 +24,7 @@ import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrde
 type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'review';
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
 type ShippingOption = NonNullable<OrderForm['shippingData']>['logisticsInfo'][number]['slas'][number];
+type PaymentMethod = NonNullable<OrderForm['paymentData']>['paymentSystems'][number];
 
 const DEFAULT_WEB_RECAPTCHA_SITE_KEY = '6LfYDiAqAAAAAPmcjgLXQkKD_sP131cQECisZO27';
 const WEB_RECAPTCHA_SITE_KEY = String(
@@ -119,18 +120,64 @@ function pickupAddressLines(option: ShippingOption) {
     address.postalCode ? 'CEP: ' + address.postalCode : '',
   ].filter(Boolean);
 }
-function isGiftCardPayment(method: { name: string; group: string }) {
+function isGiftCardPayment(method: PaymentMethod) {
   const text = `${method.name} ${method.group}`.toLowerCase();
   return text.includes('giftcard') || text.includes('gift card') || text.includes('vale-presente') || text.includes('vale presente') || text.includes('voucher');
 }
-function isCardPayment(method: { name: string; group: string }) {
+function isCardPayment(method: PaymentMethod) {
   if (isGiftCardPayment(method)) return false;
   const text = `${method.name} ${method.group}`.toLowerCase();
   const group = method.group.toLowerCase().replace(/[\s_-]/g, '');
   return group.includes('creditcard') || text.includes('cartão de crédito') || text.includes('cartao de credito') || text.includes('credit card');
 }
-function isPixPayment(method: { name: string; group: string }) {
+function isPixPayment(method: PaymentMethod) {
   return (method.name + ' ' + method.group).toLowerCase().includes('pix');
+}
+type CardBrand = 'visa' | 'mastercard' | 'amex' | 'elo' | 'hipercard';
+
+function cardBrandFromNumber(value: string): CardBrand | '' {
+  const cardNumber = digits(value);
+  if (/^4/.test(cardNumber)) return 'visa';
+  if (/^5[1-5]/.test(cardNumber)) return 'mastercard';
+  if (/^\d{4}$/.test(cardNumber.slice(0, 4))) {
+    const prefix = Number(cardNumber.slice(0, 4));
+    if (prefix >= 2221 && prefix <= 2720) return 'mastercard';
+  }
+  if (/^3[47]/.test(cardNumber)) return 'amex';
+  if (/^(606282|637095|637568|637599)/.test(cardNumber)) return 'hipercard';
+  return '';
+}
+
+function paymentMethodMatchesBrand(method: PaymentMethod, brand: CardBrand) {
+  const label = `${method.name} ${method.group}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (brand === 'visa') return label.includes('visa');
+  if (brand === 'mastercard') return label.includes('mastercard') || label.includes('master card') || label.includes('master');
+  if (brand === 'amex') return label.includes('american express') || label.includes('amex');
+  if (brand === 'elo') return label.includes('elo');
+  return label.includes('hipercard') || label.includes('hiper card');
+}
+
+function paymentMethodMatchesValidator(method: PaymentMethod, cardNumber: string) {
+  const expression = method.validator?.regex?.trim();
+  if (!expression) return false;
+  try {
+    return new RegExp(expression).test(digits(cardNumber));
+  } catch {
+    return false;
+  }
+}
+
+function cardPaymentMethodForNumber(methods: PaymentMethod[], cardNumber: string) {
+  const candidates = methods.filter(isCardPayment);
+  if (candidates.length === 0) return null;
+  if (!digits(cardNumber)) return candidates[0];
+
+  const validatorMatch = candidates.find((method) => paymentMethodMatchesValidator(method, cardNumber));
+  if (validatorMatch) return validatorMatch;
+
+  const brand = cardBrandFromNumber(cardNumber);
+  if (brand) return candidates.find((method) => paymentMethodMatchesBrand(method, brand)) || null;
+  return candidates.length === 1 ? candidates[0] : null;
 }
 type ParsedPixPayment = {
   code: string;
@@ -232,7 +279,6 @@ export default function CheckoutScreen() {
   const [pickupSelectionOpen, setPickupSelectionOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
   const [selectedPaymentLabel, setSelectedPaymentLabel] = useState('');
-  const [cardPaymentSystem, setCardPaymentSystem] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -522,8 +568,7 @@ export default function CheckoutScreen() {
     }
   }
 
-  function openCardPayment(method: { id: string; name: string }) {
-    setCardPaymentSystem(method.id);
+  function openCardPayment(method: PaymentMethod) {
     setSelectedPayment(method.id);
     setSelectedPaymentLabel(method.name || 'Cartão de crédito');
     setCardValidationAttempted(false);
@@ -561,7 +606,12 @@ export default function CheckoutScreen() {
   function continueWithCard() {
     setCardValidationAttempted(true);
     if (Object.values(getCardErrors()).some(Boolean)) return;
-    const paymentSystem = cardPaymentSystem.trim();
+    const selectedCardMethod = cardPaymentMethodForNumber(orderForm?.paymentData?.paymentSystems ?? [], cardNumber);
+    if (!selectedCardMethod) {
+      setMessage('Não foi possível identificar uma forma de pagamento compatível com a bandeira deste cartão.');
+      return;
+    }
+    const paymentSystem = selectedCardMethod.id.trim();
     if (!paymentSystem) {
       setMessage('Cartão de crédito não está disponível para este carrinho.');
       return;

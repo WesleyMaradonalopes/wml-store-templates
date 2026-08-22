@@ -69,7 +69,13 @@ export type OrderForm = {
     }>;
   };
   paymentData?: {
-    paymentSystems: Array<{ id: string; stringId: string; name: string; group: string }>;
+    paymentSystems: Array<{
+      id: string;
+      stringId: string;
+      name: string;
+      group: string;
+      validator?: { regex?: string };
+    }>;
   };
 };
 
@@ -164,7 +170,13 @@ type VtexOrderForm = {
     }>;
   };
   paymentData?: {
-    paymentSystems?: Array<{ id?: string | number; stringId?: string | null; name?: string; groupName?: string }>;
+    paymentSystems?: Array<{
+      id?: string | number;
+      stringId?: string | null;
+      name?: string;
+      groupName?: string;
+      validator?: { regex?: string | null } | null;
+    }>;
   };
 };
 
@@ -257,6 +269,7 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
         stringId: String(system.stringId ?? '').trim(),
         name: system.name ?? '',
         group: system.groupName ?? '',
+        validator: { regex: String(system.validator?.regex ?? '').trim() },
       })),
     },
   };
