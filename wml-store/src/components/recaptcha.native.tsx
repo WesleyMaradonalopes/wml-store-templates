@@ -1,14 +1,14 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { NativeModules, Platform, StyleSheet, View } from 'react-native';
-import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { executeAction, initializeRecaptcha } from 'react-native-recaptcha-enterprise';
+import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { storeConfig } from '@/config/store';
 import type { RecaptchaHandle, RecaptchaProps } from './recaptcha';
 
 // Site keys are public and can be bundled in the app. Google API keys and
 // client secrets must remain on the server/VTEX configuration.
-const DEFAULT_WEB_SITE_KEY = '6LeYIh0qAAAAANOiLphZJNLG5JTHhBZHUPkhJfZU';
+const DEFAULT_WEB_SITE_KEY = '6LfYDiAqAAAAAPmcjgLXQkKD_sP131cQECisZO27';
 const configuredWebSiteKey = String(
   process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || DEFAULT_WEB_SITE_KEY,
 ).trim();

@@ -1,5 +1,5 @@
-import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
@@ -25,7 +25,7 @@ type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' |
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
 type ShippingOption = NonNullable<OrderForm['shippingData']>['logisticsInfo'][number]['slas'][number];
 
-const DEFAULT_WEB_RECAPTCHA_SITE_KEY = '6LeYIh0qAAAAANOiLphZJNLG5JTHhBZHUPkhJfZU';
+const DEFAULT_WEB_RECAPTCHA_SITE_KEY = '6LfYDiAqAAAAAPmcjgLXQkKD_sP131cQECisZO27';
 const WEB_RECAPTCHA_SITE_KEY = String(
   process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_SITE_KEY || DEFAULT_WEB_RECAPTCHA_SITE_KEY,
 ).trim();
