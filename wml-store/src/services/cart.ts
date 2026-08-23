@@ -55,6 +55,9 @@ export type OrderForm = {
   items: CartItem[];
   recaptchaKey?: string;
   recaptchaKeyV3?: string;
+  marketingData?: {
+    coupon?: string;
+  };
   clientProfileData?: {
     email?: string;
     firstName?: string;
@@ -156,6 +159,9 @@ type VtexOrderForm = {
   value?: number;
   recaptchaKey?: string;
   recaptchaKeyV3?: string;
+  marketingData?: {
+    coupon?: string | null;
+  };
   items?: Array<{
     seller?: string;
     id?: string;
@@ -278,6 +284,9 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
     value: (orderForm.value ?? 0) / 100,
     recaptchaKey: orderForm.recaptchaKey,
     recaptchaKeyV3: orderForm.recaptchaKeyV3,
+    marketingData: orderForm.marketingData
+      ? { coupon: orderForm.marketingData.coupon ?? undefined }
+      : undefined,
     items: (orderForm.items ?? []).map((item, index) => ({
       index,
       id: item.id ?? '',
@@ -672,6 +681,10 @@ export async function addCouponToCart(orderFormId: string, coupon: string): Prom
   const orderForm = await response.json() as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   return normalizeOrderForm(orderForm);
+}
+
+export async function removeCouponFromCart(orderFormId: string): Promise<OrderForm> {
+  return addCouponToCart(orderFormId, '');
 }
 
 export async function addGiftCardToCart(orderFormId: string, redemptionCode: string): Promise<OrderForm> {

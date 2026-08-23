@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, getPaymentInstallments, OrderForm, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type InstallmentChoice } from '@/services/cart';
+import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, getPaymentInstallments, OrderForm, removeCouponFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
@@ -318,6 +318,10 @@ export default function CheckoutScreen() {
   const [customerValidationAttempted, setCustomerValidationAttempted] = useState(false);
   const [addressValidationAttempted, setAddressValidationAttempted] = useState(false);
   const [coupon, setCoupon] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponMessage, setCouponMessage] = useState('');
+  const [couponMessageType, setCouponMessageType] = useState<'success' | 'error' | null>(null);
   const [voucher, setVoucher] = useState('');
   const [voucherOpen, setVoucherOpen] = useState(false);
   const [voucherApplied, setVoucherApplied] = useState(false);
@@ -334,9 +338,34 @@ export default function CheckoutScreen() {
   const [orderResult, setOrderResult] = useState<CheckoutOrderResult | null>(null);
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState(CONFIGURED_RECAPTCHA_SITE_KEY);
   const recaptchaRef = useRef<RecaptchaHandle>(null);
+  const couponMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newsletterOptInTouched = useRef(false);
   const genders = ['Feminino', 'Masculino', 'Prefiro não informar', 'Outro'];
   const customerDataRequests = useRef(new Map<string, Promise<CustomerCheckoutData>>()).current;
+
+  function clearCouponMessage() {
+    if (couponMessageTimeoutRef.current) {
+      clearTimeout(couponMessageTimeoutRef.current);
+      couponMessageTimeoutRef.current = null;
+    }
+    setCouponMessage('');
+    setCouponMessageType(null);
+  }
+
+  function showCouponMessage(text: string, type: 'success' | 'error') {
+    if (couponMessageTimeoutRef.current) clearTimeout(couponMessageTimeoutRef.current);
+    setCouponMessage(text);
+    setCouponMessageType(type);
+    couponMessageTimeoutRef.current = setTimeout(() => {
+      setCouponMessage('');
+      setCouponMessageType(null);
+      couponMessageTimeoutRef.current = null;
+    }, 2000);
+  }
+
+  useEffect(() => () => {
+    if (couponMessageTimeoutRef.current) clearTimeout(couponMessageTimeoutRef.current);
+  }, []);
 
   function loadCustomerData(customerEmail: string) {
     const key = customerEmail.trim().toLowerCase();
@@ -355,6 +384,10 @@ export default function CheckoutScreen() {
     Promise.all([getOrderForm(), getAccountSession()]).then(async ([value, session]) => {
       if (!active) return;
       setOrderForm(value);
+      const existingCoupon = value.marketingData?.coupon?.trim() ?? '';
+      setCoupon(existingCoupon.toUpperCase());
+      setCouponApplied(Boolean(existingCoupon));
+      clearCouponMessage();
       const loggedEmail = session?.email?.trim().toLowerCase() ?? '';
       setEmail(loggedEmail);
       newsletterOptInTouched.current = false;
@@ -830,14 +863,45 @@ export default function CheckoutScreen() {
   }
 
   async function applyCoupon() {
-    if (!orderForm || !coupon.trim()) return;
+    const couponCode = coupon.trim();
+    if (!orderForm || !couponCode) return;
     setSaving(true);
+    setCouponLoading(true);
+    clearCouponMessage();
     try {
-      setOrderForm(await addCouponToCart(orderForm.orderFormId, coupon.trim()));
-      setMessage('Cupom aplicado.');
+      const updatedOrderForm = await addCouponToCart(orderForm.orderFormId, couponCode);
+      setOrderForm(updatedOrderForm);
+      const appliedCoupon = updatedOrderForm.marketingData?.coupon?.trim() ?? '';
+      if (!appliedCoupon || appliedCoupon.toLowerCase() !== couponCode.toLowerCase()) {
+        setCouponApplied(false);
+        showCouponMessage('Cupom inválido.', 'error');
+        return;
+      }
+      setCoupon(appliedCoupon.toUpperCase());
+      setCouponApplied(true);
+      showCouponMessage('Cupom aplicado!', 'success');
     } catch {
-      setMessage('Cupom inválido.');
+      setCouponApplied(false);
+      showCouponMessage('Cupom inválido.', 'error');
     } finally {
+      setCouponLoading(false);
+      setSaving(false);
+    }
+  }
+
+  async function removeCoupon() {
+    if (!orderForm || !couponApplied) return;
+    setSaving(true);
+    setCouponLoading(true);
+    clearCouponMessage();
+    try {
+      setOrderForm(await removeCouponFromCart(orderForm.orderFormId));
+      setCoupon('');
+      setCouponApplied(false);
+    } catch {
+      showCouponMessage('Não foi possível remover o cupom.', 'error');
+    } finally {
+      setCouponLoading(false);
       setSaving(false);
     }
   }
@@ -1024,7 +1088,7 @@ export default function CheckoutScreen() {
   const cardErrors = getCardErrors();
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{recaptchaSiteKey && (step === 'payment' || step === 'card' || step === 'review') && <Recaptcha ref={recaptchaRef} siteKey={recaptchaSiteKey} />}<ScrollView contentContainerStyle={styles.content}>
-    {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}<Pressable onPress={() => setGiftWrap((value) => !value)} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable></ThemedView><ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={setCoupon} placeholder="Insira o código" style={[styles.input, styles.flex]} /><Pressable onPress={applyCoupon} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View></ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
+    {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}<Pressable onPress={() => setGiftWrap((value) => !value)} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable></ThemedView><ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={() => router.push('/privacy-policy' as never)} /></Card>}
     {step === 'customer' && <>
       {customerExists && !editingCustomer
@@ -1381,11 +1445,14 @@ const styles = StyleSheet.create({
   fieldLabel: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, fontWeight: '400' },
   inputWrap: { position: 'relative' },
   input: { minHeight: 46, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#d9d3cc', backgroundColor: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 15, color: '#0a0a0a' },
+  appliedCouponInput: { fontFamily: Fonts.bold, fontWeight: '700', textTransform: 'uppercase' },
   inputWithAccessory: { paddingRight: 62 },
   fieldAccessory: { position: 'absolute', right: 8, top: 9, width: 42, height: 27, alignItems: 'center', justifyContent: 'center' },
   inputError: { borderColor: '#ff7772', borderWidth: 1.5 },
   errorText: { color: '#ed6560', fontSize: 11, lineHeight: 15, fontFamily: Fonts.sans },
   successText: { color: '#2f8f5b', fontSize: 12, fontFamily: Fonts.sans },
+  couponSuccess: { color: '#2f8f5b', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18 },
+  couponError: { color: '#ed6560', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18 },
   inline: { flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-start' },
   select: { minHeight: 46, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#d9d3cc', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   selectArrow: { fontSize: 20, color: '#625d57', lineHeight: 22 },
