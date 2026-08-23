@@ -14,6 +14,23 @@ export type CustomerOrder = {
   [key: string]: any;
 };
 
+export function orderStatusLabel(status?: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  const labels: Record<string, string> = {
+    invoiced: 'Faturado',
+    processing: 'Processando',
+    handling: 'Em preparação',
+    'ready-for-handling': 'Em preparação',
+    shipped: 'Enviado',
+    delivered: 'Entregue',
+    canceled: 'Cancelado',
+    cancelled: 'Cancelado',
+    'payment-pending': 'Aguardando pagamento',
+    'waiting-for-seller-confirmation': 'Aguardando confirmação',
+  };
+  return labels[normalized] || status || 'Processando';
+}
+
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getVtexUserToken();
   return token ? { VtexIdclientAutCookie: token } : {};

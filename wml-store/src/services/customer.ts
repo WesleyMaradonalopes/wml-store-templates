@@ -11,6 +11,7 @@ export type CustomerProfile = {
   phone?: string;
   gender?: string;
   birthDate?: string;
+  isNewsletterOptIn?: boolean;
 };
 
 export type CustomerAddress = {

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
+import { NewsletterOptIn } from '@/components/newsletter-opt-in';
 import StoreIcon from '@/components/icons/StoreIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import TruckIcon from '@/components/icons/TruckIcon';
@@ -20,8 +21,9 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, getPaymentInstallments, OrderForm, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type InstallmentChoice } from '@/services/cart';
-import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, type CustomerAddress, type CustomerProfile } from '@/services/customer';
+import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
+import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
 
 type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'installments' | 'review';
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
@@ -284,10 +286,12 @@ export default function CheckoutScreen() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
+  const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [document, setDocument] = useState('');
   const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState('');
   const [genderOpen, setGenderOpen] = useState(false);
   const [receiverName, setReceiverName] = useState('');
@@ -330,6 +334,7 @@ export default function CheckoutScreen() {
   const [orderResult, setOrderResult] = useState<CheckoutOrderResult | null>(null);
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState(CONFIGURED_RECAPTCHA_SITE_KEY);
   const recaptchaRef = useRef<RecaptchaHandle>(null);
+  const newsletterOptInTouched = useRef(false);
   const genders = ['Feminino', 'Masculino', 'Prefiro não informar', 'Outro'];
   const customerDataRequests = useRef(new Map<string, Promise<CustomerCheckoutData>>()).current;
 
@@ -352,7 +357,9 @@ export default function CheckoutScreen() {
       setOrderForm(value);
       const loggedEmail = session?.email?.trim().toLowerCase() ?? '';
       setEmail(loggedEmail);
-      setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setGender('');
+      newsletterOptInTouched.current = false;
+      setNewsletterOptIn(true);
+      setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setBirthDate(''); setGender('');
       setCustomerExists(false); setEditingCustomer(false);
       setCustomerAddresses([]); setAddressSaved(false); setEditingAddress(false);
       setLoading(false);
@@ -417,7 +424,14 @@ export default function CheckoutScreen() {
     setLastName(profile.lastName || '');
     setDocument(formatCpf(profile.document || ''));
     setPhone(formatPhone(profile.phone || profile.homePhone || ''));
+    setBirthDate(formatBirthDate(profile.birthDate || ''));
     setGender(profile.gender || '');
+    if (!newsletterOptInTouched.current) setNewsletterOptIn(Boolean(profile.isNewsletterOptIn));
+  }
+
+  function changeNewsletterOptIn(value: boolean) {
+    newsletterOptInTouched.current = true;
+    setNewsletterOptIn(value);
   }
 
   function applyAddress(address: CustomerAddress | NonNullable<NonNullable<OrderForm['shippingData']>['selectedAddresses']>[number]) {
@@ -469,8 +483,19 @@ export default function CheckoutScreen() {
         lastName: lastName.trim(),
         document: digits(document),
         phone: digits(phone),
+        birthDate: birthDateToApi(birthDate) || undefined,
         gender: gender || undefined,
       }));
+      await updateCustomerProfile(email.trim().toLowerCase(), {
+        email: email.trim().toLowerCase(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        document: digits(document),
+        phone: digits(phone),
+        birthDate: birthDateToApi(birthDate) || undefined,
+        gender: gender || undefined,
+        isNewsletterOptIn: newsletterOptIn,
+      });
       setStep('address');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.');
@@ -508,11 +533,13 @@ export default function CheckoutScreen() {
         if (preferred) applyAddress(preferred);
         setStep('customer');
       } else {
-        setCustomerExists(false); setEditingCustomer(true); setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setGender('');
+        setCustomerExists(false); setEditingCustomer(true); setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setBirthDate(''); setGender('');
+        if (!newsletterOptInTouched.current) setNewsletterOptIn(true);
         setCustomerAddresses([]); setAddressSaved(false); setCustomerValidationAttempted(false); setStep('customer');
       }
     } catch {
-      setCustomerExists(false); setEditingCustomer(true); setCustomerValidationAttempted(false); setStep('customer');
+      setCustomerExists(false); setEditingCustomer(true); setBirthDate(''); setCustomerValidationAttempted(false); setStep('customer');
+      if (!newsletterOptInTouched.current) setNewsletterOptIn(true);
     } finally {
       setSaving(false);
     }
@@ -759,7 +786,7 @@ export default function CheckoutScreen() {
           },
         } : {}),
         savePersonalData: true,
-        optinNewsLetter: false,
+        optinNewsLetter: newsletterOptIn,
         ...(token && siteKey ? { captchaToken: token, captchaSiteKey: siteKey } : {}),
       });
 
@@ -998,19 +1025,20 @@ export default function CheckoutScreen() {
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{recaptchaSiteKey && (step === 'payment' || step === 'card' || step === 'review') && <Recaptcha ref={recaptchaRef} siteKey={recaptchaSiteKey} />}<ScrollView contentContainerStyle={styles.content}>
     {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}<Pressable onPress={() => setGiftWrap((value) => !value)} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable></ThemedView><ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={setCoupon} placeholder="Insira o código" style={[styles.input, styles.flex]} /><Pressable onPress={applyCoupon} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View></ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
-    {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /></Card>}
+    {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={() => router.push('/privacy-policy' as never)} /></Card>}
     {step === 'customer' && <>
       {customerExists && !editingCustomer
-        ? <CustomerDataSummary email={email} firstName={firstName} lastName={lastName} phone={phone} document={document} gender={gender} onEdit={() => setEditingCustomer(true)} />
+        ? <CustomerDataSummary email={email} firstName={firstName} lastName={lastName} phone={phone} birthDate={birthDate} document={document} gender={gender} onEdit={() => setEditingCustomer(true)} />
         : <Card>
           <ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText>
           <ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente</ThemedText>
           <Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={customerValidationAttempted ? customerErrors.email : ''} />
           <Field label="Nome" value={firstName} setValue={setFirstName} required placeholder="Nome" error={customerValidationAttempted ? customerErrors.firstName : ''} />
           <Field label="Sobrenome" value={lastName} setValue={setLastName} required placeholder="Sobrenome" error={customerValidationAttempted ? customerErrors.lastName : ''} />
-          <Field label="Telefone com DDD" value={phone} setValue={(value) => setPhone(formatPhone(value))} required placeholder="+5511999999999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} />
+          <Field label="Telefone com DDD" value={formatPhoneWithoutCountryCode(phone)} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11999999999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} />
+          <Field label="Data de nascimento" value={birthDate} setValue={(value) => setBirthDate(formatBirthDateInput(value))} placeholder="DD/MM/AAAA" keyboardType="numeric" />
           <Field label="CPF" value={document} setValue={(value) => setDocument(formatCpf(value))} required placeholder="000.000.000-00" keyboardType="numeric" error={customerValidationAttempted ? customerErrors.document : ''} />
-          <View style={styles.field}><ThemedText style={styles.fieldLabel}>Gênero</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText style={styles.bodyText} themeColor="textSecondary">{gender || 'Selecione seu gênero'}</ThemedText><View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText style={styles.bodyText}>{option}</ThemedText></Pressable>)}</View>}</View>
+          <View style={styles.field}><ThemedText style={styles.fieldLabel}>Gênero</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText style={styles.bodyText} themeColor="textSecondary">{formatGenderLabel(gender) || 'Selecione seu gênero'}</ThemedText><View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText style={styles.bodyText}>{option}</ThemedText></Pressable>)}</View>}</View>
         </Card>}
       {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
     </>}
@@ -1250,16 +1278,17 @@ function PixPaymentScreen({
 }
 
 function Card({ children }: { children: ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
-function CustomerDataSummary({ email, firstName, lastName, phone, document, gender, onEdit }: { email: string; firstName: string; lastName: string; phone: string; document: string; gender: string; onEdit: () => void }) {
+function CustomerDataSummary({ email, firstName, lastName, phone, birthDate, document, gender, onEdit }: { email: string; firstName: string; lastName: string; phone: string; birthDate: string; document: string; gender: string; onEdit: () => void }) {
   const row = (label: string, value: string) => <View style={styles.customerDataRow}><ThemedText style={styles.customerDataLabel}>{label}</ThemedText><ThemedText style={styles.customerDataValue}>{value || 'Não informado'}</ThemedText></View>;
   return <ThemedView style={[styles.card, styles.customerDataCard]}>
     <ThemedText style={styles.customerDataTitle}>Informe seu e-mail para continuar</ThemedText>
     <View style={styles.customerDataRows}>
       {row('E-mail', email)}
       {row('Nome', `${firstName} ${lastName}`.trim())}
-      {row('Telefone com DDD', phone)}
+      {row('Telefone com DDD', formatPhoneWithoutCountryCode(phone))}
+      {row('Data de nascimento', formatBirthDate(birthDate))}
       {row('CPF', document)}
-      {row('Gênero', gender)}
+      {row('Gênero', formatGenderLabel(gender))}
     </View>
     <Pressable onPress={onEdit}><ThemedText style={styles.link}>Editar dados</ThemedText></Pressable>
   </ThemedView>;
@@ -1269,7 +1298,7 @@ function CustomerReviewData({ email, firstName, lastName, phone, document }: { e
     <ThemedText style={styles.customerReviewValue}>{email}</ThemedText>
     <ThemedText style={styles.customerReviewValue}>{`${firstName} ${lastName}`.trim()}</ThemedText>
 		<ThemedText style={styles.customerReviewValue}>{document || 'Não informado'}</ThemedText>
-    <ThemedText style={styles.customerReviewValue}>{phone || 'Não informado'}</ThemedText>
+    <ThemedText style={styles.customerReviewValue}>{formatPhoneWithoutCountryCode(phone) || 'Não informado'}</ThemedText>
   </View>;
 }
 function PickupStoreCard({ option, selected, disabled, onPress }: { option: ShippingOption; selected: boolean; disabled: boolean; onPress: () => void }) {

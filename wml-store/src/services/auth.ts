@@ -52,6 +52,7 @@ async function saveVtexUserToken(token: string) {
 
 type StartAuthResponse = { authenticationToken?: string };
 type ValidateAuthResponse = { authStatus?: string; authCookie?: { Value?: string }; userId?: string };
+type SetPasswordResponse = ValidateAuthResponse & { authToken?: string; accountAuthCookie?: unknown; message?: string; error?: string };
 type GoogleClientIdResponse = { enabled?: boolean; clientId?: string };
 export type VtexGoogleLoginResponse = {
   authStatus?: string;
@@ -151,6 +152,62 @@ export async function startVtexAuthentication() {
 export async function sendVtexAccessKey(email: string, authenticationToken: string) {
   const response = await fetch(`${authUrl('accesskey/send')}?email=${encodeURIComponent(email)}`, { method: 'POST', headers: { Cookie: `_vss=${authenticationToken}` } });
   if (!response.ok) throw new Error('Não foi possível enviar o código de acesso.');
+}
+
+async function startAuthenticatorPasswordFlow(email: string) {
+  const account = encodeURIComponent(storeConfig.account);
+  const form = new FormData();
+  form.append('user', email);
+  form.append('scope', storeConfig.account);
+  form.append('accountName', storeConfig.account);
+  form.append('returnUrl', '/');
+  const response = await fetch(`${storeConfig.vtexBaseUrl}/api/authenticator/v1/pub/authentication/start?an=${account}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    credentials: 'include',
+    body: form,
+  });
+  if (!response.ok) throw new Error('Não foi possível iniciar a recuperação de senha.');
+}
+
+export async function setVtexPassword(email: string, accessKey: string, newPassword: string, authenticationToken = '') {
+  // A VTEX migrou este fluxo para o Authenticator e passou a exigir o
+  // início da sessão por esse endpoint antes do setpassword.
+  await startAuthenticatorPasswordFlow(email);
+
+  const account = encodeURIComponent(storeConfig.account);
+  const endpoints = [
+    `${storeConfig.vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
+    `${storeConfig.vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
+    `${authUrl('classic/setpassword')}?expireSessions=true&an=${account}`,
+  ];
+  let lastMessage = 'Não foi possível criar ou alterar a senha.';
+
+  for (const endpoint of endpoints) {
+    const form = new FormData();
+    form.append('login', email);
+    form.append('currentPassword', '');
+    form.append('newPassword', newPassword);
+    form.append('accesskey', accessKey);
+    form.append('recaptcha', '');
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    // Não sobrescreva o cookie criado pelo Authenticator; o token antigo só
+    // é necessário no fallback legado do VTEX ID.
+    if (authenticationToken && endpoint.includes('/api/vtexid/')) headers.Cookie = `_vss=${authenticationToken}`;
+    const response = await fetch(endpoint, { method: 'POST', headers, credentials: 'include', body: form });
+    const data = await response.json().catch(() => ({})) as SetPasswordResponse;
+    const status = String(data.authStatus || '').toLowerCase().trim();
+    const failed = Boolean(data.error) || ['failed', 'error', 'invalidemail', 'invalidpassword', 'wrongcredentials', 'unexpectederror'].includes(status);
+    if (response.ok && !failed && (!status || status === 'success')) {
+      const token = extractAuthToken(data.authCookie) || extractAuthToken(data.accountAuthCookie) || extractAuthToken(data.authToken);
+      if (token) await saveVtexUserToken(token);
+      return data;
+    }
+    lastMessage = data.message || data.error || (status === 'wrongcredentials' ? 'O código ou e-mail não é válido.' : 'Não foi possível criar ou alterar a senha.');
+    if (![404, 405].includes(response.status)) break;
+  }
+
+  throw new Error(lastMessage);
 }
 
 export async function validateVtexAccessKey(email: string, accessKey: string, authenticationToken: string) {
