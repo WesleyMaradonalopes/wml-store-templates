@@ -32,7 +32,7 @@ export const Fonts = {
   bold: 'Montserrat_700Bold',
   serif: 'Montserrat_400Regular',
   rounded: 'Montserrat_400Regular',
-  mono: Platform.select({ web: 'ui-monospace', default: 'monospace' }) ?? 'monospace',
+  mono: 'Montserrat_400Regular',
 } as const;
 
 export const Spacing = {
