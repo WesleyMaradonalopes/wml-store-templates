@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, getPaymentInstallments, OrderForm, removeCouponFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type InstallmentChoice } from '@/services/cart';
+import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, getPaymentInstallments, OrderForm, removeCouponFromCart, removeGiftCardFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
@@ -323,8 +323,10 @@ export default function CheckoutScreen() {
   const [couponMessage, setCouponMessage] = useState('');
   const [couponMessageType, setCouponMessageType] = useState<'success' | 'error' | null>(null);
   const [voucher, setVoucher] = useState('');
-  const [voucherOpen, setVoucherOpen] = useState(false);
-  const [voucherApplied, setVoucherApplied] = useState(false);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [voucherMessage, setVoucherMessage] = useState('');
+  const [voucherMessageType, setVoucherMessageType] = useState<'success' | 'error' | null>(null);
+  const [removingGiftCard, setRemovingGiftCard] = useState<string | null>(null);
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<CartItem | null>(null);
   const [customerExists, setCustomerExists] = useState(false);
@@ -681,7 +683,7 @@ export default function CheckoutScreen() {
     setSaving(true);
     setMessage('');
     try {
-      const updatedOrderForm = await selectPaymentMethod({ orderFormId: orderForm.orderFormId, paymentSystem, value: orderForm.value });
+      const updatedOrderForm = await selectPaymentMethod({ orderFormId: orderForm.orderFormId, paymentSystem, value: orderForm.value, giftCards: orderForm.paymentData?.giftCards ?? [] });
       setOrderForm(updatedOrderForm);
       const requestedSiteKey = getRecaptchaSiteKey(updatedOrderForm);
       if (requestedSiteKey) setRecaptchaSiteKey(requestedSiteKey);
@@ -738,6 +740,7 @@ export default function CheckoutScreen() {
         value: orderForm.value,
         installments: option.count,
         installmentsInterestRate: option.interestRate,
+        giftCards: orderForm.paymentData?.giftCards ?? [],
       });
       setOrderForm(updatedOrderForm);
       setSelectedInstallment(option);
@@ -774,6 +777,7 @@ export default function CheckoutScreen() {
         value: paymentOrderForm.value,
         installments: paymentKind === 'card' ? selectedInstallment?.count ?? 1 : 1,
         installmentsInterestRate: paymentKind === 'card' ? selectedInstallment?.interestRate ?? 0 : 0,
+        giftCards: paymentOrderForm.paymentData?.giftCards ?? [],
       });
       setOrderForm(paymentOrderForm);
       let activeRecaptchaSiteKey = getRecaptchaSiteKey(paymentOrderForm) || recaptchaSiteKey;
@@ -907,17 +911,44 @@ export default function CheckoutScreen() {
   }
 
   async function applyVoucher() {
-    if (!orderForm || !voucher.trim()) return;
+    const redemptionCode = voucher.trim();
+    if (!orderForm || !redemptionCode) return;
     setSaving(true);
-    setMessage('');
+    setVoucherLoading(true);
+    setVoucherMessage('');
+    setVoucherMessageType(null);
     try {
-      setOrderForm(await addGiftCardToCart(orderForm.orderFormId, voucher.trim()));
-      setVoucherApplied(true);
-      setMessage('Vale-presente adicionado.');
-    } catch {
-      setVoucherApplied(false);
-      setMessage('Não foi possível adicionar o vale-presente.');
+      const giftCardProvider = orderForm.paymentData?.giftCards?.find((giftCard) => giftCard.provider)?.provider;
+      const updatedOrderForm = await addGiftCardToCart(orderForm.orderFormId, redemptionCode, appliedGiftCards, giftCardProvider, orderForm.paymentData?.payments ?? []);
+      setOrderForm(updatedOrderForm);
+      setVoucher('');
+      setVoucherMessage('Vale-presente aplicado.');
+      setVoucherMessageType('success');
+    } catch (error) {
+      setVoucherMessage(error instanceof Error ? error.message : 'Não foi possível adicionar o vale-presente.');
+      setVoucherMessageType('error');
     } finally {
+      setVoucherLoading(false);
+      setSaving(false);
+    }
+  }
+
+  async function removeVoucher(redemptionCode: string) {
+    if (!orderForm || !redemptionCode) return;
+    setSaving(true);
+    setRemovingGiftCard(redemptionCode);
+    setVoucherMessage('');
+    setVoucherMessageType(null);
+    try {
+      const remainingGiftCards = appliedGiftCards.filter((giftCard) => giftCard.redemptionCode !== redemptionCode);
+      setOrderForm(await removeGiftCardFromCart(orderForm.orderFormId, redemptionCode, remainingGiftCards, orderForm.paymentData?.payments ?? []));
+      setVoucherMessage('Vale-presente removido.');
+      setVoucherMessageType('success');
+    } catch (error) {
+      setVoucherMessage(error instanceof Error ? error.message : 'Não foi possível remover o vale-presente.');
+      setVoucherMessageType('error');
+    } finally {
+      setRemovingGiftCard(null);
       setSaving(false);
     }
   }
@@ -1082,6 +1113,7 @@ export default function CheckoutScreen() {
   const activeCardMethod = cardPaymentMethodForNumber(payments, cardNumber);
   const activeCardBrand = cardNumber ? cardBrandFor(activeCardMethod, cardNumber) : 'generic';
   const reviewCardBrand = selectedCardBrand === 'generic' ? activeCardBrand : selectedCardBrand;
+  const appliedGiftCards = (orderForm.paymentData?.giftCards ?? []).filter((giftCard) => giftCard.inUse && giftCard.redemptionCode);
   const title: Record<Step, string> = { cart: 'Carrinho', email: 'Dados pessoais', customer: 'Dados pessoais', address: 'Entrega', shipping: 'Entrega', payment: 'Pagamento', card: 'Cartão de crédito', installments: 'Parcelamento', review: 'Revise e confirme' };
   const customerErrors = getCustomerErrors();
   const addressErrors = getAddressErrors();
@@ -1107,7 +1139,7 @@ export default function CheckoutScreen() {
       {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
     </>}
     {step === 'address' && (addressSaved && !editingAddress ? <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><ThemedText style={styles.bodyText}>{receiverName}</ThemedText><ThemedText style={styles.bodyText}>{street + ', ' + number + (complement ? ' - ' + complement : '')}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ' - ' + city + '/' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></Card> : <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><Field label="CEP" value={postalCode} setValue={lookupCep} required placeholder="00000-000" keyboardType="numeric" error={addressValidationAttempted ? addressErrors.postalCode : ''} /><Field label="Endereço" value={street} setValue={setStreet} required placeholder="Endereço" error={addressValidationAttempted ? addressErrors.street : ''} /><View style={styles.inline}><Field label="Número" value={number} setValue={setNumber} required placeholder="Número" error={addressValidationAttempted ? addressErrors.number : ''} /><Field label="Complemento" value={complement} setValue={setComplement} placeholder="Complemento" /></View><Field label="Bairro" value={neighborhood} setValue={setNeighborhood} required placeholder="Bairro" error={addressValidationAttempted ? addressErrors.neighborhood : ''} /><View style={styles.inline}><Field label="Cidade" value={city} setValue={setCity} required placeholder="Cidade" error={addressValidationAttempted ? addressErrors.city : ''} /><Field label="Estado" value={state} setValue={setState} required placeholder="Estado" error={addressValidationAttempted ? addressErrors.state : ''} /></View><Field label="Quem irá receber?" value={receiverName} setValue={setReceiverName} required placeholder="Nome do recebedor" error={addressValidationAttempted ? addressErrors.receiverName : ''} />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</Card>)}
-     {step === 'payment' && <><ThemedText style={styles.pageTitle}>Escolha como pagar</ThemedText><Pressable disabled={saving} onPress={() => cardMethod ? openCardPayment(cardMethod) : setMessage('Cartão de crédito não está disponível para este carrinho.')} style={styles.paymentCard}><View style={styles.paymentHeader}><CreditCardIcon color="#0a0a0a" size={21} /><ThemedText style={styles.sectionTitle}>Cartão de Crédito</ThemedText></View><View style={styles.paymentDivider} /><ThemedText style={styles.bodyText} themeColor="textSecondary">+ novo cartão</ThemedText></Pressable><View style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>{!voucherOpen ? <Pressable onPress={() => setVoucherOpen(true)} style={styles.voucherTrigger}><ThemedText style={styles.sectionTitle}>{voucherApplied ? 'Vale presente adicionado' : 'Adicionar vale presente'}</ThemedText></Pressable> : <><View style={styles.paymentDivider} /><View style={styles.inline}><TextInput value={voucher} onChangeText={(text) => setVoucher(text.normalize('NFC'))} autoCapitalize="characters" placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} /><Pressable disabled={saving} onPress={applyVoucher} style={styles.smallButton}><ThemedText style={styles.buttonText}>Adicionar</ThemedText></Pressable></View>{voucherApplied && <ThemedText style={styles.successText}>Vale-presente adicionado.</ThemedText>}</>}</View>{!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}<Pressable disabled={saving} onPress={() => pixMethod ? choosePayment(pixMethod.id, pixMethod.name || 'Pix') : setMessage('Pix não está disponível para este carrinho.')} style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Pagamento instantâneo</ThemedText><View style={styles.pixInfo}><PaymentBrandIcon brand="pix" width={58} height={30} /><ThemedText style={styles.bodyText} themeColor="textSecondary">O código Pix será exibido na próxima etapa, após a revisão do seu pedido.</ThemedText></View></Pressable></>}
+     {step === 'payment' && <><ThemedText style={styles.pageTitle}>Escolha como pagar</ThemedText><Pressable disabled={saving} onPress={() => cardMethod ? openCardPayment(cardMethod) : setMessage('Cartão de crédito não está disponível para este carrinho.')} style={styles.paymentCard}><View style={styles.paymentHeader}><CreditCardIcon color="#0a0a0a" size={21} /><ThemedText style={styles.sectionTitle}>Cartão de Crédito</ThemedText></View><View style={styles.paymentDivider} /><ThemedText style={styles.bodyText} themeColor="textSecondary">+ novo cartão</ThemedText></Pressable><View style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Vale presente</ThemedText><View style={styles.paymentDivider} /><View style={styles.inline}><TextInput value={voucher} onChangeText={(text) => { setVoucher(text.normalize('NFC')); if (voucherMessage) { setVoucherMessage(''); setVoucherMessageType(null); } }} autoCapitalize="characters" autoCorrect={false} placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} /><Pressable disabled={saving || voucherLoading || !voucher.trim()} onPress={applyVoucher} style={styles.smallButton}>{voucherLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable></View>{appliedGiftCards.length > 0 && <View style={styles.giftCardList}><ThemedText style={styles.giftCardListTitle}>Vales aplicados</ThemedText>{appliedGiftCards.map((giftCard, index) => <View key={(giftCard.id || giftCard.redemptionCode) + '-' + index} style={styles.giftCardRow}><ThemedText style={styles.giftCardCode}>{giftCard.redemptionCode.toUpperCase()}</ThemedText><View style={styles.giftCardActions}><ThemedText style={styles.giftCardAmount}>{money(giftCard.value > 0 ? giftCard.value : giftCard.balance)}</ThemedText><Pressable disabled={saving || removingGiftCard === giftCard.redemptionCode} onPress={() => removeVoucher(giftCard.redemptionCode)}><ThemedText style={styles.giftCardRemove}>{removingGiftCard === giftCard.redemptionCode ? 'Removendo...' : 'Remover'}</ThemedText></Pressable></View></View>)}</View>}{!!voucherMessage && <ThemedText style={voucherMessageType === 'success' ? styles.successText : styles.errorText}>{voucherMessage}</ThemedText>}</View>{!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}<Pressable disabled={saving} onPress={() => pixMethod ? choosePayment(pixMethod.id, pixMethod.name || 'Pix') : setMessage('Pix não está disponível para este carrinho.')} style={styles.paymentCard}><ThemedText style={styles.sectionTitle}>Pix</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Pagamento instantâneo</ThemedText><View style={styles.pixInfo}><PaymentBrandIcon brand="pix" width={58} height={30} /><ThemedText style={styles.bodyText} themeColor="textSecondary">O código Pix será exibido na próxima etapa, após a revisão do seu pedido.</ThemedText></View></Pressable></>}
      {step === 'card' && <><CreditCardVisual brand={activeCardBrand} cardNumber={cardNumber} holderName={cardHolder} expiry={cardExpiry} cvv={cardCvv} /><Card><Field label="Número do cartão" value={cardNumber} setValue={(value) => setCardNumber(formatCardNumber(value))} required placeholder="Insira o número do seu cartão" keyboardType="numeric" accessory={activeCardBrand !== 'generic' ? <PaymentBrandIcon brand={activeCardBrand} width={42} height={27} /> : undefined} error={cardValidationAttempted ? cardErrors.number : ''} /><Field label="Nome impresso no cartão" value={cardHolder} setValue={setCardHolder} required placeholder="Nome impresso no cartão" error={cardValidationAttempted ? cardErrors.holder : ''} /><View style={styles.inline}><Field label="Validade" value={cardExpiry} setValue={(value) => setCardExpiry(formatExpiry(value))} required placeholder="MM/AA" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.expiry : ''} /><Field label="CVV" value={cardCvv} setValue={setCardCvv} required placeholder="CVV" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.cvv : ''} /></View><ThemedText style={styles.cardTitle}>Endereço de cobrança</ThemedText><Pressable onPress={() => undefined} style={styles.billingRow}><View style={styles.billingCheckbox}><ThemedText style={styles.billingCheck}>✓</ThemedText></View><ThemedText style={styles.billingText}>O endereço da fatura é {street + ', ' + number + ' - ' + neighborhood + ', ' + city + ' - ' + state}</ThemedText></Pressable></Card><AcceptedBrands />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
      {step === 'review' && <><ThemedText style={styles.pageTitle}>Revise e confirme</ThemedText><Summary orderForm={orderForm} shippingPrice={selectedShipping?.price} /><Card><ReviewHeader icon="user" title="DADOS PESSOAIS" /><CustomerReviewData email={email} firstName={firstName} lastName={lastName} phone={phone} document={document} /><Pressable onPress={() => { setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><View style={styles.reviewDeliveryTop}><ReviewHeader icon="truck" title="ENTREGA" /><ThemedText style={styles.freeText}>{selectedShipping?.price === 0 ? 'Grátis' : money(selectedShipping?.price || 0)}</ThemedText></View><ThemedText style={styles.bodyText}>{selectedPickup ? pickupStoreName(selectedPickup) : selectedShipping?.name || 'Entrega selecionada'}</ThemedText><ThemedText style={styles.deliveryText}>◷ {selectedPickup ? 'Retire em ' + humanShippingEstimate(selectedShipping?.shippingEstimate || '') : deliveryEstimate(selectedShipping?.shippingEstimate || '')}</ThemedText><View style={styles.reviewAddress}><ThemedText style={styles.sectionTitle}>{selectedPickup ? 'Loja para retirada' : 'Endereço de Entrega'}</ThemedText>{selectedPickup ? pickupAddressLines(selectedPickup).map((line, index) => <ThemedText key={line + index} style={styles.bodyText}>{line}</ThemedText>) : <><ThemedText style={styles.bodyText}>{street + ', ' + number}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText></>}</View><View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.reviewItemImage} />}<ThemedText style={styles.reviewItemName}>{item.name + ' ' + item.quantity + ' un.'}</ThemedText></View>)}</View><Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card><Card><ReviewHeader icon="card" title="PAGAMENTO" /><View style={styles.paymentReviewCard}>{selectedPaymentLabel.toLowerCase().includes('pix') ? <><PaymentBrandIcon brand="pix" width={78} height={39} /><ThemedText style={styles.bodyText}>Aprovação imediata</ThemedText></> : <><CreditCardVisual brand={reviewCardBrand} cardNumber={cardNumber} holderName={cardHolder} expiry={cardExpiry} cvv={cardCvv} masked compact /><View style={styles.installmentSummary}><ThemedText style={styles.installmentSummaryLabel}>Parcelamento</ThemedText><ThemedText style={styles.installmentSummaryValue}>{selectedInstallment ? `${selectedInstallment.count}x ${money(selectedInstallment.value)}` : `1x ${money(orderForm.value)}`}</ThemedText></View></>}</View><Pressable onPress={() => setStep('payment')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable></Card>{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
   </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
@@ -1501,7 +1533,13 @@ const styles = StyleSheet.create({
   paymentCard: { gap: 6, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
   paymentHeader: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, justifyContent: 'space-between' },
   paymentDivider: { height: 1, backgroundColor: '#eeeae5' },
-  voucherTrigger: { minHeight: 34, justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#eeeae5' },
+  giftCardList: { gap: Spacing.two, marginTop: Spacing.one, paddingTop: Spacing.two, borderTopWidth: 1, borderTopColor: '#eeeae5' },
+  giftCardListTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  giftCardRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.two },
+  giftCardCode: { flex: 1, color: '#2f2d2b', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  giftCardActions: { alignItems: 'flex-end', gap: 2 },
+  giftCardAmount: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  giftCardRemove: { color: '#4f4b47', fontFamily: Fonts.sans, fontSize: 11, lineHeight: 15, textDecorationLine: 'underline' },
   pixInfo: { gap: Spacing.two, marginTop: Spacing.one, padding: Spacing.three, borderRadius: 8, backgroundColor: '#f5f5f5' },
   pixQrImage: { alignSelf: 'center', width: 240, height: 240, marginVertical: Spacing.two },
   pixCodeInput: { minHeight: 92, textAlignVertical: 'top' },

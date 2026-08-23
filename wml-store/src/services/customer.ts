@@ -38,16 +38,19 @@ export async function getCustomerAddressesFromMasterData(email: string): Promise
 }
 
 export async function getCustomerProfileFromMasterData(email: string): Promise<CustomerProfile | null> {
-  const token = await getVtexUserToken();
-  if (!token || !email) throw new Error('Sessão VTEX sem token de usuário. Saia e entre novamente.');
+  if (!email) return null;
 
   const backendResponse = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || storeConfig.backendUrl}/customer/profile?email=${encodeURIComponent(email)}`, {
-    headers: { VtexIdclientAutCookie: token },
   }).catch(() => null);
   if (backendResponse?.ok) {
     const payload = await backendResponse.json() as { profile?: CustomerProfile | null };
     if (payload.profile) return payload.profile;
   }
+
+  // A consulta pública acima é o caminho principal do checkout sem login.
+  // Os fallbacks oficiais abaixo só podem ser usados quando há sessão VTEX.
+  const token = await getVtexUserToken();
+  if (!token) return null;
 
   // Endpoint oficial para storefronts headless. O parâmetro permite perfis
   // incompletos, que também precisam aparecer na tela de dados pessoais.

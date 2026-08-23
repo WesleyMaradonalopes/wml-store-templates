@@ -49,6 +49,27 @@ export type InstallmentOption = {
   installments: InstallmentChoice[];
 };
 
+export type PaymentDataPayment = {
+  paymentSystem: string;
+  referenceValue: number;
+  value: number;
+  installments: number;
+  installmentsInterestRate: number;
+};
+
+export type GiftCard = {
+  redemptionCode: string;
+  value: number;
+  balance: number;
+  name?: string | null;
+  caption?: string | null;
+  id?: string | null;
+  provider?: string | null;
+  groupName?: string | null;
+  inUse: boolean;
+  isSpecialCard?: boolean;
+};
+
 export type OrderForm = {
   orderFormId: string;
   value: number;
@@ -94,6 +115,8 @@ export type OrderForm = {
       validator?: { regex?: string };
     }>;
     installmentOptions?: InstallmentOption[];
+    payments?: PaymentDataPayment[];
+    giftCards?: GiftCard[];
   };
 };
 
@@ -156,6 +179,10 @@ function isBetterShippingQuote(candidate: ShippingQuote, current: ShippingQuote)
 
 type VtexOrderForm = {
   orderFormId: string;
+  message?: string;
+  error?: { code?: string; message?: string };
+  messages?: Array<{ text?: string | null; message?: string | null }>;
+  giftCardMessages?: Array<{ text?: string | null; message?: string | null }>;
   value?: number;
   recaptchaKey?: string;
   recaptchaKeyV3?: string;
@@ -199,6 +226,26 @@ type VtexOrderForm = {
       validator?: { regex?: string | null } | null;
     }>;
     installmentOptions?: VtexInstallmentOption[];
+    payments?: Array<{
+      paymentSystem?: string | number | null;
+      referenceValue?: number | null;
+      value?: number | null;
+      installments?: number | null;
+      installmentsInterestRate?: number | null;
+    }>;
+    giftCards?: Array<{
+      redemptionCode?: string | null;
+      value?: number | null;
+      balance?: number | null;
+      name?: string | null;
+      caption?: string | null;
+      id?: string | null;
+      provider?: string | null;
+      groupName?: string | null;
+      inUse?: boolean | null;
+      isSpecialCard?: boolean | null;
+    }>;
+    giftCardMessages?: Array<{ text?: string | null; message?: string | null }>;
   };
 };
 
@@ -325,8 +372,44 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
         validator: { regex: String(system.validator?.regex ?? '').trim() },
       })),
       installmentOptions: (orderForm.paymentData?.installmentOptions ?? []).map(normalizeInstallmentOption),
+      payments: (orderForm.paymentData?.payments ?? []).map((payment) => ({
+        paymentSystem: String(payment.paymentSystem ?? '').trim(),
+        referenceValue: Number(payment.referenceValue ?? 0),
+        value: Number(payment.value ?? 0),
+        installments: Math.max(1, Number(payment.installments ?? 1)),
+        installmentsInterestRate: Number(payment.installmentsInterestRate ?? 0),
+      })).filter((payment) => payment.paymentSystem),
+      giftCards: (orderForm.paymentData?.giftCards ?? []).map((giftCard) => ({
+        redemptionCode: String(giftCard.redemptionCode ?? '').trim(),
+        value: (giftCard.value ?? 0) / 100,
+        balance: (giftCard.balance ?? 0) / 100,
+        name: giftCard.name ?? null,
+        caption: giftCard.caption ?? null,
+        id: giftCard.id ?? null,
+        provider: giftCard.provider ?? null,
+        groupName: giftCard.groupName ?? null,
+        inUse: giftCard.inUse === true,
+        isSpecialCard: giftCard.isSpecialCard === true,
+      })).filter((giftCard) => giftCard.redemptionCode || giftCard.id),
     },
   };
+}
+
+function giftCardResponseMessage(payload?: VtexOrderForm | null): string | undefined {
+  const messages = [
+    ...(payload?.paymentData?.giftCardMessages ?? []),
+    ...(payload?.giftCardMessages ?? []),
+    ...(payload?.messages ?? []),
+  ];
+  return messages
+    .map((item) => (item.text ?? item.message ?? '').trim())
+    .find(Boolean)
+    ?? payload?.error?.message?.trim()
+    ?? payload?.message?.trim();
+}
+
+function normalizeGiftCardCode(value: string): string {
+  return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
 
 export async function updateClientProfile({
@@ -475,12 +558,14 @@ export async function selectPaymentMethod({
   value,
   installments = 1,
   installmentsInterestRate = 0,
+  giftCards,
 }: {
   orderFormId: string;
   paymentSystem: string;
   value: number;
   installments?: number;
   installmentsInterestRate?: number;
+  giftCards?: GiftCard[];
 }): Promise<OrderForm> {
   const response = await checkoutFetch(
     `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${orderFormId}/attachments/paymentData`,
@@ -495,6 +580,13 @@ export async function selectPaymentMethod({
           installments: Math.max(1, Math.round(installments)),
           installmentsInterestRate: Number(installmentsInterestRate || 0),
         }],
+        ...(giftCards
+          ? {
+              giftCards: giftCards
+                .filter((giftCard) => giftCard.inUse && (giftCard.redemptionCode || giftCard.id))
+                .map((giftCard) => giftCardAttachment(giftCard, true)),
+            }
+          : {}),
       }),
     },
   );
@@ -687,13 +779,94 @@ export async function removeCouponFromCart(orderFormId: string): Promise<OrderFo
   return addCouponToCart(orderFormId, '');
 }
 
-export async function addGiftCardToCart(orderFormId: string, redemptionCode: string): Promise<OrderForm> {
-  const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${orderFormId}/giftcards`, {
+type GiftCardAttachment = {
+  redemptionCode?: string;
+  id?: string;
+  provider?: string;
+  isSpecialCard: boolean;
+  inUse: boolean;
+};
+
+function giftCardAttachment(
+  giftCard: Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>,
+  inUse: boolean,
+  providerOverride?: string | null,
+): GiftCardAttachment {
+  const provider = giftCard.provider || providerOverride || undefined;
+  return {
+    ...(giftCard.redemptionCode ? { redemptionCode: giftCard.redemptionCode } : {}),
+    ...(giftCard.id ? { id: giftCard.id } : {}),
+    ...(provider ? { provider } : {}),
+    isSpecialCard: giftCard.isSpecialCard === true,
+    inUse,
+  };
+}
+
+export async function addGiftCardToCart(
+  orderFormId: string,
+  redemptionCode: string,
+  existingGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
+  provider?: string | null,
+  payments: PaymentDataPayment[] = [],
+): Promise<OrderForm> {
+  const giftCards = [
+    ...existingGiftCards
+      .filter((giftCard) => giftCard.redemptionCode || giftCard.id)
+      .map((giftCard) => giftCardAttachment(giftCard, true)),
+    giftCardAttachment({ redemptionCode: redemptionCode.trim() }, true, provider),
+  ];
+  const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ giftCards: [{ redemptionCode, inUse: true }] }),
+    body: JSON.stringify({ payments, giftCards }),
   });
-  if (!response.ok) throw new Error('Não foi possível adicionar o vale-presente.');
+  const errorBody = !response.ok
+    ? await response.clone().json().catch(() => null) as VtexOrderForm | null
+    : null;
+  if (!response.ok) {
+    const message = giftCardResponseMessage(errorBody);
+    console.warn('[GIFT CARD] add rejected', { status: response.status, code: errorBody?.error?.code, message });
+    throw new Error(message || 'Não foi possível adicionar o vale-presente.');
+  }
+  const orderForm = await response.json() as VtexOrderForm;
+  await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
+  const normalizedOrderForm = normalizeOrderForm(orderForm);
+  const normalizedCode = normalizeGiftCardCode(redemptionCode);
+  const applied = normalizedOrderForm.paymentData?.giftCards?.some((giftCard) => giftCard.inUse && normalizeGiftCardCode(giftCard.redemptionCode) === normalizedCode);
+  if (!applied) {
+    const message = giftCardResponseMessage(orderForm);
+    const returnedGiftCards = normalizedOrderForm.paymentData?.giftCards ?? [];
+    const providers = [...new Set(returnedGiftCards.map((giftCard) => giftCard.provider).filter(Boolean))];
+    const paymentGroups = [...new Set((normalizedOrderForm.paymentData?.paymentSystems ?? []).map((system) => system.group).filter(Boolean))];
+    console.warn('[GIFT CARD] add not reflected in orderForm', {
+      message,
+      inUseCount: returnedGiftCards.filter((giftCard) => giftCard.inUse).length,
+      providers,
+      paymentGroups,
+    });
+    throw new Error(message || 'Não foi possível adicionar o vale-presente.');
+  }
+  return normalizedOrderForm;
+}
+
+export async function removeGiftCardFromCart(
+  orderFormId: string,
+  redemptionCode: string,
+  remainingGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
+  payments: PaymentDataPayment[] = [],
+): Promise<OrderForm> {
+  const giftCards = [
+    ...remainingGiftCards
+      .filter((giftCard) => giftCard.redemptionCode || giftCard.id)
+      .map((giftCard) => giftCardAttachment(giftCard, true)),
+    giftCardAttachment({ redemptionCode: redemptionCode.trim() }, false),
+  ];
+  const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payments, giftCards }),
+  });
+  if (!response.ok) throw new Error('Não foi possível remover o vale-presente.');
   const orderForm = await response.json() as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   return normalizeOrderForm(orderForm);
