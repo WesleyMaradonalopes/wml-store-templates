@@ -15,7 +15,7 @@ import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
-import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneWithoutCountryCode, phoneToApi } from '@/utils/customer-formatters';
+import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode, phoneToApi } from '@/utils/customer-formatters';
 
 import AppleLogoIcon from '@/components/icons/AppleLogoIcon';
 import Box01Icon from '@/components/icons/Box01Icon';
@@ -595,7 +595,8 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
   async function save() {
     try {
       setSaving(true); setMessage(null);
-      const updated = await updateCustomerProfile(email, { email, firstName, lastName, document, phone: phoneToApi(phone), gender, birthDate: birthDateToApi(birthDate), isNewsletterOptIn: newsletterOptIn });
+      const normalizedBirthDate = birthDateToApi(birthDate);
+      const updated = await updateCustomerProfile(email, { email, firstName, lastName, document, phone: phoneToApi(phone), gender, ...(normalizedBirthDate ? { birthDate: normalizedBirthDate } : {}), isNewsletterOptIn: newsletterOptIn });
       onSaved(updated);
       setEditing(false);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.'); }
@@ -618,7 +619,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
     }
   }
 
-  const fields = [{ label: 'Nome', value: firstName, set: setFirstName }, { label: 'Sobrenome', value: lastName, set: setLastName }, { label: 'CPF', value: document, set: setDocument }, { label: 'Data de nascimento', value: birthDate, set: (value: string) => setBirthDate(formatBirthDateInput(value)) }, { label: 'Telefone com DDD', value: phone, displayValue: formatPhoneWithoutCountryCode(phone), set: (value: string) => setPhone(formatPhoneWithoutCountryCode(value)) }];
+  const fields = [{ label: 'Nome', value: firstName, set: setFirstName }, { label: 'Sobrenome', value: lastName, set: setLastName }, { label: 'CPF', value: document, set: setDocument }, { label: 'Data de nascimento', value: birthDate, set: (value: string) => setBirthDate(formatBirthDateInput(value)) }, { label: 'Telefone com DDD', value: phone, displayValue: formatPhoneWithoutCountryCode(phone), set: (value: string) => setPhone(formatPhoneInput(value)) }];
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Dados Pessoais" onBack={onBack} /><ScrollView contentContainerStyle={styles.content}><ThemedView style={styles.card}><ThemedText type="subtitle">Dados Pessoais</ThemedText><ThemedText themeColor="textSecondary">E-mail</ThemedText>{editing ? <TextInput value={email} editable={false} style={[styles.input, styles.readonly]} /> : <ThemedText>{email || 'Não informado'}</ThemedText>}{fields.map((field) => <View key={field.label}><ThemedText themeColor="textSecondary">{field.label}</ThemedText>{editing ? <TextInput value={field.label === 'Telefone com DDD' ? formatPhoneWithoutCountryCode(field.value) : field.value} onChangeText={field.set} style={styles.input} /> : <ThemedText>{(field.displayValue ?? field.value) || 'Não informado'}</ThemedText>}</View>)}<ThemedText themeColor="textSecondary">Gênero (opcional)</ThemedText>{editing ? <><Pressable onPress={() => setGenderOpen(!genderOpen)} style={styles.select}><ThemedText>{formatGenderLabel(gender) || 'Selecione'}</ThemedText><View style={[styles.genderDropdownIcon, genderOpen && styles.genderDropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText>{option}</ThemedText></Pressable>)}</View>}</> : <ThemedText>{formatGenderLabel(gender) || 'Não informado'}</ThemedText>}{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}{editing ? <Pressable disabled={saving} onPress={save} style={[styles.primaryButton, saving && styles.disabled]}>{saving ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Confirmar</ThemedText>}</Pressable> : <Pressable onPress={() => setEditing(true)}><ThemedText style={styles.primaryDadosText} type="link">Editar dados pessoais</ThemedText></Pressable>}</ThemedView><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={onPrivacyPress} disabled={newsletterSaving} /></ScrollView></SafeAreaView></ThemedView>;
 }
 

@@ -23,7 +23,7 @@ import { getAccountSession } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, getPaymentInstallments, OrderForm, removeCouponFromCart, removeGiftCardFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
-import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
+import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
 
 type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'installments' | 'review';
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
@@ -65,14 +65,8 @@ function validCpf(value: string) {
 }
 function money(value: number) { return 'R$ ' + value.toFixed(2).replace('.', ','); }
 function formatPhone(value: string) {
-  const valueDigits = digits(value);
-  const localDigits = valueDigits.startsWith('55') && valueDigits.length > 11
-    ? valueDigits.slice(2)
-    : valueDigits.startsWith('0') && valueDigits.length > 11
-      ? valueDigits.slice(1)
-      : valueDigits;
-  const normalized = localDigits.slice(0, 11);
-  return normalized ? '+55' + normalized : valueDigits === '55' ? '+55' : '';
+  const normalized = formatPhoneInput(value);
+  return normalized ? '+55' + normalized : '';
 }
 function formatCpf(value: string) {
   const valueDigits = digits(value).slice(0, 11);
@@ -910,6 +904,38 @@ export default function CheckoutScreen() {
     }
   }
 
+  async function ensureCustomerProfileForGiftCard(currentOrderForm: OrderForm): Promise<OrderForm> {
+    const desiredEmail = email.trim();
+    const desiredDocument = digits(document);
+    const currentEmail = currentOrderForm.clientProfileData?.email?.trim() ?? '';
+    const currentDocument = digits(currentOrderForm.clientProfileData?.document ?? '');
+    const documentMatches = Boolean(desiredDocument && currentDocument && desiredDocument === currentDocument);
+
+    console.info('[GIFT CARD] customer context', {
+      profileEmailPresent: Boolean(currentEmail),
+      profileDocumentPresent: Boolean(currentDocument),
+      documentProvided: Boolean(desiredDocument),
+      documentMatches,
+    });
+
+    if (!desiredEmail || !desiredDocument || (currentEmail.toLowerCase() === desiredEmail.toLowerCase() && documentMatches)) {
+      return currentOrderForm;
+    }
+
+    const updatedOrderForm = await updateClientProfile({
+      orderFormId: currentOrderForm.orderFormId,
+      email: desiredEmail,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      document: desiredDocument,
+      phone: digits(phone),
+      birthDate: birthDateToApi(birthDate) || undefined,
+      gender: gender || undefined,
+    });
+    setOrderForm(updatedOrderForm);
+    return updatedOrderForm;
+  }
+
   async function applyVoucher() {
     const redemptionCode = voucher.trim();
     if (!orderForm || !redemptionCode) return;
@@ -918,8 +944,10 @@ export default function CheckoutScreen() {
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
-      const giftCardProvider = orderForm.paymentData?.giftCards?.find((giftCard) => giftCard.provider)?.provider;
-      const updatedOrderForm = await addGiftCardToCart(orderForm.orderFormId, redemptionCode, appliedGiftCards, giftCardProvider, orderForm.paymentData?.payments ?? []);
+      const giftCardOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
+      const giftCardApplied = (giftCardOrderForm.paymentData?.giftCards ?? []).filter((giftCard) => giftCard.inUse && giftCard.redemptionCode);
+      const giftCardProvider = giftCardOrderForm.paymentData?.giftCards?.find((giftCard) => giftCard.provider)?.provider;
+      const updatedOrderForm = await addGiftCardToCart(giftCardOrderForm.orderFormId, redemptionCode, giftCardApplied, giftCardProvider, giftCardOrderForm.paymentData?.payments ?? []);
       setOrderForm(updatedOrderForm);
       setVoucher('');
       setVoucherMessage('Vale-presente aplicado.');

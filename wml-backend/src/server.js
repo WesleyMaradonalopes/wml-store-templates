@@ -387,6 +387,10 @@ async function searchCustomerByEmail(email) {
 
 async function updateCustomerByEmail(email, profile) {
   const current = await searchCustomerByEmail(email);
+  const requestedBirthDate = String(profile.birthDate ?? '').trim();
+  const currentBirthDate = String(current?.birthDate ?? '').trim();
+  const requestedGender = String(profile.gender ?? '').trim();
+  const currentGender = String(current?.gender ?? '').trim();
   const payload = {
     email,
     firstName: profile.firstName ?? current?.firstName ?? '',
@@ -395,8 +399,8 @@ async function updateCustomerByEmail(email, profile) {
     documentType: profile.documentType ?? current?.documentType ?? 'cpf',
     phone: profile.phone ?? current?.phone ?? '',
     homePhone: profile.homePhone ?? current?.homePhone ?? profile.phone ?? current?.homePhone ?? '',
-    birthDate: profile.birthDate ?? current?.birthDate ?? '',
-    gender: profile.gender ?? current?.gender ?? '',
+    ...(requestedBirthDate || currentBirthDate ? { birthDate: requestedBirthDate || currentBirthDate } : {}),
+    ...(requestedGender || currentGender ? { gender: requestedGender || currentGender } : {}),
     isNewsletterOptIn: profile.isNewsletterOptIn ?? current?.isNewsletterOptIn ?? false,
   };
   const url = current?.id
