@@ -551,12 +551,35 @@ export default function CheckoutScreen() {
     void persistCustomer();
   }
 
+  async function clearGiftCardsBeforeCustomerSwitch(currentOrderForm: OrderForm, nextEmail: string): Promise<OrderForm> {
+    const normalizedNextEmail = nextEmail.trim().toLowerCase();
+    const currentEmail = currentOrderForm.clientProfileData?.email?.trim().toLowerCase() ?? '';
+    const currentGiftCards = (currentOrderForm.paymentData?.giftCards ?? []).filter((giftCard) => giftCard.inUse && giftCard.redemptionCode);
+    if (!currentGiftCards.length || currentEmail === normalizedNextEmail) return currentOrderForm;
+
+    let updatedOrderForm = currentOrderForm;
+    for (const giftCard of currentGiftCards) {
+      const currentCards = (updatedOrderForm.paymentData?.giftCards ?? []).filter((item) => item.inUse && item.redemptionCode);
+      updatedOrderForm = await removeGiftCardFromCart(
+        updatedOrderForm.orderFormId,
+        giftCard,
+        currentCards,
+        updatedOrderForm.paymentData?.payments ?? [],
+      );
+    }
+    setOrderForm(updatedOrderForm);
+    setVoucherMessage('');
+    setVoucherMessageType(null);
+    return updatedOrderForm;
+  }
+
   async function continueWithEmail() {
     setEmailValidationAttempted(true);
     if (!validEmail(email)) return;
     setSaving(true);
     setMessage('');
     try {
+      if (orderForm) await clearGiftCardsBeforeCustomerSwitch(orderForm, email);
       const { profile, addresses } = await loadCustomerData(email);
       if (profile) {
         setCustomerExists(true); setEditingCustomer(false); applyProfile(profile, email);
@@ -924,6 +947,9 @@ export default function CheckoutScreen() {
     if (!desiredEmail || !desiredDocument) {
       return currentOrderForm;
     }
+
+    const customerOrderForm = await clearGiftCardsBeforeCustomerSwitch(currentOrderForm, desiredEmail);
+    if (customerOrderForm !== currentOrderForm) currentOrderForm = customerOrderForm;
 
     if (customerExists || currentOrderForm.userProfileId) {
       const identifiedOrderForm = await identifyExistingCustomerByEmail(currentOrderForm.orderFormId, desiredEmail);
