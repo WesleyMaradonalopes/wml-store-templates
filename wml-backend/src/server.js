@@ -18,6 +18,7 @@ const wishlistEntity = process.env.VTEX_WISHLIST_ENTITY || 'wishlist';
 const wishlistSchema = process.env.VTEX_WISHLIST_SCHEMA || 'wishlist';
 const wishlistEntities = [...new Set([wishlistEntity, 'wishlist', 'WL', 'wl', 'WI', 'wi'])];
 const customerVtexSessions = new Map();
+const checkoutOwnershipCookies = new Map();
 const wishlistIoStrategyByEmail = new Map();
 const backendSourceDirectory = path.dirname(fileURLToPath(import.meta.url));
 const cmsDirectory = process.env.CMS_SCHEMAS_DIR
@@ -310,6 +311,27 @@ function transactionAuthCookie(response) {
 
 function normalizeCookieHeader(raw) {
   return String(raw || '').split(/,(?=[A-Za-z0-9_.-]+=)/).map((part) => part.trim().split(';')[0]).filter(Boolean).join('; ');
+}
+
+function checkoutOwnershipCookieForOrderForm(orderFormId) {
+  const key = String(orderFormId || '').trim();
+  const stored = checkoutOwnershipCookies.get(key);
+  if (!stored) return '';
+  if (Date.now() - stored.updatedAt > 24 * 60 * 60 * 1000) {
+    checkoutOwnershipCookies.delete(key);
+    return '';
+  }
+  return stored.cookieHeader || '';
+}
+
+function rememberCheckoutOwnershipCookie(orderFormId, response) {
+  const key = String(orderFormId || '').trim();
+  if (!key) return;
+  const received = normalizeCookieHeader(extractSetCookie(response));
+  if (!received) return;
+  const merged = mergeCookieHeaders(checkoutOwnershipCookieForOrderForm(key), received);
+  checkoutOwnershipCookies.set(key, { cookieHeader: merged, updatedAt: Date.now() });
+  console.info(`[CHECKOUT] ownership cookie stored -> orderForm=${key}`);
 }
 
 function tokenFromCookie(cookieHeader) {
@@ -689,10 +711,13 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
       {
         method: 'POST',
         contentType: true,
+        cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
         fallbackToAppAuth: true,
         body: JSON.stringify(profile),
       },
     );
+    console.info(`[CHECKOUT] paymentData -> ownershipCookie=${Boolean(checkoutOwnershipCookieForOrderForm(orderFormId))}`);
+    rememberCheckoutOwnershipCookie(orderFormId, result);
     const body = await readResponseBody(result);
     if (!result.ok) {
       return response.status(502).json({
@@ -710,6 +735,44 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
   }
 });
 
+app.post('/checkout/order-form/:orderFormId/payment-data', async (request, response) => {
+  const orderFormId = String(request.params.orderFormId || '').trim();
+  if (!isSafeCheckoutId(orderFormId)) {
+    return response.status(400).json({ ok: false, message: 'Carrinho inválido.' });
+  }
+
+  const paymentData = request.body && typeof request.body === 'object' ? request.body : {};
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  try {
+    const result = await requestCheckout(
+      `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`,
+      {
+        method: 'POST',
+        userToken,
+        contentType: true,
+        cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+        fallbackToAppAuth: true,
+        body: JSON.stringify(paymentData),
+      },
+    );
+    rememberCheckoutOwnershipCookie(orderFormId, result);
+    const body = await readResponseBody(result);
+    if (!result.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(body),
+        message: vtexErrorMessage(body, `A VTEX não conseguiu atualizar os dados de pagamento (HTTP ${result.status}).`),
+      });
+    }
+    return response.json(body);
+  } catch (error) {
+    return response.status(502).json({
+      ok: false,
+      message: error instanceof Error ? error.message : 'Não foi possível atualizar os dados de pagamento.',
+    });
+  }
+});
+
 app.post('/checkout/order', async (request, response) => {
   const orderFormId = String(request.body?.orderFormId || '').trim();
   const paymentSystem = String(request.body?.paymentSystem || '').trim();
@@ -723,7 +786,7 @@ app.post('/checkout/order', async (request, response) => {
   try {
     const orderFormResult = await requestCheckout(
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}`,
-      { userToken, fallbackToAppAuth: true },
+      { userToken, cookie: checkoutOwnershipCookieForOrderForm(orderFormId), fallbackToAppAuth: true },
     );
     const orderForm = await readResponseBody(orderFormResult);
     if (!orderFormResult.ok) {
@@ -786,6 +849,7 @@ app.post('/checkout/order', async (request, response) => {
         // Guests still make a public request because userToken is empty.
         userToken,
         contentType: true,
+        cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
         // A primeira tentativa preserva a sessão do cliente. Se a VTEX
         // rejeitar essa identidade com 401, o backend tenta uma única vez
         // usando suas credenciais protegidas. Um 403 não é repetido para não

@@ -918,7 +918,7 @@ export default function CheckoutScreen() {
       documentMatches,
     });
 
-    if (!desiredEmail || !desiredDocument || (currentEmail.toLowerCase() === desiredEmail.toLowerCase() && documentMatches)) {
+    if (!desiredEmail || !desiredDocument) {
       return currentOrderForm;
     }
 

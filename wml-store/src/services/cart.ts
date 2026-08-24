@@ -325,6 +325,20 @@ async function checkoutFetch(url: string, init: RequestInit = {}) {
   return fetch(url, { ...init, cache: 'no-store', headers: { ...authHeaders, ...baseHeaders } });
 }
 
+async function paymentDataFetch(orderFormId: string, init: RequestInit = {}) {
+  const baseHeaders = { 'Cache-Control': 'no-cache', Pragma: 'no-cache', ...(init.headers || {}) };
+  const authHeaders = await userTokenHeaders();
+  const backendResponse = await fetch(
+    `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/payment-data`,
+    { ...init, cache: 'no-store', headers: { ...authHeaders, ...baseHeaders } },
+  ).catch(() => null);
+  if (backendResponse) return backendResponse;
+  return checkoutFetch(
+    `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`,
+    init,
+  );
+}
+
 function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
   return {
     orderFormId: orderForm.orderFormId,
@@ -567,29 +581,26 @@ export async function selectPaymentMethod({
   installmentsInterestRate?: number;
   giftCards?: GiftCard[];
 }): Promise<OrderForm> {
-  const response = await checkoutFetch(
-    `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${orderFormId}/attachments/paymentData`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        payments: [{
-          paymentSystem,
-          referenceValue: Math.round(value * 100),
-          value: Math.round(value * 100),
-          installments: Math.max(1, Math.round(installments)),
-          installmentsInterestRate: Number(installmentsInterestRate || 0),
-        }],
-        ...(giftCards
-          ? {
-              giftCards: giftCards
-                .filter((giftCard) => giftCard.inUse && (giftCard.redemptionCode || giftCard.id))
-                .map((giftCard) => giftCardAttachment(giftCard, true)),
-            }
-          : {}),
-      }),
-    },
-  );
+  const response = await paymentDataFetch(orderFormId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      payments: [{
+        paymentSystem,
+        referenceValue: Math.round(value * 100),
+        value: Math.round(value * 100),
+        installments: Math.max(1, Math.round(installments)),
+        installmentsInterestRate: Number(installmentsInterestRate || 0),
+      }],
+      ...(giftCards
+        ? {
+            giftCards: giftCards
+              .filter((giftCard) => giftCard.inUse && (giftCard.redemptionCode || giftCard.id))
+              .map((giftCard) => giftCardAttachment(giftCard, true)),
+          }
+        : {}),
+    }),
+  });
 
   if (!response.ok) throw new Error(`Unable to select payment method: ${response.status}`);
   const orderForm = (await response.json()) as VtexOrderForm;
@@ -815,7 +826,7 @@ export async function addGiftCardToCart(
       .map((giftCard) => giftCardAttachment(giftCard, true)),
     giftCardAttachment({ redemptionCode: redemptionCode.trim() }, true, provider),
   ];
-  const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`, {
+  const response = await paymentDataFetch(orderFormId, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payments, giftCards }),
@@ -861,7 +872,7 @@ export async function removeGiftCardFromCart(
       .map((giftCard) => giftCardAttachment(giftCard, true)),
     giftCardAttachment({ redemptionCode: redemptionCode.trim() }, false),
   ];
-  const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`, {
+  const response = await paymentDataFetch(orderFormId, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payments, giftCards }),
