@@ -683,6 +683,72 @@ async function saveWishlistByEmail(email, items, token = '', current = null) {
 
 app.get('/health', (_request, response) => response.json({ ok: true, service: 'wml-backend' }));
 
+app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, response) => {
+  const orderFormId = String(request.params.orderFormId || '').trim();
+  const email = String(request.body?.email || '').trim().toLowerCase();
+  const requestedSalesChannel = String(request.body?.salesChannel || '1').trim();
+  const salesChannel = /^\d+$/.test(requestedSalesChannel) ? requestedSalesChannel : '1';
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  if (!isSafeCheckoutId(orderFormId) || !email) {
+    return response.status(400).json({ ok: false, message: 'Carrinho ou e-mail inválido.' });
+  }
+
+  try {
+    // O Checkout VTEX usa esta consulta + o attachment contendo somente o
+    // e-mail para fazer a identificação parcial de um cliente existente.
+    const profileUrl = new URL(`${vtexBaseUrl}/api/checkout/pub/profiles`);
+    profileUrl.searchParams.set('email', email);
+    profileUrl.searchParams.set('sc', salesChannel);
+    profileUrl.searchParams.set('ensureComplete', 'false');
+    const profileResult = await requestCheckout(profileUrl.toString(), {
+      userToken,
+      cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+    });
+    rememberCheckoutOwnershipCookie(orderFormId, profileResult);
+    const profileBody = await readResponseBody(profileResult);
+    if (!profileResult.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(profileBody),
+        message: vtexErrorMessage(profileBody, `A VTEX não conseguiu localizar o cliente (HTTP ${profileResult.status}).`),
+      });
+    }
+    const profile = Array.isArray(profileBody) ? profileBody[0] : profileBody;
+    const profileFound = Boolean(profile?.userProfileId || profile?.userProfile?.email || profile?.email);
+    if (!profileFound) {
+      console.info(`[CHECKOUT] profile-by-email -> found=false orderForm=${orderFormId}`);
+      return response.status(404).json({ ok: false, message: 'Cliente não encontrado no Checkout VTEX.' });
+    }
+
+    const attachmentResult = await requestCheckout(
+      `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
+      {
+        method: 'POST',
+        userToken,
+        contentType: true,
+        cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+        body: JSON.stringify({ email }),
+      },
+    );
+    rememberCheckoutOwnershipCookie(orderFormId, attachmentResult);
+    const attachmentBody = await readResponseBody(attachmentResult);
+    if (!attachmentResult.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(attachmentBody),
+        message: vtexErrorMessage(attachmentBody, `A VTEX não conseguiu identificar o cliente (HTTP ${attachmentResult.status}).`),
+      });
+    }
+    console.info(`[CHECKOUT] profile-by-email -> found=true identified=${Boolean(attachmentBody?.userProfileId)} ownershipCookie=${Boolean(checkoutOwnershipCookieForOrderForm(orderFormId))}`);
+    return response.json(attachmentBody);
+  } catch (error) {
+    return response.status(502).json({
+      ok: false,
+      message: error instanceof Error ? error.message : 'Não foi possível identificar o cliente no Checkout VTEX.',
+    });
+  }
+});
+
 app.post('/checkout/order-form/:orderFormId/client-profile', async (request, response) => {
   const orderFormId = String(request.params.orderFormId || '').trim();
   if (!isSafeCheckoutId(orderFormId)) {
@@ -690,6 +756,7 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
   }
 
   const source = request.body && typeof request.body === 'object' ? request.body : {};
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
   const profile = {
     email: String(source.email || '').trim(),
     ...(source.firstName ? { firstName: String(source.firstName).trim() } : {}),
@@ -704,20 +771,19 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
   }
 
   try {
-    // O orderForm é identificado pelo próprio ID. Evitar o cookie do usuário
-    // aqui impede que um token antigo do Expo Go bloqueie um attachment público.
     const result = await requestCheckout(
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
       {
         method: 'POST',
+        userToken,
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
         fallbackToAppAuth: true,
         body: JSON.stringify(profile),
       },
     );
-    console.info(`[CHECKOUT] paymentData -> ownershipCookie=${Boolean(checkoutOwnershipCookieForOrderForm(orderFormId))}`);
     rememberCheckoutOwnershipCookie(orderFormId, result);
+    console.info(`[CHECKOUT] clientProfile -> ownershipCookie=${Boolean(checkoutOwnershipCookieForOrderForm(orderFormId))}`);
     const body = await readResponseBody(result);
     if (!result.ok) {
       return response.status(502).json({

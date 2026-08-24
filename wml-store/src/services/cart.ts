@@ -72,6 +72,8 @@ export type GiftCard = {
 
 export type OrderForm = {
   orderFormId: string;
+  userProfileId?: string;
+  canEditData?: boolean;
   value: number;
   items: CartItem[];
   recaptchaKey?: string;
@@ -179,6 +181,8 @@ function isBetterShippingQuote(candidate: ShippingQuote, current: ShippingQuote)
 
 type VtexOrderForm = {
   orderFormId: string;
+  userProfileId?: string | null;
+  canEditData?: boolean | null;
   message?: string;
   error?: { code?: string; message?: string };
   messages?: Array<{ text?: string | null; message?: string | null }>;
@@ -342,6 +346,8 @@ async function paymentDataFetch(orderFormId: string, init: RequestInit = {}) {
 function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
   return {
     orderFormId: orderForm.orderFormId,
+    userProfileId: orderForm.userProfileId ?? undefined,
+    canEditData: orderForm.canEditData ?? undefined,
     value: (orderForm.value ?? 0) / 100,
     recaptchaKey: orderForm.recaptchaKey,
     recaptchaKeyV3: orderForm.recaptchaKeyV3,
@@ -445,6 +451,7 @@ export async function updateClientProfile({
   gender?: string;
   birthDate?: string;
 }): Promise<OrderForm> {
+  const authHeaders = await userTokenHeaders();
   // A attachment clientProfileData recebe os campos diretamente. O objeto
   // aninhado funciona em algumas respostas, mas é rejeitado quando o cliente
   // ainda não existe.
@@ -459,7 +466,7 @@ export async function updateClientProfile({
   });
   const requestInit: RequestInit = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
     body,
   };
 
@@ -860,27 +867,80 @@ export async function addGiftCardToCart(
   return normalizedOrderForm;
 }
 
+export async function identifyExistingCustomerByEmail(
+  orderFormId: string,
+  email: string,
+): Promise<OrderForm | null> {
+  const authHeaders = await userTokenHeaders();
+  const response = await fetch(
+    `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/profile-by-email`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ email: email.trim().toLowerCase(), salesChannel: storeConfig.salesChannel }),
+    },
+  ).catch(() => null);
+
+  if (!response) throw new Error('Não foi possível identificar o cliente no Checkout VTEX.');
+  const payload = await response.json().catch(() => ({})) as VtexOrderForm & { message?: string };
+  if (response.status === 404) return null;
+  if (!response.ok || !payload.orderFormId) {
+    throw new Error(payload.message || `Não foi possível identificar o cliente (HTTP ${response.status}).`);
+  }
+
+  await setStoredJson(ORDER_FORM_ID_KEY, payload.orderFormId);
+  const normalizedOrderForm = normalizeOrderForm(payload);
+  publishCartChange(normalizedOrderForm);
+  return normalizedOrderForm;
+}
+
 export async function removeGiftCardFromCart(
   orderFormId: string,
-  redemptionCode: string,
-  remainingGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
+  giftCardToRemove: Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>,
+  currentGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
   payments: PaymentDataPayment[] = [],
 ): Promise<OrderForm> {
-  const giftCards = [
-    ...remainingGiftCards
-      .filter((giftCard) => giftCard.redemptionCode || giftCard.id)
-      .map((giftCard) => giftCardAttachment(giftCard, true)),
-    giftCardAttachment({ redemptionCode: redemptionCode.trim() }, false),
-  ];
+  const targetCode = normalizeGiftCardCode(giftCardToRemove.redemptionCode);
+  const targetId = String(giftCardToRemove.id || '').trim();
+  let targetIncluded = false;
+  const giftCards = currentGiftCards
+    .filter((giftCard) => giftCard.redemptionCode || giftCard.id)
+    .map((giftCard) => {
+      const matches = Boolean(
+        (targetId && String(giftCard.id || '').trim() === targetId)
+        || (targetCode && normalizeGiftCardCode(giftCard.redemptionCode) === targetCode),
+      );
+      if (matches) targetIncluded = true;
+      return giftCardAttachment(giftCard, !matches);
+    });
+  if (!targetIncluded) giftCards.push(giftCardAttachment(giftCardToRemove, false));
+
   const response = await paymentDataFetch(orderFormId, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payments, giftCards }),
   });
-  if (!response.ok) throw new Error('Não foi possível remover o vale-presente.');
+  const errorBody = !response.ok
+    ? await response.clone().json().catch(() => null) as VtexOrderForm | null
+    : null;
+  if (!response.ok) {
+    const message = giftCardResponseMessage(errorBody);
+    console.warn('[GIFT CARD] remove rejected', { status: response.status, code: errorBody?.error?.code, message });
+    throw new Error(message || 'Não foi possível remover o vale-presente.');
+  }
   const orderForm = await response.json() as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
-  return normalizeOrderForm(orderForm);
+  const normalizedOrderForm = normalizeOrderForm(orderForm);
+  const stillApplied = normalizedOrderForm.paymentData?.giftCards?.some((giftCard) => giftCard.inUse && Boolean(
+    (targetId && String(giftCard.id || '').trim() === targetId)
+    || (targetCode && normalizeGiftCardCode(giftCard.redemptionCode) === targetCode),
+  ));
+  if (stillApplied) {
+    const message = giftCardResponseMessage(orderForm);
+    console.warn('[GIFT CARD] remove not reflected in orderForm', { message });
+    throw new Error(message || 'Não foi possível remover o vale-presente.');
+  }
+  return normalizedOrderForm;
 }
 
 export async function simulateProductShipping({
