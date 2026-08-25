@@ -628,11 +628,13 @@ export async function getPaymentInstallments({ orderFormId, paymentSystem }: { o
     ?? [];
 }
 
-async function loadOrderForm(orderFormId?: string): Promise<OrderForm> {
-  const persistedOrderFormId = orderFormId ?? (await getStoredJson<string>(ORDER_FORM_ID_KEY));
+async function loadOrderForm(orderFormId?: string, forceNewCart = false): Promise<OrderForm> {
+  const persistedOrderFormId = forceNewCart
+    ? undefined
+    : orderFormId ?? (await getStoredJson<string>(ORDER_FORM_ID_KEY));
   const path = persistedOrderFormId
     ? `/api/checkout/pub/orderform/${persistedOrderFormId}`
-    : `/api/checkout/pub/orderform?sc=${encodeURIComponent(storeConfig.salesChannel)}`;
+    : `/api/checkout/pub/orderform?sc=${encodeURIComponent(storeConfig.salesChannel)}${forceNewCart ? '&forceNewCart=true' : ''}`;
   const response = await checkoutFetch(`${storeConfig.vtexBaseUrl}${path}`);
   if (!response.ok && persistedOrderFormId) {
     await removeStoredValue(ORDER_FORM_ID_KEY);
@@ -667,7 +669,10 @@ export async function createFreshOrderForm(items: CartItem[] = []): Promise<Orde
   await removeStoredValue(ORDER_FORM_ID_KEY);
 
   try {
-    const freshOrderForm = await loadOrderForm();
+    const freshOrderForm = await loadOrderForm(undefined, true);
+    if (previousOrderFormId && freshOrderForm.orderFormId === previousOrderFormId) {
+      throw new Error('A VTEX não gerou um novo carrinho. Tente novamente.');
+    }
     if (!items.length) return freshOrderForm;
 
     const response = await checkoutFetch(
@@ -942,18 +947,16 @@ export async function removeGiftCardFromCart(
 ): Promise<OrderForm> {
   const targetCode = normalizeGiftCardCode(giftCardToRemove.redemptionCode);
   const targetId = String(giftCardToRemove.id || '').trim();
-  let targetIncluded = false;
   const giftCards = currentGiftCards
     .filter((giftCard) => giftCard.redemptionCode || giftCard.id)
-    .map((giftCard) => {
+    .filter((giftCard) => {
       const matches = Boolean(
         (targetId && String(giftCard.id || '').trim() === targetId)
         || (targetCode && normalizeGiftCardCode(giftCard.redemptionCode) === targetCode),
       );
-      if (matches) targetIncluded = true;
-      return giftCardAttachment(giftCard, !matches);
-    });
-  if (!targetIncluded) giftCards.push(giftCardAttachment(giftCardToRemove, false));
+      return !matches;
+    })
+    .map((giftCard) => giftCardAttachment(giftCard, true));
 
   const response = await paymentDataFetch(orderFormId, {
     method: 'POST',
