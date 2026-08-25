@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, addGiftCardToCart, clearCart, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type GiftCard, type InstallmentChoice } from '@/services/cart';
+import { addCouponToCart, addGiftCardToCart, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
@@ -29,6 +29,26 @@ type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' |
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
 type ShippingOption = NonNullable<OrderForm['shippingData']>['logisticsInfo'][number]['slas'][number];
 type PaymentMethod = NonNullable<OrderForm['paymentData']>['paymentSystems'][number];
+
+function mergeCustomerProfiles(primary: CustomerProfile | null, fallback: NonNullable<OrderForm['clientProfileData']> | null): CustomerProfile | null {
+  if (!primary && !fallback) return null;
+  return {
+    email: primary?.email || fallback?.email || '',
+    firstName: primary?.firstName || fallback?.firstName || '',
+    lastName: primary?.lastName || fallback?.lastName || '',
+    document: primary?.document || fallback?.document || '',
+    phone: primary?.phone || primary?.homePhone || fallback?.phone || '',
+    homePhone: primary?.homePhone || primary?.phone || fallback?.phone || '',
+    birthDate: primary?.birthDate || fallback?.birthDate || '',
+    gender: primary?.gender || fallback?.gender || '',
+    ...(primary?.isNewsletterOptIn !== undefined ? { isNewsletterOptIn: primary.isNewsletterOptIn } : {}),
+  };
+}
+
+function isGiftCardOwnershipError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /um usuário por carrinho|um usuario por carrinho|remover e adicioná-lo novamente|remover e adiciona-lo novamente/i.test(message);
+}
 
 const DEFAULT_WEB_RECAPTCHA_SITE_KEY = '6LfYDiAqAAAAAPmcjgLXQkKD_sP131cQECisZO27';
 const WEB_RECAPTCHA_SITE_KEY = String(
@@ -455,7 +475,7 @@ export default function CheckoutScreen() {
     setPhone(formatPhone(profile.phone || profile.homePhone || ''));
     setBirthDate(formatBirthDate(profile.birthDate || ''));
     setGender(profile.gender || '');
-    if (!newsletterOptInTouched.current) setNewsletterOptIn(Boolean(profile.isNewsletterOptIn));
+    if (!newsletterOptInTouched.current && profile.isNewsletterOptIn !== undefined) setNewsletterOptIn(Boolean(profile.isNewsletterOptIn));
   }
 
   function changeNewsletterOptIn(value: boolean) {
@@ -505,6 +525,7 @@ export default function CheckoutScreen() {
     setSaving(true);
     setMessage('');
     try {
+      const customerOrderForm = await clearGiftCardsBeforeCustomerSwitch(orderForm, email);
       await updateCustomerProfile(email.trim().toLowerCase(), {
         email: email.trim().toLowerCase(),
         firstName: firstName.trim(),
@@ -516,10 +537,10 @@ export default function CheckoutScreen() {
         isNewsletterOptIn: newsletterOptIn,
       });
       const identifiedOrderForm = customerExists
-        ? await identifyExistingCustomerByEmail(orderForm.orderFormId, email)
+        ? await identifyExistingCustomerByEmail(customerOrderForm.orderFormId, email)
         : null;
-      setOrderForm(identifiedOrderForm ?? await updateClientProfile({
-        orderFormId: orderForm.orderFormId,
+      setOrderForm(await updateClientProfile({
+        orderFormId: (identifiedOrderForm ?? customerOrderForm).orderFormId,
         email: email.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -551,26 +572,57 @@ export default function CheckoutScreen() {
     void persistCustomer();
   }
 
+  async function createFreshCheckoutOrderForm(previousOrderForm: OrderForm): Promise<OrderForm> {
+    let freshOrderForm = await createFreshOrderForm(previousOrderForm.items);
+    const existingCoupon = previousOrderForm.marketingData?.coupon?.trim();
+    if (existingCoupon) {
+      freshOrderForm = await addCouponToCart(freshOrderForm.orderFormId, existingCoupon).catch(() => freshOrderForm);
+    }
+    return freshOrderForm;
+  }
+
   async function clearGiftCardsBeforeCustomerSwitch(currentOrderForm: OrderForm, nextEmail: string): Promise<OrderForm> {
     const normalizedNextEmail = nextEmail.trim().toLowerCase();
     const currentEmail = currentOrderForm.clientProfileData?.email?.trim().toLowerCase() ?? '';
     const currentGiftCards = (currentOrderForm.paymentData?.giftCards ?? []).filter((giftCard) => giftCard.inUse && giftCard.redemptionCode);
     if (!currentGiftCards.length || currentEmail === normalizedNextEmail) return currentOrderForm;
 
-    let updatedOrderForm = currentOrderForm;
-    for (const giftCard of currentGiftCards) {
-      const currentCards = (updatedOrderForm.paymentData?.giftCards ?? []).filter((item) => item.inUse && item.redemptionCode);
-      updatedOrderForm = await removeGiftCardFromCart(
-        updatedOrderForm.orderFormId,
-        giftCard,
-        currentCards,
-        updatedOrderForm.paymentData?.payments ?? [],
-      );
-    }
+    // Não tentamos trocar o proprietário de um orderForm que ainda tem vale
+    // restrito. A VTEX bloqueia essa operação; um novo orderForm mantém os
+    // itens e elimina o vínculo do cliente anterior de forma segura.
+    const updatedOrderForm = await createFreshCheckoutOrderForm(currentOrderForm);
     setOrderForm(updatedOrderForm);
     setVoucherMessage('');
     setVoucherMessageType(null);
+    setSelectedPayment(null);
+    setSelectedPaymentLabel('');
+    setInstallmentOptions([]);
+    setSelectedInstallment(null);
+    setSelectedCardBrand('generic');
     return updatedOrderForm;
+  }
+
+  async function recoverFromGiftCardOwnershipError(previousOrderForm: OrderForm): Promise<OrderForm> {
+    const freshOrderForm = await createFreshCheckoutOrderForm(previousOrderForm);
+    const recoveredOrderForm = email.trim()
+      ? await updateClientProfile({
+          orderFormId: freshOrderForm.orderFormId,
+          email: email.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          document: digits(document),
+          phone: digits(phone),
+          birthDate: birthDateToApi(birthDate) || undefined,
+          gender: gender || undefined,
+        })
+      : freshOrderForm;
+    setOrderForm(recoveredOrderForm);
+    setSelectedPayment(null);
+    setSelectedPaymentLabel('');
+    setInstallmentOptions([]);
+    setSelectedInstallment(null);
+    setSelectedCardBrand('generic');
+    return recoveredOrderForm;
   }
 
   async function continueWithEmail() {
@@ -579,10 +631,16 @@ export default function CheckoutScreen() {
     setSaving(true);
     setMessage('');
     try {
-      if (orderForm) await clearGiftCardsBeforeCustomerSwitch(orderForm, email);
+      let identifiedOrderForm: OrderForm | null = null;
+      const customerOrderForm = orderForm ? await clearGiftCardsBeforeCustomerSwitch(orderForm, email) : null;
+      if (customerOrderForm) {
+        identifiedOrderForm = await identifyExistingCustomerByEmail(customerOrderForm.orderFormId, email).catch(() => null);
+        if (identifiedOrderForm) setOrderForm(identifiedOrderForm);
+      }
       const { profile, addresses } = await loadCustomerData(email);
-      if (profile) {
-        setCustomerExists(true); setEditingCustomer(false); applyProfile(profile, email);
+      const hydratedProfile = mergeCustomerProfiles(profile, identifiedOrderForm?.clientProfileData ?? null);
+      if (hydratedProfile) {
+        setCustomerExists(true); setEditingCustomer(false); applyProfile(hydratedProfile, email);
         setCustomerAddresses(addresses);
         const preferred = addresses.find((item) => item.postalCode && item.street);
         if (preferred) applyAddress(preferred);
@@ -954,8 +1012,21 @@ export default function CheckoutScreen() {
     if (customerExists || currentOrderForm.userProfileId) {
       const identifiedOrderForm = await identifyExistingCustomerByEmail(currentOrderForm.orderFormId, desiredEmail);
       if (identifiedOrderForm) {
-        setOrderForm(identifiedOrderForm);
-        return identifiedOrderForm;
+        // A identificação somente pelo e-mail pode deixar o documento do
+        // cliente anterior no orderForm. Reanexamos o perfil completo antes
+        // de consultar um vale-presente vinculado ao CPF.
+        const hydratedOrderForm = await updateClientProfile({
+          orderFormId: identifiedOrderForm.orderFormId,
+          email: desiredEmail,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          document: desiredDocument,
+          phone: digits(phone),
+          birthDate: birthDateToApi(birthDate) || undefined,
+          gender: gender || undefined,
+        });
+        setOrderForm(hydratedOrderForm);
+        return hydratedOrderForm;
       }
     }
 
@@ -1010,8 +1081,19 @@ export default function CheckoutScreen() {
       setVoucherMessage('Vale-presente removido.');
       setVoucherMessageType('success');
     } catch (error) {
-      setVoucherMessage(error instanceof Error ? error.message : 'Não foi possível remover o vale-presente.');
-      setVoucherMessageType('error');
+      if (isGiftCardOwnershipError(error)) {
+        try {
+          await recoverFromGiftCardOwnershipError(orderForm);
+          setVoucherMessage('Vale-presente removido.');
+          setVoucherMessageType('success');
+        } catch (recoveryError) {
+          setVoucherMessage(recoveryError instanceof Error ? recoveryError.message : 'Não foi possível remover o vale-presente.');
+          setVoucherMessageType('error');
+        }
+      } else {
+        setVoucherMessage(error instanceof Error ? error.message : 'Não foi possível remover o vale-presente.');
+        setVoucherMessageType('error');
+      }
     } finally {
       setRemovingGiftCard(null);
       setSaving(false);

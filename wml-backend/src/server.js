@@ -376,23 +376,78 @@ function sessionHeaders(email, token = '') {
   return headers;
 }
 
+function firstProfileValue(profile, keys) {
+  for (const key of keys) {
+    const value = profile?.[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'string' && !value.trim()) continue;
+    return value;
+  }
+  return '';
+}
+
+function profileBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  return ['true', '1', 'yes', 'sim'].includes(String(value || '').trim().toLowerCase());
+}
+
+function checkoutBirthDate(value) {
+  const normalized = String(value || '').trim();
+  const isoMatch = normalized.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const brazilianMatch = normalized.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (brazilianMatch) return `${brazilianMatch[3]}-${brazilianMatch[2]}-${brazilianMatch[1]}`;
+  return '';
+}
+
 function normalizeProfile(profile) {
   if (!profile || typeof profile !== 'object') return null;
+  const nestedProfile = profile.userProfile && typeof profile.userProfile === 'object' ? profile.userProfile : {};
+  const source = { ...profile, ...nestedProfile };
   return {
-    id: profile.id || profile.Id || '',
-    userId: profile.userId || profile.UserId || '',
-    email: profile.email || profile.userEmail || '',
-    firstName: profile.firstName || '',
-    lastName: profile.lastName || '',
-    document: profile.document || '',
-    documentType: profile.documentType || 'cpf',
-    phone: profile.phone || profile.homePhone || '',
-    homePhone: profile.homePhone || profile.phone || '',
-    businessPhone: profile.businessPhone || '',
-    birthDate: profile.birthDate || '',
-    gender: profile.gender || '',
-    isNewsletterOptIn: Boolean(profile.isNewsletterOptIn),
+    id: String(firstProfileValue(source, ['id', 'Id', 'documentId']) || ''),
+    userId: String(firstProfileValue(source, ['userId', 'UserId', 'userProfileId', 'profileId']) || ''),
+    email: String(firstProfileValue(source, ['email', 'userEmail']) || ''),
+    firstName: String(firstProfileValue(source, ['firstName', 'first_name', 'name', 'Nome']) || ''),
+    lastName: String(firstProfileValue(source, ['lastName', 'last_name', 'surname', 'Sobrenome']) || ''),
+    document: String(firstProfileValue(source, ['document', 'cpf', 'CPF']) || ''),
+    documentType: String(firstProfileValue(source, ['documentType', 'document_type']) || 'cpf'),
+    phone: String(firstProfileValue(source, ['phone', 'homePhone', 'telephone', 'phoneNumber']) || ''),
+    homePhone: String(firstProfileValue(source, ['homePhone', 'phone', 'telephone', 'phoneNumber']) || ''),
+    businessPhone: String(firstProfileValue(source, ['businessPhone', 'business_phone']) || ''),
+    birthDate: String(firstProfileValue(source, ['birthDate', 'birthdate', 'dateOfBirth', 'date_of_birth']) || ''),
+    gender: String(firstProfileValue(source, ['gender', 'sex', 'genero']) || ''),
+    isNewsletterOptIn: profileBoolean(firstProfileValue(source, ['isNewsletterOptIn', 'newsletterOptIn', 'newsletter'])),
   };
+}
+
+async function searchCheckoutProfileByEmail(email) {
+  const url = new URL(`${vtexBaseUrl}/api/checkout/pub/profiles`);
+  url.searchParams.set('email', email);
+  url.searchParams.set('sc', '1');
+  url.searchParams.set('ensureComplete', 'false');
+  const response = await fetch(url, { headers: publicCheckoutHeaders() });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) return null;
+  const profile = Array.isArray(body) ? body[0] : body;
+  if (!profile || typeof profile !== 'object') return null;
+  return normalizeProfile({
+    ...(profile.userProfile || profile),
+    id: profile.userProfile?.id || profile.userProfileId || profile.id || '',
+    userId: profile.userProfile?.userId || profile.userProfileId || profile.userId || '',
+  });
+}
+
+function mergeProfiles(primary, fallback) {
+  if (!primary) return fallback;
+  if (!fallback) return primary;
+  const merged = { ...fallback };
+  for (const field of ['id', 'userId', 'email', 'firstName', 'lastName', 'document', 'documentType', 'phone', 'homePhone', 'businessPhone', 'birthDate', 'gender']) {
+    const value = primary[field];
+    if (value !== undefined && value !== null && String(value).trim()) merged[field] = value;
+  }
+  if (primary.isNewsletterOptIn !== undefined) merged.isNewsletterOptIn = primary.isNewsletterOptIn;
+  return normalizeProfile(merged);
 }
 
 async function searchCustomerByEmail(email) {
@@ -400,11 +455,23 @@ async function searchCustomerByEmail(email) {
   const url = new URL(`${vtexBaseUrl}/api/dataentities/CL/search`);
   url.searchParams.set('_fields', fields);
   url.searchParams.set('_where', `email=${email}`);
-  url.searchParams.set('_size', '1');
+  url.searchParams.set('_size', '10');
   const response = await fetch(url, { headers: vtexHeaders() });
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(`VTEX Master Data retornou HTTP ${response.status}.`);
-  return Array.isArray(body) ? normalizeProfile(body[0]) : null;
+  if (!Array.isArray(body)) return null;
+  const normalizedEmail = email.trim().toLowerCase();
+  const match = body.find((item) => String(item?.email || item?.userEmail || '').trim().toLowerCase() === normalizedEmail);
+  return normalizeProfile(match || body[0]);
+}
+
+async function resolveCustomerProfile(email) {
+  const masterDataProfile = await searchCustomerByEmail(email).catch(() => null);
+  const needsCheckoutFallback = !masterDataProfile
+    || ['firstName', 'lastName', 'document', 'phone'].some((field) => !String(masterDataProfile[field] || '').trim());
+  if (!needsCheckoutFallback) return masterDataProfile;
+  const checkoutProfile = await searchCheckoutProfileByEmail(email).catch(() => null);
+  return mergeProfiles(masterDataProfile, checkoutProfile);
 }
 
 async function updateCustomerByEmail(email, profile) {
@@ -413,14 +480,15 @@ async function updateCustomerByEmail(email, profile) {
   const currentBirthDate = String(current?.birthDate ?? '').trim();
   const requestedGender = String(profile.gender ?? '').trim();
   const currentGender = String(current?.gender ?? '').trim();
+  const textValue = (requested, existing) => String(requested ?? '').trim() || String(existing ?? '').trim();
   const payload = {
     email,
-    firstName: profile.firstName ?? current?.firstName ?? '',
-    lastName: profile.lastName ?? current?.lastName ?? '',
-    document: profile.document ?? current?.document ?? '',
-    documentType: profile.documentType ?? current?.documentType ?? 'cpf',
-    phone: profile.phone ?? current?.phone ?? '',
-    homePhone: profile.homePhone ?? current?.homePhone ?? profile.phone ?? current?.homePhone ?? '',
+    firstName: textValue(profile.firstName, current?.firstName),
+    lastName: textValue(profile.lastName, current?.lastName),
+    document: textValue(profile.document, current?.document),
+    documentType: textValue(profile.documentType, current?.documentType) || 'cpf',
+    phone: textValue(profile.phone, current?.phone),
+    homePhone: textValue(profile.homePhone, current?.homePhone || profile.phone),
     ...(requestedBirthDate || currentBirthDate ? { birthDate: requestedBirthDate || currentBirthDate } : {}),
     ...(requestedGender || currentGender ? { gender: requestedGender || currentGender } : {}),
     isNewsletterOptIn: profile.isNewsletterOptIn ?? current?.isNewsletterOptIn ?? false,
@@ -694,8 +762,9 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
   }
 
   try {
-    // O Checkout VTEX usa esta consulta + o attachment contendo somente o
-    // e-mail para fazer a identificação parcial de um cliente existente.
+    // O Checkout VTEX usa esta consulta para confirmar que o e-mail pertence
+    // a um perfil existente. Depois anexamos também os dados do perfil para
+    // que o CPF do cliente correto não seja deixado para trás no orderForm.
     const profileUrl = new URL(`${vtexBaseUrl}/api/checkout/pub/profiles`);
     profileUrl.searchParams.set('email', email);
     profileUrl.searchParams.set('sc', salesChannel);
@@ -720,6 +789,25 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
       return response.status(404).json({ ok: false, message: 'Cliente não encontrado no Checkout VTEX.' });
     }
 
+    const checkoutProfile = normalizeProfile({
+      ...(profile?.userProfile || profile || {}),
+      id: profile?.userProfile?.id || profile?.userProfileId || profile?.id || '',
+      userId: profile?.userProfile?.userId || profile?.userProfileId || profile?.userId || '',
+    });
+    const customerProfile = mergeProfiles(
+      await searchCustomerByEmail(email).catch(() => null),
+      checkoutProfile,
+    );
+    const clientProfile = {
+      email,
+      ...(customerProfile?.firstName ? { firstName: customerProfile.firstName } : {}),
+      ...(customerProfile?.lastName ? { lastName: customerProfile.lastName } : {}),
+      ...(customerProfile?.document ? { document: digits(customerProfile.document), documentType: customerProfile.documentType || 'cpf' } : {}),
+      ...(customerProfile?.phone || customerProfile?.homePhone ? { phone: digits(customerProfile.phone || customerProfile.homePhone) } : {}),
+      ...(customerProfile?.gender ? { gender: customerProfile.gender } : {}),
+      ...(checkoutBirthDate(customerProfile?.birthDate) ? { birthDate: checkoutBirthDate(customerProfile.birthDate) } : {}),
+    };
+
     const attachmentResult = await requestCheckout(
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
       {
@@ -727,7 +815,7 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
         userToken,
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(clientProfile),
       },
     );
     rememberCheckoutOwnershipCookie(orderFormId, attachmentResult);
@@ -1222,7 +1310,7 @@ app.get('/customer/profile', async (request, response) => {
   if (!email) return response.status(400).json({ ok: false, message: 'Informe o e-mail do cliente.' });
 
   try {
-    const profile = await searchCustomerByEmail(email);
+    const profile = await resolveCustomerProfile(email);
     console.log(`[PROFILE] ${email} -> ${profile ? 'found' : 'not-found'}`);
     return response.json({ ok: true, profile });
   } catch (error) {

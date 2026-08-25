@@ -657,6 +657,46 @@ export function getOrderForm(orderFormId?: string): Promise<OrderForm> {
   });
 }
 
+/**
+ * Starts a clean checkout cart while keeping the products that were already
+ * selected. VTEX does not allow changing the owner of a cart that still has
+ * a customer-restricted gift card attached to it.
+ */
+export async function createFreshOrderForm(items: CartItem[] = []): Promise<OrderForm> {
+  const previousOrderFormId = await getStoredJson<string>(ORDER_FORM_ID_KEY);
+  await removeStoredValue(ORDER_FORM_ID_KEY);
+
+  try {
+    const freshOrderForm = await loadOrderForm();
+    if (!items.length) return freshOrderForm;
+
+    const response = await checkoutFetch(
+      `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(freshOrderForm.orderFormId)}/items`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderItems: items.map((item) => ({
+            id: item.id,
+            quantity: Math.max(1, item.quantity),
+            seller: item.seller || '1',
+          })),
+        }),
+      },
+    );
+    if (!response.ok) throw new Error(`Unable to restore cart items: ${response.status}`);
+
+    const orderForm = await response.json() as VtexOrderForm;
+    await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
+    const normalizedOrderForm = normalizeOrderForm(orderForm);
+    publishCartChange(normalizedOrderForm);
+    return normalizedOrderForm;
+  } catch (error) {
+    if (previousOrderFormId) await setStoredJson(ORDER_FORM_ID_KEY, previousOrderFormId);
+    throw error;
+  }
+}
+
 export async function clearCart(orderFormId?: string): Promise<OrderForm | null> {
   const id = orderFormId ?? await getStoredJson<string>(ORDER_FORM_ID_KEY);
   if (!id) return null;
