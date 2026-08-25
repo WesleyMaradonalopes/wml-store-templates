@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, addGiftCardToCart, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type GiftCard, type InstallmentChoice } from '@/services/cart';
+import { addCouponToCart, addGiftCardToCart, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, OrderForm, removeCouponFromCart, removeGiftCardFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
@@ -536,11 +536,8 @@ export default function CheckoutScreen() {
         gender: gender || undefined,
         isNewsletterOptIn: newsletterOptIn,
       });
-      const identifiedOrderForm = customerExists
-        ? await identifyExistingCustomerByEmail(customerOrderForm.orderFormId, email)
-        : null;
       setOrderForm(await updateClientProfile({
-        orderFormId: (identifiedOrderForm ?? customerOrderForm).orderFormId,
+        orderFormId: customerOrderForm.orderFormId,
         email: email.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -631,14 +628,10 @@ export default function CheckoutScreen() {
     setSaving(true);
     setMessage('');
     try {
-      let identifiedOrderForm: OrderForm | null = null;
       const customerOrderForm = orderForm ? await clearGiftCardsBeforeCustomerSwitch(orderForm, email) : null;
-      if (customerOrderForm) {
-        identifiedOrderForm = await identifyExistingCustomerByEmail(customerOrderForm.orderFormId, email).catch(() => null);
-        if (identifiedOrderForm) setOrderForm(identifiedOrderForm);
-      }
+      if (customerOrderForm && customerOrderForm !== orderForm) setOrderForm(customerOrderForm);
       const { profile, addresses } = await loadCustomerData(email);
-      const hydratedProfile = mergeCustomerProfiles(profile, identifiedOrderForm?.clientProfileData ?? null);
+      const hydratedProfile = mergeCustomerProfiles(profile, customerOrderForm?.clientProfileData ?? null);
       if (hydratedProfile) {
         setCustomerExists(true); setEditingCustomer(false); applyProfile(hydratedProfile, email);
         setCustomerAddresses(addresses);
@@ -1008,27 +1001,6 @@ export default function CheckoutScreen() {
 
     const customerOrderForm = await clearGiftCardsBeforeCustomerSwitch(currentOrderForm, desiredEmail);
     if (customerOrderForm !== currentOrderForm) currentOrderForm = customerOrderForm;
-
-    if (customerExists || currentOrderForm.userProfileId) {
-      const identifiedOrderForm = await identifyExistingCustomerByEmail(currentOrderForm.orderFormId, desiredEmail);
-      if (identifiedOrderForm) {
-        // A identificação somente pelo e-mail pode deixar o documento do
-        // cliente anterior no orderForm. Reanexamos o perfil completo antes
-        // de consultar um vale-presente vinculado ao CPF.
-        const hydratedOrderForm = await updateClientProfile({
-          orderFormId: identifiedOrderForm.orderFormId,
-          email: desiredEmail,
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          document: desiredDocument,
-          phone: digits(phone),
-          birthDate: birthDateToApi(birthDate) || undefined,
-          gender: gender || undefined,
-        });
-        setOrderForm(hydratedOrderForm);
-        return hydratedOrderForm;
-      }
-    }
 
     const updatedOrderForm = await updateClientProfile({
       orderFormId: currentOrderForm.orderFormId,
