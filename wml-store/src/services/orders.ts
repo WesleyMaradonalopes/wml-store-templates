@@ -2,12 +2,29 @@ import { storeConfig } from '@/config/store';
 
 import { getAccountSession, getVtexUserToken } from './auth';
 
+export type CustomerOrderBundleItem = {
+  id?: string | number;
+  name?: string;
+  quantity?: number;
+  price?: number;
+  priceDefinition?: { total?: number };
+};
+
+export type CustomerOrderItem = {
+  id?: string | number;
+  name?: string;
+  quantity?: number;
+  imageUrl?: string;
+  price?: number;
+  bundleItems?: CustomerOrderBundleItem[];
+};
+
 export type CustomerOrder = {
   orderId: string;
   creationDate?: string;
   status?: string;
   value?: number;
-  items?: Array<{ name?: string; quantity?: number; imageUrl?: string; price?: number }>;
+  items?: CustomerOrderItem[];
   shippingData?: unknown;
   clientProfileData?: unknown;
   paymentData?: unknown;

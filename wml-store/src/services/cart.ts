@@ -3,8 +3,17 @@ import { storeConfig } from '@/config/store';
 import { getStoredJson, removeStoredValue, setStoredJson } from './storage';
 import { getVtexUserToken } from './auth';
 
+export type CartOffering = {
+  id: string;
+  name: string;
+  type?: string;
+  price?: number;
+  quantity?: number;
+};
+
 export type CartItem = {
   index: number;
+  uniqueId?: string;
   id: string;
   seller: string;
   productId: string;
@@ -12,6 +21,8 @@ export type CartItem = {
   quantity: number;
   imageUrl: string;
   price: number;
+  offerings?: CartOffering[];
+  bundleItems?: CartOffering[];
 };
 
 export type ShippingAddress = {
@@ -194,6 +205,7 @@ type VtexOrderForm = {
     coupon?: string | null;
   };
   items?: Array<{
+    uniqueId?: string;
     seller?: string;
     id?: string;
     productId?: string;
@@ -201,6 +213,8 @@ type VtexOrderForm = {
     quantity?: number;
     imageUrl?: string;
     price?: number;
+    offerings?: VtexOffering[];
+    bundleItems?: VtexOffering[];
   }>;
   clientProfileData?: OrderForm['clientProfileData'];
   shippingData?: {
@@ -251,6 +265,14 @@ type VtexOrderForm = {
     }>;
     giftCardMessages?: Array<{ text?: string | null; message?: string | null }>;
   };
+};
+
+type VtexOffering = {
+  id?: string | number;
+  name?: string;
+  type?: string;
+  price?: number;
+  quantity?: number;
 };
 
 type VtexInstallment = {
@@ -312,6 +334,16 @@ function normalizeInstallmentOption(option?: VtexInstallmentOption | null): Inst
   };
 }
 
+function normalizeOffering(offering: VtexOffering): CartOffering {
+  return {
+    id: String(offering.id ?? '').trim(),
+    name: String(offering.name ?? '').trim(),
+    type: offering.type,
+    price: offering.price === undefined ? undefined : offering.price / 100,
+    quantity: offering.quantity,
+  };
+}
+
 async function userTokenHeaders(): Promise<Record<string, string>> {
   const token = await getVtexUserToken();
   return token ? { VtexIdclientAutCookie: token } : {};
@@ -356,6 +388,7 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
       : undefined,
     items: (orderForm.items ?? []).map((item, index) => ({
       index,
+      uniqueId: item.uniqueId ?? undefined,
       id: item.id ?? '',
       seller: item.seller ?? '1',
       productId: item.productId ?? '',
@@ -363,6 +396,8 @@ function normalizeOrderForm(orderForm: VtexOrderForm): OrderForm {
       quantity: item.quantity ?? 0,
       imageUrl: item.imageUrl ?? '',
       price: (item.price ?? 0) / 100,
+      offerings: (item.offerings ?? []).map(normalizeOffering).filter((offering) => offering.id),
+      bundleItems: (item.bundleItems ?? []).map(normalizeOffering).filter((offering) => offering.id),
     })).filter((item) => item.quantity > 0),
     clientProfileData: orderForm.clientProfileData,
     shippingData: {
@@ -828,6 +863,56 @@ export async function updateCartItem({
   const normalizedOrderForm = normalizeOrderForm(orderForm);
   publishCartChange(normalizedOrderForm);
   return normalizedOrderForm;
+}
+
+async function changeItemOffering({
+  orderFormId,
+  itemIndex,
+  offeringId,
+  remove = false,
+}: {
+  orderFormId: string;
+  itemIndex: number;
+  offeringId: string;
+  remove?: boolean;
+}): Promise<OrderForm> {
+  const normalizedOfferingId = String(offeringId).trim();
+  if (!normalizedOfferingId) throw new Error('Serviço de embalagem inválido.');
+  const basePath = `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/items/${itemIndex}/offerings`;
+  const path = remove ? `${basePath}/${encodeURIComponent(normalizedOfferingId)}/remove` : basePath;
+  const method = 'POST';
+  const requestInit: RequestInit = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: normalizedOfferingId }),
+  };
+  const backendPath = `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/items/${itemIndex}/offerings${remove ? `/${encodeURIComponent(normalizedOfferingId)}/remove` : ''}`;
+  const backendResponse = await fetch(backendPath, {
+    ...requestInit,
+    headers: { ...(await userTokenHeaders()), 'Content-Type': 'application/json' },
+  }).catch(() => null);
+  const response = backendResponse && backendResponse.status !== 404
+    ? backendResponse
+    : await checkoutFetch(path, requestInit);
+  const errorBody = !response.ok
+    ? await response.clone().json().catch(() => null) as { error?: { message?: string }; message?: string } | null
+    : null;
+  if (!response.ok) {
+    throw new Error(errorBody?.error?.message || errorBody?.message || `Não foi possível ${remove ? 'remover' : 'adicionar'} a embalagem (HTTP ${response.status}).`);
+  }
+  const orderForm = await response.json() as VtexOrderForm;
+  await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
+  const normalizedOrderForm = normalizeOrderForm(orderForm);
+  publishCartChange(normalizedOrderForm);
+  return normalizedOrderForm;
+}
+
+export function addItemOffering({ orderFormId, itemIndex, offeringId }: { orderFormId: string; itemIndex: number; offeringId: string }) {
+  return changeItemOffering({ orderFormId, itemIndex, offeringId });
+}
+
+export function removeItemOffering({ orderFormId, itemIndex, offeringId }: { orderFormId: string; itemIndex: number; offeringId: string }) {
+  return changeItemOffering({ orderFormId, itemIndex, offeringId, remove: true });
 }
 
 export async function addCouponToCart(orderFormId: string, coupon: string): Promise<OrderForm> {

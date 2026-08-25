@@ -1258,6 +1258,43 @@ app.post('/checkout/order-form/:orderFormId/items', async (request, response) =>
   return response.status(lastResult?.status || 502).json(lastBody || { ok: false, message: 'Não foi possível atualizar o carrinho VTEX.' });
 });
 
+async function updateCheckoutOffering(request, response, remove = false) {
+  const orderFormId = String(request.params.orderFormId || '').trim();
+  const itemIndex = Number(request.params.itemIndex);
+  const offeringId = String(remove ? request.params.offeringId : request.body?.id || '').trim();
+  if (!isSafeCheckoutId(orderFormId) || !Number.isInteger(itemIndex) || itemIndex < 0 || !offeringId) {
+    return response.status(400).json({ ok: false, message: 'Carrinho, item ou serviço inválido.' });
+  }
+
+  const path = `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/items/${itemIndex}/offerings${remove ? `/${encodeURIComponent(offeringId)}/remove` : ''}`;
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  try {
+    const result = await requestCheckout(path, {
+      method: 'POST',
+      userToken,
+      cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+      contentType: true,
+      fallbackToAppAuth: true,
+      body: JSON.stringify({ id: offeringId }),
+    });
+    rememberCheckoutOwnershipCookie(orderFormId, result);
+    const body = await readResponseBody(result);
+    if (!result.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(body),
+        message: vtexErrorMessage(body, `Não foi possível ${remove ? 'remover' : 'adicionar'} o serviço ao carrinho.`),
+      });
+    }
+    return response.status(result.status).json(body);
+  } catch (error) {
+    return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Não foi possível atualizar o serviço do carrinho.' });
+  }
+}
+
+app.post('/checkout/order-form/:orderFormId/items/:itemIndex/offerings', (request, response) => updateCheckoutOffering(request, response));
+app.post('/checkout/order-form/:orderFormId/items/:itemIndex/offerings/:offeringId/remove', (request, response) => updateCheckoutOffering(request, response, true));
+
 app.post('/auth/login', async (request, response) => {
   const email = String(request.body?.email || '').trim().toLowerCase();
   const password = String(request.body?.password || '');

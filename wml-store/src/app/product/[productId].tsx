@@ -71,8 +71,9 @@ function estimateLabel(value: string) {
 export default function ProductScreen() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const galleryHeight = screenHeight + insets.top + insets.bottom;
+  // The header and the bottom safe area handle their own insets. The gallery
+  // must stay within the viewport so its overlay content is visible on load.
+  const galleryHeight = screenHeight;
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [colorProducts, setColorProducts] = useState<Product[]>([]);

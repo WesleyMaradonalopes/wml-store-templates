@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, addGiftCardToCart, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, OrderForm, removeCouponFromCart, removeGiftCardFromCart, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type GiftCard, type InstallmentChoice } from '@/services/cart';
+import { addCouponToCart, addGiftCardToCart, addItemOffering, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
@@ -267,6 +267,20 @@ function deliveryEstimate(estimate: string) {
   return label === 'Prazo a confirmar' ? label : 'Receba em até ' + label;
 }
 
+function giftWrappingOffering(item: CartItem): CartOffering | null {
+  return item.offerings?.find((offering) => /embalag/i.test(offering.name)) ?? null;
+}
+
+function hasGiftWrapping(item: CartItem) {
+  const offering = giftWrappingOffering(item);
+  return Boolean(offering && item.bundleItems?.some((bundleItem) => bundleItem.id === offering.id));
+}
+
+function allGiftWrappingApplied(items: CartItem[]) {
+  const giftWrappingItems = items.filter((item) => giftWrappingOffering(item));
+  return giftWrappingItems.length > 0 && giftWrappingItems.every(hasGiftWrapping);
+}
+
 function getShippingOptions(orderForm: OrderForm): ShippingOption[] {
   const options = new Map<string, ShippingOption>();
   for (const info of orderForm.shippingData?.logisticsInfo ?? []) {
@@ -353,6 +367,7 @@ export default function CheckoutScreen() {
   const [editingCustomer, setEditingCustomer] = useState(false);
   const [editingAddress, setEditingAddress] = useState(false);
   const [giftWrap, setGiftWrap] = useState(false);
+  const [giftWrapLoading, setGiftWrapLoading] = useState(false);
   const [addressSaved, setAddressSaved] = useState(false);
   const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>([]);
   const [addressSelectionOpen, setAddressSelectionOpen] = useState(false);
@@ -406,6 +421,7 @@ export default function CheckoutScreen() {
     Promise.all([getOrderForm(), getAccountSession()]).then(async ([value, session]) => {
       if (!active) return;
       setOrderForm(value);
+      setGiftWrap(allGiftWrappingApplied(value.items));
       const existingCoupon = value.marketingData?.coupon?.trim() ?? '';
       setCoupon(existingCoupon.toUpperCase());
       setCouponApplied(Boolean(existingCoupon));
@@ -577,6 +593,24 @@ export default function CheckoutScreen() {
 
   async function createFreshCheckoutOrderForm(previousOrderForm: OrderForm): Promise<OrderForm> {
     let freshOrderForm = await createFreshOrderForm(previousOrderForm.items);
+    const wrappedItems = previousOrderForm.items.filter(hasGiftWrapping);
+    const usedFreshIndexes = new Set<number>();
+    for (const previousItem of wrappedItems) {
+      const freshItem = freshOrderForm.items.find((item) => (
+        !usedFreshIndexes.has(item.index)
+        && item.id === previousItem.id
+        && item.seller === previousItem.seller
+      ));
+      const offering = freshItem ? giftWrappingOffering(freshItem) : null;
+      if (!freshItem || !offering) continue;
+      usedFreshIndexes.add(freshItem.index);
+      freshOrderForm = await addItemOffering({
+        orderFormId: freshOrderForm.orderFormId,
+        itemIndex: freshItem.index,
+        offeringId: offering.id,
+      });
+    }
+    setGiftWrap(allGiftWrappingApplied(freshOrderForm.items));
     const existingCoupon = previousOrderForm.marketingData?.coupon?.trim();
     if (existingCoupon) {
       freshOrderForm = await addCouponToCart(freshOrderForm.orderFormId, existingCoupon).catch(() => freshOrderForm);
@@ -1141,12 +1175,65 @@ export default function CheckoutScreen() {
     setUpdatingItem(itemId); setMessage('');
     setOrderForm({ ...orderForm, items: optimisticItems, value: optimisticValue });
     try {
-      setOrderForm(await updateCartItem({ orderFormId: previousOrderForm.orderFormId, index: currentItem.index, itemId, sellerId: currentItem.seller, quantity: nextQuantity }));
+      const updatedOrderForm = await updateCartItem({ orderFormId: previousOrderForm.orderFormId, index: currentItem.index, itemId, sellerId: currentItem.seller, quantity: nextQuantity });
+      setOrderForm(updatedOrderForm);
+      setGiftWrap(allGiftWrappingApplied(updatedOrderForm.items));
     } catch (error) {
       setOrderForm(previousOrderForm);
+      setGiftWrap(allGiftWrappingApplied(previousOrderForm.items));
       setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar o produto.');
     } finally {
       setUpdatingItem(null);
+    }
+  }
+
+  async function toggleGiftWrapping() {
+    if (!orderForm || giftWrapLoading) return;
+    const nextGiftWrap = !giftWrap;
+    const giftWrappingItems = orderForm.items.filter((item) => giftWrappingOffering(item));
+    if (giftWrappingItems.length === 0) {
+      setMessage('Este carrinho não possui uma embalagem de presente disponível.');
+      return;
+    }
+
+    const previousOrderForm = orderForm;
+    setGiftWrap(nextGiftWrap);
+    setGiftWrapLoading(true);
+    setMessage('');
+    try {
+      let updatedOrderForm = previousOrderForm;
+      for (const originalItem of giftWrappingItems) {
+        const currentItem = updatedOrderForm.items.find((item) => (
+          originalItem.uniqueId && item.uniqueId === originalItem.uniqueId
+        ))
+          ?? updatedOrderForm.items.find((item) => item.index === originalItem.index && item.id === originalItem.id)
+          ?? updatedOrderForm.items.find((item) => item.id === originalItem.id && item.seller === originalItem.seller);
+        if (!currentItem) continue;
+        const offering = giftWrappingOffering(currentItem);
+        if (!offering) continue;
+        if (nextGiftWrap && !hasGiftWrapping(currentItem)) {
+          updatedOrderForm = await addItemOffering({
+            orderFormId: updatedOrderForm.orderFormId,
+            itemIndex: currentItem.index,
+            offeringId: offering.id,
+          });
+        } else if (!nextGiftWrap && hasGiftWrapping(currentItem)) {
+          updatedOrderForm = await removeItemOffering({
+            orderFormId: updatedOrderForm.orderFormId,
+            itemIndex: currentItem.index,
+            offeringId: offering.id,
+          });
+        }
+      }
+      setOrderForm(updatedOrderForm);
+      setGiftWrap(allGiftWrappingApplied(updatedOrderForm.items));
+    } catch (error) {
+      const refreshedOrderForm = await getOrderForm(previousOrderForm.orderFormId).catch(() => previousOrderForm);
+      setOrderForm(refreshedOrderForm);
+      setGiftWrap(allGiftWrappingApplied(refreshedOrderForm.items));
+      setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a embalagem de presente.');
+    } finally {
+      setGiftWrapLoading(false);
     }
   }
 
@@ -1161,6 +1248,8 @@ export default function CheckoutScreen() {
   if (!orderForm) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ThemedText>{message || 'Carrinho vazio.'}</ThemedText></SafeAreaView></ThemedView>;
   if (orderForm.items.length === 0) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Carrinho" onBack={() => router.replace('/')} showSearch={false} showCart /><View style={styles.emptyState}><ThemedText type="subtitle">Seu carrinho está vazio</ThemedText><ThemedText themeColor="textSecondary">Encontre produtos para continuar sua compra.</ThemedText><Primary title="Encontrar produtos" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
 
+  const giftWrappingAvailable = orderForm.items.some((item) => giftWrappingOffering(item));
+
   if (orderResult) {
     const pixPayload = parsePaymentAppPayload(orderResult.paymentApp);
     const isCompleted = orderResult.status === 'completed';
@@ -1173,16 +1262,24 @@ export default function CheckoutScreen() {
         onBack={() => router.replace('/')}
       />;
     }
-    const title = isCompleted
-      ? 'Pedido realizado'
-      : isPending
-        ? 'Pagamento pendente'
-        : 'Pagamento não autorizado';
+    if (isCompleted) {
+      return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Pedido concluído" onBack={() => router.replace('/')} showSearch={false} showCart /><ScrollView contentContainerStyle={[styles.content, styles.orderSuccessContent]}>
+        <View style={styles.orderSuccessCard}>
+          <View style={styles.orderSuccessIcon}><ThemedText style={styles.orderSuccessCheck}>✓</ThemedText></View>
+          <ThemedText style={styles.orderSuccessTitle}>Pronto, compra feita!</ThemedText>
+          <ThemedText style={styles.orderSuccessDescription}>Enviamos uma confirmação com os detalhes do seu pedido para seu email.</ThemedText>
+          <ThemedText style={styles.orderSuccessLabel}>Seu código de pedido é</ThemedText>
+          <ThemedText style={styles.orderSuccessId}>{orderResult.orderId || orderResult.orderGroup}</ThemedText>
+          {!!orderResult.message && <ThemedText style={styles.orderSuccessDescription}>{orderResult.message}</ThemedText>}
+        </View>
+      </ScrollView><View style={styles.fixedFooter}><Primary title="Ver meus pedidos" onPress={() => router.push('/orders')} /><Secondary title="Voltar ao início" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
+    }
+    const title = isPending ? 'Pagamento pendente' : 'Pagamento não autorizado';
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Resultado do pedido" onBack={() => router.replace('/')} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
       <View style={styles.paymentReview}>
         <ThemedText style={styles.pageTitle}>{title}</ThemedText>
-        <ThemedText style={isCompleted ? styles.successText : isPending ? styles.bodyText : styles.errorText}>
-          {orderResult.message || (isCompleted ? 'Seu pedido foi enviado para processamento.' : 'A VTEX não confirmou o pagamento.')}
+        <ThemedText style={isPending ? styles.bodyText : styles.errorText}>
+          {orderResult.message || (isPending ? 'A confirmação do pagamento ainda está pendente.' : 'A VTEX não confirmou o pagamento.')}
         </ThemedText>
       </View>
       <Card>
@@ -1196,11 +1293,10 @@ export default function CheckoutScreen() {
         {!!pixPayload.code && <TextInput value={pixPayload.code} editable={false} multiline style={[styles.input, styles.pixCodeInput]} />}
         <ThemedText style={styles.bodyText} themeColor="textSecondary">A confirmação será atualizada automaticamente nesta tela.</ThemedText>
       </Card>}
-      {!isCompleted && !isPending && <ThemedText style={styles.errorText}>A transação foi criada, mas o pedido não deve ser considerado aprovado. Você pode tentar novamente após revisar a configuração do provedor de pagamento.</ThemedText>}
+      {!isPending && <ThemedText style={styles.errorText}>A transação foi criada, mas o pedido não deve ser considerado aprovado. Você pode tentar novamente após revisar a configuração do provedor de pagamento.</ThemedText>}
     </ScrollView><View style={styles.fixedFooter}>
-      {isCompleted && <Primary title="Voltar para a loja" onPress={() => router.replace('/')} />}
       {isPending && <Secondary title="Voltar para a loja" onPress={() => router.replace('/')} />}
-      {!isCompleted && !isPending && <Primary title="Tentar novamente" onPress={() => { setOrderResult(null); setMessage(''); setStep('payment'); }} />}
+      {!isPending && <Primary title="Tentar novamente" onPress={() => { setOrderResult(null); setMessage(''); setStep('payment'); }} />}
     </View></SafeAreaView></ThemedView>;
   }
 
@@ -1295,7 +1391,7 @@ export default function CheckoutScreen() {
   const cardErrors = getCardErrors();
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{recaptchaSiteKey && (step === 'payment' || step === 'card' || step === 'review') && <Recaptcha ref={recaptchaRef} siteKey={recaptchaSiteKey} />}<ScrollView contentContainerStyle={styles.content}>
-    {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}<Pressable onPress={() => setGiftWrap((value) => !value)} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable></ThemedView><ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
+    {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}{giftWrappingAvailable && <Pressable disabled={giftWrapLoading || saving} onPress={toggleGiftWrapping} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrapLoading ? <ActivityIndicator size="small" color={giftWrap ? '#FFFFFF' : '#0a0a0a'} /> : giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable>}</ThemedView>{giftWrap && <View style={styles.giftMessage}><ThemedText style={styles.giftMessageText}>Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC.</ThemedText></View>}<ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /></>}
     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={() => router.push('/privacy-policy' as never)} /></Card>}
     {step === 'customer' && <>
       {customerExists && !editingCustomer
@@ -1604,7 +1700,7 @@ function FreeShippingProgress({ value }: { value: number }) {
   const target = 249;
   const remaining = Math.max(0, target - value);
   const progress = Math.min(1, value / target);
-  return <View style={styles.progressCard}><ThemedText style={styles.dataLabel}>{remaining > 0 ? 'Faltam ' + money(remaining) + ' para Frete Grátis' : 'Você ganhou Frete Grátis'}</ThemedText><View style={styles.progressTrack}><View style={[styles.progressFill, { width: (progress * 100 + '%') as `${number}%` }]} /></View></View>;
+  return <View style={styles.progressCard}><View style={styles.progressLabel}><TruckIcon color="#0a0a0a" size={18} /><ThemedText style={styles.dataLabel}>{remaining > 0 ? 'Faltam ' + money(remaining) + ' para Frete Grátis' : 'Você ganhou Frete Grátis'}</ThemedText></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: (progress * 100 + '%') as `${number}%` }]} /></View></View>;
 }
 function ReviewHeader({ icon, title }: { icon: 'user' | 'truck' | 'card'; title: string }) {
   return <View style={styles.reviewHeader}>{icon === 'user' && <UserIcon color="#0a0a0a" size={20} />}{icon === 'truck' && <TruckIcon color="#0a0a0a" size={20} />}{icon === 'card' && <CreditCardIcon color="#0a0a0a" size={20} />}<ThemedText style={styles.sectionTitle}>{title}</ThemedText></View>;
@@ -1648,6 +1744,8 @@ const styles = StyleSheet.create({
   giftCheckboxSelected: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
   giftCheck: { color: '#FFFFFF', fontSize: 13, lineHeight: 15 },
   giftText: { flex: 1, fontSize: 13 },
+  giftMessage: { padding: Spacing.three, borderRadius: 4, borderWidth: 1, borderColor: '#e5c95a', backgroundColor: '#fffbe7' },
+  giftMessageText: { color: '#9a7b2f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
   field: { flex: 1, gap: 4 },
   fieldLabel: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, fontWeight: '400' },
   inputWrap: { position: 'relative' },
@@ -1681,6 +1779,14 @@ const styles = StyleSheet.create({
   secondary: { minHeight: 48, padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   secondaryText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, fontWeight: '700' },
   fixedFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, gap: Spacing.two, padding: Spacing.two, paddingTop: 10, paddingBottom: 35, backgroundColor: '#ffffff' },
+  orderSuccessContent: { justifyContent: 'center' },
+  orderSuccessCard: { alignItems: 'center', gap: Spacing.two, padding: Spacing.five, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
+  orderSuccessIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e4f5e9' },
+  orderSuccessCheck: { color: '#2f8f5b', fontFamily: Fonts.bold, fontSize: 32, lineHeight: 36, fontWeight: '700' },
+  orderSuccessTitle: { color: '#2f2d2b', fontFamily: Fonts.bold, fontSize: 20, lineHeight: 26, fontWeight: '700', textAlign: 'center' },
+  orderSuccessDescription: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  orderSuccessLabel: { marginTop: Spacing.two, color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  orderSuccessId: { color: '#2f2d2b', fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
   smallButton: { minHeight: 46, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   buttonText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 13, fontWeight: '700' },
   selected: { borderColor: '#0a0a0a', borderWidth: 2 },
@@ -1703,6 +1809,7 @@ const styles = StyleSheet.create({
   summary: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1 },
   summaryTotal: { marginTop: 4, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eeeae5' },
   progressCard: { gap: 8, padding: Spacing.two, borderRadius: 10, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e1da' },
+  progressLabel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.one },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#e3ded5' },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: '#2f8f5b' },
   paymentCard: { gap: 6, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
