@@ -281,7 +281,13 @@ export default function AccountScreen() {
     try {
       setAuthMessage(null);
       setCodeLoading(true);
-      await setVtexPassword(normalizedEmail, accessCode.trim(), newPassword, authToken);
+      await setVtexPassword(
+        normalizedEmail,
+        accessCode.trim(),
+        newPassword,
+        authToken,
+        view === 'register-password' ? 'register' : 'recovery',
+      );
       // O setpassword pode responder sem o cookie de usuário em aplicativos
       // nativos; o login subsequente garante uma sessão utilizável no app.
       await loginVtexPassword(normalizedEmail, newPassword);

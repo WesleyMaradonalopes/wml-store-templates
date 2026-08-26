@@ -1409,15 +1409,30 @@ app.post('/auth/set-password', async (request, response) => {
   const email = String(request.body?.email || '').trim().toLowerCase();
   const accessKey = String(request.body?.accessKey || '').trim();
   const newPassword = String(request.body?.newPassword || '');
-  if (!email || !accessKey || !newPassword) return response.status(400).json({ ok: false, message: 'Dados para criação da senha incompletos.' });
+  const flow = request.body?.flow === 'register' ? 'register' : 'recovery';
+  const authenticationToken = flow === 'register' ? String(request.body?.authenticationToken || '').trim() : '';
+  if (!email || !accessKey || !newPassword || (flow === 'register' && !authenticationToken)) {
+    return response.status(400).json({ ok: false, message: 'Dados para criação da senha incompletos.' });
+  }
 
   try {
-    const authenticatorSession = await startAuthenticatorPasswordSession(email);
     const accountName = encodeURIComponent(account);
-    const endpoints = [
-      `${vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
-      `${vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
-    ];
+    let sessionCookie = '';
+    let endpoints;
+    if (flow === 'register') {
+      // No cadastro, o access key foi emitido dentro desta sessão VTEX ID.
+      // Reutilizar o _vss é necessário para que a VTEX associe o código ao
+      // e-mail recebido, em vez de abrir uma nova sessão Authenticator.
+      sessionCookie = `_vss=${authenticationToken}`;
+      endpoints = [`${vtexBaseUrl}/api/vtexid/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`];
+    } else {
+      const authenticatorSession = await startAuthenticatorPasswordSession(email);
+      sessionCookie = authenticatorSession.cookieHeader;
+      endpoints = [
+        `${vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
+        `${vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
+      ];
+    }
     let result;
     let body;
 
@@ -1429,7 +1444,7 @@ app.post('/auth/set-password', async (request, response) => {
       form.append('accesskey', accessKey);
       form.append('recaptcha', '');
       const headers = { Accept: 'application/json' };
-      if (authenticatorSession.cookieHeader) headers.Cookie = authenticatorSession.cookieHeader;
+      if (sessionCookie) headers.Cookie = sessionCookie;
       const nextResult = await fetch(endpoint, { method: 'POST', headers, body: form });
       const nextBody = await readResponseBody(nextResult);
       result = nextResult;

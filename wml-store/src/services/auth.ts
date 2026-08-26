@@ -53,6 +53,7 @@ async function saveVtexUserToken(token: string) {
 type StartAuthResponse = { authenticationToken?: string };
 type ValidateAuthResponse = { authStatus?: string; authCookie?: { Value?: string }; userId?: string };
 type SetPasswordResponse = ValidateAuthResponse & { ok?: boolean; authToken?: string; accountAuthCookie?: unknown; message?: string; error?: string };
+type PasswordSetupFlow = 'register' | 'recovery';
 type GoogleClientIdResponse = { enabled?: boolean; clientId?: string };
 export type VtexGoogleLoginResponse = {
   authStatus?: string;
@@ -170,7 +171,7 @@ async function startAuthenticatorPasswordFlow(email: string) {
   if (!response.ok) throw new Error('Não foi possível iniciar a recuperação de senha.');
 }
 
-export async function setVtexPassword(email: string, accessKey: string, newPassword: string, authenticationToken = '') {
+export async function setVtexPassword(email: string, accessKey: string, newPassword: string, authenticationToken = '', flow: PasswordSetupFlow = 'recovery') {
   // Em apps nativos, o fetch não mantém de forma confiável o cookie criado
   // pelo Authenticator entre duas chamadas. O backend faz as duas etapas na
   // mesma sessão e deixa o fallback direto disponível para desenvolvimento
@@ -178,7 +179,7 @@ export async function setVtexPassword(email: string, accessKey: string, newPassw
   const backendResponse = await fetch(`${storeConfig.backendUrl}/auth/set-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, accessKey, newPassword }),
+    body: JSON.stringify({ email, accessKey, newPassword, flow, ...(flow === 'register' ? { authenticationToken } : {}) }),
   }).catch(() => null);
   if (backendResponse && ![404, 405].includes(backendResponse.status)) {
     const data = await backendResponse.json().catch(() => ({})) as SetPasswordResponse;
@@ -193,16 +194,19 @@ export async function setVtexPassword(email: string, accessKey: string, newPassw
     throw new Error(data.message || data.error || (invalidCode ? 'O código ou e-mail não é válido.' : 'Não foi possível criar ou alterar a senha.'));
   }
 
-  // A VTEX migrou este fluxo para o Authenticator e passou a exigir o
-  // início da sessão por esse endpoint antes do setpassword.
-  await startAuthenticatorPasswordFlow(email);
-
   const account = encodeURIComponent(storeConfig.account);
-  const endpoints = [
-    `${storeConfig.vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
-    `${storeConfig.vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
-    `${authUrl('classic/setpassword')}?expireSessions=true&an=${account}`,
-  ];
+  // O cadastro mantém o token _vss criado junto com o envio do código. A
+  // recuperação usa a sessão Authenticator, que é iniciada imediatamente
+  // antes do setpassword.
+  if (flow === 'register' && !authenticationToken) throw new Error('A sessão de cadastro expirou. Solicite um novo código.');
+  if (flow !== 'register') await startAuthenticatorPasswordFlow(email);
+  const endpoints = flow === 'register'
+    ? [`${authUrl('classic/setpassword')}?expireSessions=true&an=${account}`]
+    : [
+      `${storeConfig.vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
+      `${storeConfig.vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
+      `${authUrl('classic/setpassword')}?expireSessions=true&an=${account}`,
+    ];
   let lastMessage = 'Não foi possível criar ou alterar a senha.';
 
   for (const endpoint of endpoints) {
