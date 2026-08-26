@@ -8,6 +8,7 @@ import { type Product } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 
 import HeartIcon from './icons/HeartIcon';
+import ShoppingBagIcon from './icons/ShoppingBagIcon';
 import { LoginRequiredModal } from './login-required-modal';
 import { ProductQuickViewButton } from './product-quick-view';
 import { ThemedText } from './themed-text';
@@ -92,11 +93,10 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
           </Pressable>
           <ProductQuickViewButton
             product={product}
-            label="+"
+            icon={<ShoppingBagIcon size={17} color="#5d5955" />}
             accessibilityLabel="Adicionar à sacola"
             disabled={!product.itemId}
             buttonStyle={styles.addButton}
-            textStyle={styles.addButtonText}
             onAdded={() => onAdded?.(product)}
           />
         </View>
@@ -131,5 +131,4 @@ const styles = StyleSheet.create({
   listPrice: { color: '#8a857f', fontSize: 11, textDecorationLine: 'line-through' },
   price: { fontSize: 14 },
   addButton: { position: 'absolute', right: 8, bottom: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
-  addButtonText: { color: '#5d5955', fontSize: 28, lineHeight: 29, fontWeight: '300' },
 });

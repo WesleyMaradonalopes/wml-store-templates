@@ -740,10 +740,14 @@ export async function createFreshOrderForm(items: CartItem[] = []): Promise<Orde
 export async function clearCart(orderFormId?: string): Promise<OrderForm | null> {
   const id = orderFormId ?? await getStoredJson<string>(ORDER_FORM_ID_KEY);
   if (!id) return null;
-  const response = await checkoutFetch(
-    `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(id)}/items/removeAll`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' } },
-  );
+  const directPath = `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(id)}/items/removeAll`;
+  const backendResponse = await fetch(
+    `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(id)}/items/remove-all`,
+    { method: 'POST', headers: await userTokenHeaders() },
+  ).catch(() => null);
+  const response = backendResponse && backendResponse.status !== 404 && backendResponse.status < 500
+    ? backendResponse
+    : await checkoutFetch(directPath, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   if (!response.ok) throw new Error(`Unable to clear cart: ${response.status}`);
   const orderForm = await response.json() as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);

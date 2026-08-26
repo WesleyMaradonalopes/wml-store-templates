@@ -1258,6 +1258,36 @@ app.post('/checkout/order-form/:orderFormId/items', async (request, response) =>
   return response.status(lastResult?.status || 502).json(lastBody || { ok: false, message: 'Não foi possível atualizar o carrinho VTEX.' });
 });
 
+app.post('/checkout/order-form/:orderFormId/items/remove-all', async (request, response) => {
+  const orderFormId = String(request.params.orderFormId || '').trim();
+  if (!isSafeCheckoutId(orderFormId)) return response.status(400).json({ ok: false, message: 'Carrinho inválido.' });
+
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  try {
+    const result = await requestCheckout(
+      `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/items/removeAll`,
+      {
+        method: 'POST',
+        userToken,
+        cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+        fallbackToAppAuth: true,
+      },
+    );
+    rememberCheckoutOwnershipCookie(orderFormId, result);
+    const body = await readResponseBody(result);
+    if (!result.ok) {
+      return response.status(502).json({
+        ok: false,
+        code: vtexErrorCode(body),
+        message: vtexErrorMessage(body, 'Não foi possível limpar o carrinho após a compra.'),
+      });
+    }
+    return response.status(result.status).json(body);
+  } catch (error) {
+    return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Não foi possível limpar o carrinho após a compra.' });
+  }
+});
+
 async function updateCheckoutOffering(request, response, remove = false) {
   const orderFormId = String(request.params.orderFormId || '').trim();
   const itemIndex = Number(request.params.itemIndex);

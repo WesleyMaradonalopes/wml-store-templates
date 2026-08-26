@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleProp, StyleSheet, TextStyle, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -26,6 +26,7 @@ type QuickViewProps = {
 type QuickViewButtonProps = {
   product: Product;
   label?: string;
+  icon?: ReactNode;
   accessibilityLabel?: string;
   disabled?: boolean;
   buttonStyle?: StyleProp<ViewStyle>;
@@ -260,7 +261,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
   );
 }
 
-export function ProductQuickViewButton({ product, label = 'Adicionar', accessibilityLabel, disabled, buttonStyle, textStyle, onAdded }: QuickViewButtonProps) {
+export function ProductQuickViewButton({ product, label = 'Adicionar', icon, accessibilityLabel, disabled, buttonStyle, textStyle, onAdded }: QuickViewButtonProps) {
   const [visible, setVisible] = useState(false);
   return (
     <>
@@ -269,7 +270,7 @@ export function ProductQuickViewButton({ product, label = 'Adicionar', accessibi
         accessibilityLabel={accessibilityLabel ?? label}
         onPress={(event) => { event.stopPropagation(); setVisible(true); }}
         style={({ pressed }) => [buttonStyle, pressed && styles.pressed, disabled && styles.disabled]}>
-        <ThemedText style={textStyle}>{label}</ThemedText>
+        {icon ?? <ThemedText style={textStyle}>{label}</ThemedText>}
       </Pressable>
       <ProductQuickView product={product} visible={visible} onClose={() => setVisible(false)} onAdded={onAdded} />
     </>
