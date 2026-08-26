@@ -8,11 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
-import { NewsletterOptIn } from '@/components/newsletter-opt-in';
 import StoreIcon from '@/components/icons/StoreIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import TruckIcon from '@/components/icons/TruckIcon';
 import UserIcon from '@/components/icons/UserIcon';
+import { NewsletterOptIn } from '@/components/newsletter-opt-in';
 import { paymentBrandFromLabel, PaymentBrandIcon, type PaymentBrand } from '@/components/payment-brand';
 import Recaptcha, { type RecaptchaHandle } from '@/components/recaptcha';
 import { ScreenHeader } from '@/components/screen-header';
@@ -1743,7 +1743,7 @@ const styles = StyleSheet.create({
   giftCheckbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: '#aaa49c', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   giftCheckboxSelected: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
   giftCheck: { color: '#FFFFFF', fontSize: 13, lineHeight: 15 },
-  giftText: { flex: 1, fontSize: 13 },
+  giftText: { flex: 1, fontSize: 11 },
   giftMessage: { padding: Spacing.three, borderRadius: 4, borderWidth: 1, borderColor: '#e5c95a', backgroundColor: '#fffbe7' },
   giftMessageText: { color: '#9a7b2f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
   field: { flex: 1, gap: 4 },
