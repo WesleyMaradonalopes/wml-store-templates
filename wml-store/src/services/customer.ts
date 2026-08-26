@@ -3,6 +3,8 @@ import { getVtexUserToken } from './auth';
 
 export type CustomerProfile = {
   id?: string;
+  /** Indicates that the profile was found in VTEX Master Data. */
+  existsInMasterData?: boolean;
   email?: string;
   firstName?: string;
   lastName?: string;

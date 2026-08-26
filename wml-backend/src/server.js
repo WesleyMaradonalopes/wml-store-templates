@@ -391,6 +391,30 @@ function profileBoolean(value) {
   return ['true', '1', 'yes', 'sim'].includes(String(value || '').trim().toLowerCase());
 }
 
+function normalizeGender(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const normalized = raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+  const values = {
+    male: 'male',
+    masculino: 'male',
+    female: 'female',
+    feminino: 'female',
+    prefer_not_to_say: 'prefer_not_to_say',
+    prefiro_nao_informar: 'prefer_not_to_say',
+    not_informed: 'prefer_not_to_say',
+    nao_informado: 'prefer_not_to_say',
+    other: 'other',
+    outro: 'other',
+    outros: 'other',
+  };
+  return values[normalized] || raw;
+}
+
 function checkoutBirthDate(value) {
   const normalized = String(value || '').trim();
   const isoMatch = normalized.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
@@ -404,6 +428,7 @@ function normalizeProfile(profile) {
   if (!profile || typeof profile !== 'object') return null;
   const nestedProfile = profile.userProfile && typeof profile.userProfile === 'object' ? profile.userProfile : {};
   const source = { ...profile, ...nestedProfile };
+  const newsletterValue = firstProfileValue(source, ['isNewsletterOptIn', 'newsletterOptIn', 'newsletter']);
   return {
     id: String(firstProfileValue(source, ['id', 'Id', 'documentId']) || ''),
     userId: String(firstProfileValue(source, ['userId', 'UserId', 'userProfileId', 'profileId']) || ''),
@@ -416,8 +441,8 @@ function normalizeProfile(profile) {
     homePhone: String(firstProfileValue(source, ['homePhone', 'phone', 'telephone', 'phoneNumber']) || ''),
     businessPhone: String(firstProfileValue(source, ['businessPhone', 'business_phone']) || ''),
     birthDate: String(firstProfileValue(source, ['birthDate', 'birthdate', 'dateOfBirth', 'date_of_birth']) || ''),
-    gender: String(firstProfileValue(source, ['gender', 'sex', 'genero']) || ''),
-    isNewsletterOptIn: profileBoolean(firstProfileValue(source, ['isNewsletterOptIn', 'newsletterOptIn', 'newsletter'])),
+    gender: normalizeGender(firstProfileValue(source, ['gender', 'sex', 'genero'])),
+    ...(newsletterValue !== '' ? { isNewsletterOptIn: profileBoolean(newsletterValue) } : {}),
   };
 }
 
@@ -447,6 +472,7 @@ function mergeProfiles(primary, fallback) {
     if (value !== undefined && value !== null && String(value).trim()) merged[field] = value;
   }
   if (primary.isNewsletterOptIn !== undefined) merged.isNewsletterOptIn = primary.isNewsletterOptIn;
+  else delete merged.isNewsletterOptIn;
   return normalizeProfile(merged);
 }
 
@@ -462,24 +488,25 @@ async function searchCustomerByEmail(email) {
   if (!Array.isArray(body)) return null;
   const normalizedEmail = email.trim().toLowerCase();
   const match = body.find((item) => String(item?.email || item?.userEmail || '').trim().toLowerCase() === normalizedEmail);
-  return normalizeProfile(match || body[0]);
+  return normalizeProfile(match);
 }
 
 async function resolveCustomerProfile(email) {
   const masterDataProfile = await searchCustomerByEmail(email).catch(() => null);
   const needsCheckoutFallback = !masterDataProfile
     || ['firstName', 'lastName', 'document', 'phone'].some((field) => !String(masterDataProfile[field] || '').trim());
-  if (!needsCheckoutFallback) return masterDataProfile;
-  const checkoutProfile = await searchCheckoutProfileByEmail(email).catch(() => null);
-  return mergeProfiles(masterDataProfile, checkoutProfile);
+  const profile = needsCheckoutFallback
+    ? mergeProfiles(masterDataProfile, await searchCheckoutProfileByEmail(email).catch(() => null))
+    : masterDataProfile;
+  return profile ? { ...profile, existsInMasterData: Boolean(masterDataProfile) } : null;
 }
 
 async function updateCustomerByEmail(email, profile) {
   const current = await searchCustomerByEmail(email);
   const requestedBirthDate = String(profile.birthDate ?? '').trim();
   const currentBirthDate = String(current?.birthDate ?? '').trim();
-  const requestedGender = String(profile.gender ?? '').trim();
-  const currentGender = String(current?.gender ?? '').trim();
+  const requestedGender = normalizeGender(profile.gender);
+  const currentGender = normalizeGender(current?.gender);
   const textValue = (requested, existing) => String(requested ?? '').trim() || String(existing ?? '').trim();
   const payload = {
     email,
@@ -851,7 +878,7 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
     ...(source.lastName ? { lastName: String(source.lastName).trim() } : {}),
     ...(source.document ? { document: digits(source.document), documentType: 'cpf' } : {}),
     ...(source.phone ? { phone: digits(source.phone) } : {}),
-    ...(source.gender ? { gender: String(source.gender).trim() } : {}),
+    ...(source.gender ? { gender: normalizeGender(source.gender) } : {}),
     ...(source.birthDate ? { birthDate: String(source.birthDate).trim() } : {}),
   };
   if (!profile.email) {

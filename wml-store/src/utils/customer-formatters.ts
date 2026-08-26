@@ -51,7 +51,7 @@ export function formatGenderLabel(value: string) {
   const normalized = String(value || '').trim().toLowerCase();
   if (['male', 'masculino'].includes(normalized)) return 'Masculino';
   if (['female', 'feminino'].includes(normalized)) return 'Feminino';
-  if (['other', 'outro'].includes(normalized)) return 'Outro';
-  if (['prefer not to say', 'prefiro não informar', 'prefiro nao informar', 'not informed', 'nao informado'].includes(normalized)) return 'Prefiro não informar';
+  if (['other', 'outro', 'outros'].includes(normalized)) return 'Outros';
+  if (['prefer_not_to_say', 'prefer not to say', 'prefiro não informar', 'prefiro nao informar', 'not informed', 'nao informado'].includes(normalized)) return 'Prefiro não informar';
   return value || '';
 }

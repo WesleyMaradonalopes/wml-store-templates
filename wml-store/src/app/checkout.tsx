@@ -377,7 +377,13 @@ export default function CheckoutScreen() {
   const recaptchaRef = useRef<RecaptchaHandle>(null);
   const couponMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newsletterOptInTouched = useRef(false);
-  const genders = ['Feminino', 'Masculino', 'Prefiro não informar', 'Outro'];
+  const genders: { value: string; text: string; disabled?: boolean; selected?: boolean }[] = [
+    { value: '', text: 'Opcional', disabled: true, selected: true },
+    { value: 'female', text: 'Feminino' },
+    { value: 'male', text: 'Masculino' },
+    { value: 'prefer_not_to_say', text: 'Prefiro não informar' },
+    { value: 'other', text: 'Outros' },
+  ];
   const customerDataRequests = useRef(new Map<string, Promise<CustomerCheckoutData>>()).current;
 
   function clearCouponMessage() {
@@ -438,9 +444,11 @@ export default function CheckoutScreen() {
       const { profile: customer, addresses } = await loadCustomerData(loggedEmail);
       if (!active) return;
       setEmail(loggedEmail);
-      if (customer) {
+      if (customer?.existsInMasterData === true) {
         setCustomerExists(true);
         applyProfile(customer, loggedEmail);
+      } else {
+        resetNewCustomerForm();
       }
       setCustomerAddresses(addresses);
       const preferred = addresses.find((item) => item.postalCode && item.street);
@@ -503,6 +511,22 @@ export default function CheckoutScreen() {
   function changeNewsletterOptIn(value: boolean) {
     newsletterOptInTouched.current = true;
     setNewsletterOptIn(value);
+  }
+
+  function resetNewCustomerForm() {
+    setCustomerExists(false);
+    setEditingCustomer(true);
+    setFirstName('');
+    setLastName('');
+    setDocument('');
+    setPhone('');
+    setBirthDate('');
+    setGender('');
+    setGenderOpen(false);
+    setCustomerAddresses([]);
+    setAddressSaved(false);
+    setCustomerValidationAttempted(false);
+    if (!newsletterOptInTouched.current) setNewsletterOptIn(true);
   }
 
   function applyAddress(address: CustomerAddress | NonNullable<NonNullable<OrderForm['shippingData']>['selectedAddresses']>[number]) {
@@ -568,6 +592,9 @@ export default function CheckoutScreen() {
         birthDate: birthDateToApi(birthDate) || undefined,
         gender: gender || undefined,
       }));
+      customerDataRequests.delete(email.trim().toLowerCase());
+      setCustomerExists(true);
+      setEditingCustomer(false);
       setStep('address');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.');
@@ -715,7 +742,9 @@ export default function CheckoutScreen() {
       const customerOrderForm = orderForm ? await prepareOrderFormForCustomer(orderForm, email) : null;
       if (customerOrderForm && customerOrderForm !== orderForm) setOrderForm(customerOrderForm);
       const { profile, addresses } = await loadCustomerData(email);
-      const hydratedProfile = mergeCustomerProfiles(profile, customerOrderForm?.clientProfileData ?? null);
+      const hydratedProfile = profile?.existsInMasterData === true
+        ? mergeCustomerProfiles(profile, customerOrderForm?.clientProfileData ?? null)
+        : null;
       if (hydratedProfile) {
         setCustomerExists(true); setEditingCustomer(false); applyProfile(hydratedProfile, email);
         setCustomerAddresses(addresses);
@@ -723,13 +752,12 @@ export default function CheckoutScreen() {
         if (preferred) applyAddress(preferred);
         setStep('customer');
       } else {
-        setCustomerExists(false); setEditingCustomer(true); setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setBirthDate(''); setGender('');
-        if (!newsletterOptInTouched.current) setNewsletterOptIn(true);
-        setCustomerAddresses([]); setAddressSaved(false); setCustomerValidationAttempted(false); setStep('customer');
+        resetNewCustomerForm();
+        setStep('customer');
       }
     } catch {
-      setCustomerExists(false); setEditingCustomer(true); setBirthDate(''); setCustomerValidationAttempted(false); setStep('customer');
-      if (!newsletterOptInTouched.current) setNewsletterOptIn(true);
+      resetNewCustomerForm();
+      setStep('customer');
     } finally {
       setSaving(false);
     }
@@ -1405,7 +1433,7 @@ export default function CheckoutScreen() {
           <Field label="Telefone com DDD" value={formatPhoneWithoutCountryCode(phone)} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11999999999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} />
           <Field label="Data de nascimento" value={birthDate} setValue={(value) => setBirthDate(formatBirthDateInput(value))} placeholder="DD/MM/AAAA" keyboardType="numeric" />
           <Field label="CPF" value={document} setValue={(value) => setDocument(formatCpf(value))} required placeholder="000.000.000-00" keyboardType="numeric" error={customerValidationAttempted ? customerErrors.document : ''} />
-          <View style={styles.field}><ThemedText style={styles.fieldLabel}>Gênero</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText style={styles.bodyText} themeColor="textSecondary">{formatGenderLabel(gender) || 'Selecione seu gênero'}</ThemedText><View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText style={styles.bodyText}>{option}</ThemedText></Pressable>)}</View>}</View>
+          <View style={styles.field}><ThemedText style={styles.fieldLabel}>Gênero</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText style={styles.bodyText} themeColor="textSecondary">{formatGenderLabel(gender) || genders[0].text}</ThemedText><View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option.value || 'optional'} disabled={option.disabled} onPress={() => { if (option.disabled) return; setGender(option.value); setGenderOpen(false); }} style={styles.option}><ThemedText style={styles.bodyText}>{option.text}</ThemedText></Pressable>)}</View>}</View>
         </Card>}
       {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
     </>}
