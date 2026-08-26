@@ -922,7 +922,7 @@ const styles = StyleSheet.create({
   heroProductCopy: { flex: 1, gap: 3 },
   heroProductName: { color: '#FFFFFF', fontSize: 14, lineHeight: 18 },
   heroProductPrice: { color: '#FFFFFF', fontSize: 14 },
-  heroBuyButton: { minWidth: 86, minHeight: 44, paddingHorizontal: Spacing.three, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  heroBuyButton: { minWidth: 86, minHeight: 40, paddingHorizontal: Spacing.three, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   heroBuyButtonText: { color: '#0a0a0a' },
   viewer: { flex: 1, backgroundColor: '#fff' },
   viewerList: { flex: 1, backgroundColor: '#fff' },
