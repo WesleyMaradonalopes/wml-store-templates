@@ -52,7 +52,7 @@ async function saveVtexUserToken(token: string) {
 
 type StartAuthResponse = { authenticationToken?: string };
 type ValidateAuthResponse = { authStatus?: string; authCookie?: { Value?: string }; userId?: string };
-type SetPasswordResponse = ValidateAuthResponse & { authToken?: string; accountAuthCookie?: unknown; message?: string; error?: string };
+type SetPasswordResponse = ValidateAuthResponse & { ok?: boolean; authToken?: string; accountAuthCookie?: unknown; message?: string; error?: string };
 type GoogleClientIdResponse = { enabled?: boolean; clientId?: string };
 export type VtexGoogleLoginResponse = {
   authStatus?: string;
@@ -171,6 +171,28 @@ async function startAuthenticatorPasswordFlow(email: string) {
 }
 
 export async function setVtexPassword(email: string, accessKey: string, newPassword: string, authenticationToken = '') {
+  // Em apps nativos, o fetch não mantém de forma confiável o cookie criado
+  // pelo Authenticator entre duas chamadas. O backend faz as duas etapas na
+  // mesma sessão e deixa o fallback direto disponível para desenvolvimento
+  // sem backend ou para versões antigas da API.
+  const backendResponse = await fetch(`${storeConfig.backendUrl}/auth/set-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, accessKey, newPassword }),
+  }).catch(() => null);
+  if (backendResponse && ![404, 405].includes(backendResponse.status)) {
+    const data = await backendResponse.json().catch(() => ({})) as SetPasswordResponse;
+    const status = String(data.authStatus || '').toLowerCase().trim();
+    const failed = data.ok === false || Boolean(data.error) || ['failed', 'error', 'invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials', 'unexpectederror'].includes(status);
+    if (backendResponse.ok && !failed) {
+      const token = extractAuthToken(data.authCookie) || extractAuthToken(data.accountAuthCookie) || extractAuthToken(data.authToken);
+      if (token) await saveVtexUserToken(token);
+      return data;
+    }
+    const invalidCode = ['invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials'].includes(status);
+    throw new Error(data.message || data.error || (invalidCode ? 'O código ou e-mail não é válido.' : 'Não foi possível criar ou alterar a senha.'));
+  }
+
   // A VTEX migrou este fluxo para o Authenticator e passou a exigir o
   // início da sessão por esse endpoint antes do setpassword.
   await startAuthenticatorPasswordFlow(email);
@@ -197,13 +219,13 @@ export async function setVtexPassword(email: string, accessKey: string, newPassw
     const response = await fetch(endpoint, { method: 'POST', headers, credentials: 'include', body: form });
     const data = await response.json().catch(() => ({})) as SetPasswordResponse;
     const status = String(data.authStatus || '').toLowerCase().trim();
-    const failed = Boolean(data.error) || ['failed', 'error', 'invalidemail', 'invalidpassword', 'wrongcredentials', 'unexpectederror'].includes(status);
+    const failed = data.ok === false || Boolean(data.error) || ['failed', 'error', 'invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials', 'unexpectederror'].includes(status);
     if (response.ok && !failed && (!status || status === 'success')) {
       const token = extractAuthToken(data.authCookie) || extractAuthToken(data.accountAuthCookie) || extractAuthToken(data.authToken);
       if (token) await saveVtexUserToken(token);
       return data;
     }
-    lastMessage = data.message || data.error || (status === 'wrongcredentials' ? 'O código ou e-mail não é válido.' : 'Não foi possível criar ou alterar a senha.');
+    lastMessage = data.message || data.error || (['invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials'].includes(status) ? 'O código ou e-mail não é válido.' : 'Não foi possível criar ou alterar a senha.');
     if (![404, 405].includes(response.status)) break;
   }
 

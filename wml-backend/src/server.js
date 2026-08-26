@@ -529,7 +529,21 @@ async function updateCustomerByEmail(email, profile) {
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(`VTEX Master Data retornou HTTP ${response.status} ao salvar.`);
-  return searchCustomerByEmail(email);
+  // O Master Data pode aceitar o POST/PATCH antes de disponibilizar o
+  // documento na busca. Não transforme essa leitura eventual em um falso
+  // erro no checkout: os dados abaixo são exatamente os que foram aceitos
+  // pela gravação e também cobrem o caso de um documento novo ainda não
+  // indexado.
+  const writeBody = await readResponseBody(response);
+  const documentId = typeof writeBody === 'object' && writeBody
+    ? firstProfileValue(writeBody, ['id', 'Id', 'documentId', 'DocumentId'])
+    : '';
+  return normalizeProfile({
+    ...(current || {}),
+    ...payload,
+    ...(documentId ? { id: documentId } : {}),
+    email,
+  });
 }
 
 function normalizeCustomerAddress(document = {}) {
@@ -1351,6 +1365,90 @@ async function updateCheckoutOffering(request, response, remove = false) {
 
 app.post('/checkout/order-form/:orderFormId/items/:itemIndex/offerings', (request, response) => updateCheckoutOffering(request, response));
 app.post('/checkout/order-form/:orderFormId/items/:itemIndex/offerings/:offeringId/remove', (request, response) => updateCheckoutOffering(request, response, true));
+
+function authenticatorPasswordFailed(body) {
+  const status = String(body?.authStatus || '').toLowerCase().trim();
+  return body?.ok === false || Boolean(body?.error) || ['failed', 'error', 'invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials', 'unexpectederror'].includes(status);
+}
+
+function authenticatorPasswordMessage(body) {
+  const status = String(body?.authStatus || '').toLowerCase().trim();
+  const invalidCode = ['invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials'].includes(status);
+  return vtexErrorMessage(body, invalidCode ? 'O código ou e-mail não é válido.' : 'Não foi possível criar ou alterar a senha.');
+}
+
+async function startAuthenticatorPasswordSession(email) {
+  const accountName = encodeURIComponent(account);
+  const startUrls = [
+    `${vtexBaseUrl}/api/authenticator/v1/pub/authentication/start?an=${accountName}`,
+    `${vtexBaseUrl}/api/authenticator/pub/authentication/start?an=${accountName}`,
+  ];
+  let lastResponse;
+  let lastBody;
+
+  for (const url of startUrls) {
+    const form = new FormData();
+    form.append('user', email);
+    form.append('scope', account);
+    form.append('accountName', account);
+    form.append('returnUrl', '/');
+    const result = await fetch(url, { method: 'POST', headers: { Accept: 'application/json' }, body: form });
+    const body = await readResponseBody(result);
+    lastResponse = result;
+    lastBody = body;
+    if (![404, 405].includes(result.status)) {
+      if (!result.ok) throw new Error(vtexErrorMessage(body, 'Não foi possível iniciar a recuperação de senha.'));
+      return { cookieHeader: normalizeCookieHeader(extractSetCookie(result)) };
+    }
+  }
+
+  throw new Error(vtexErrorMessage(lastBody, `VTEX Authenticator retornou HTTP ${lastResponse?.status || 502}.`));
+}
+
+app.post('/auth/set-password', async (request, response) => {
+  const email = String(request.body?.email || '').trim().toLowerCase();
+  const accessKey = String(request.body?.accessKey || '').trim();
+  const newPassword = String(request.body?.newPassword || '');
+  if (!email || !accessKey || !newPassword) return response.status(400).json({ ok: false, message: 'Dados para criação da senha incompletos.' });
+
+  try {
+    const authenticatorSession = await startAuthenticatorPasswordSession(email);
+    const accountName = encodeURIComponent(account);
+    const endpoints = [
+      `${vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
+      `${vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
+    ];
+    let result;
+    let body;
+
+    for (const endpoint of endpoints) {
+      const form = new FormData();
+      form.append('login', email);
+      form.append('currentPassword', '');
+      form.append('newPassword', newPassword);
+      form.append('accesskey', accessKey);
+      form.append('recaptcha', '');
+      const headers = { Accept: 'application/json' };
+      if (authenticatorSession.cookieHeader) headers.Cookie = authenticatorSession.cookieHeader;
+      const nextResult = await fetch(endpoint, { method: 'POST', headers, body: form });
+      const nextBody = await readResponseBody(nextResult);
+      result = nextResult;
+      body = nextBody;
+      if (![404, 405].includes(nextResult.status)) break;
+    }
+
+    if (!result || !result.ok || authenticatorPasswordFailed(body)) {
+      const statusCode = result && result.status >= 400 && result.status <= 599 ? result.status : 400;
+      const safeBody = body && typeof body === 'object' && !Array.isArray(body) && !body.raw ? body : {};
+      return response.status(statusCode).json({ ...safeBody, ok: false, message: authenticatorPasswordMessage(body) });
+    }
+
+    const safeBody = body && typeof body === 'object' && !Array.isArray(body) && !body.raw ? body : {};
+    return response.json({ ...safeBody, ok: true });
+  } catch (error) {
+    return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Não foi possível criar ou alterar a senha.' });
+  }
+});
 
 app.post('/auth/login', async (request, response) => {
   const email = String(request.body?.email || '').trim().toLowerCase();
