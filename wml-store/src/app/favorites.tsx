@@ -9,19 +9,15 @@ import { ProductCard } from '@/components/product-card';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { type Product } from '@/services/catalog';
 import { getCachedFavorites, getFavorites } from '@/services/favorites';
 
 const EMPTY_FAVORITES_SHELF: Record<string, unknown> = {
+  ...RECENT_PRODUCTS_SHELF,
   title: 'Você pode gostar',
-  showSeeAll: false,
-  sort: 'orders:desc',
-  facets: [
-    { key: 'category-1', value: 'calcinhas' },
-    { key: 'category-2', value: 'biquini' },
-  ],
 };
 
 export default function FavoritesScreen() {
@@ -77,7 +73,7 @@ export default function FavoritesScreen() {
               <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.homeButton}>
                 <ThemedText style={styles.homeButtonText}>Ir para Home</ThemedText>
               </Pressable>
-              <ProductShelf data={EMPTY_FAVORITES_SHELF} />
+              <ProductShelf data={EMPTY_FAVORITES_SHELF} titleStyle={styles.emptyShelfTitle} />
             </View>
           ) : null}
           renderItem={({ item }) => (
@@ -107,6 +103,7 @@ const styles = StyleSheet.create({
   card: { width: '48.7%' },
   emptyState: { gap: Spacing.three, paddingVertical: Spacing.two },
   emptyMessage: { fontSize: 14 },
+  emptyShelfTitle: { fontSize: 16, lineHeight: 22 },
   homeButton: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   homeButtonText: { color: '#FFFFFF', fontWeight: '700' },
 });

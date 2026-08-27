@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
@@ -85,7 +85,13 @@ function richTextBlocks(value: unknown): string[] {
 
 const PRODUCT_CARD_WIDTH = 220;
 
-export function ProductShelf({ data }: { data: Record<string, unknown> }) {
+type ProductShelfProps = {
+  data: Record<string, unknown>;
+  titleStyle?: StyleProp<TextStyle>;
+  onAdded?: (product: Product) => void;
+};
+
+export function ProductShelf({ data, titleStyle, onAdded }: ProductShelfProps) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +144,7 @@ export function ProductShelf({ data }: { data: Record<string, unknown> }) {
   return (
     <ThemedView style={styles.section}>
       <View style={styles.sectionHeader}>
-        <ThemedText type="subtitle">{text(data.title) || 'Produtos'}</ThemedText>
+        <ThemedText type="subtitle" style={titleStyle}>{text(data.title) || 'Produtos'}</ThemedText>
         {data.showSeeAll !== false && (
           <Pressable onPress={() => router.push(`/search?q=${encodeURIComponent(text(activeConfig.term) || text(activeConfig.query))}` as never)}>
             <ThemedText style={styles.seeAll}>Ver tudo</ThemedText>
@@ -178,6 +184,7 @@ export function ProductShelf({ data }: { data: Record<string, unknown> }) {
             style={{ width: PRODUCT_CARD_WIDTH }}
             favorite={favoriteIds.includes(item.id)}
             onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))}
+            onAdded={onAdded}
           />
         )}
       />
