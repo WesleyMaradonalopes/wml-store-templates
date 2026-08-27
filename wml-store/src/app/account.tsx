@@ -31,7 +31,7 @@ import HomeUtilityStoresIcon from '@/components/icons/HomeUtilityStoresIcon';
 import LockIcon from '@/components/icons/LockIcon';
 import UserIcon from '@/components/icons/UserIcon';
 
-type AccountView = 'home' | 'access' | 'password' | 'email' | 'code' | 'register' | 'register-password' | 'recovery-email' | 'recovery-password' | 'personal';
+type AccountView = 'home' | 'access' | 'password' | 'email' | 'code' | 'register' | 'register-code' | 'register-password' | 'recovery-email' | 'recovery-password' | 'personal';
 type OrderFormProfile = NonNullable<OrderForm['clientProfileData']> & { homePhone?: string; isNewsletterOptIn?: boolean };
 type CustomerProfile = OrderFormProfile & { gender?: string; birthDate?: string };
 
@@ -96,6 +96,7 @@ export default function AccountScreen() {
   const [notifications, setNotifications] = useState(true);
   const [authToken, setAuthToken] = useState('');
   const [accessCode, setAccessCode] = useState('');
+  const [codeSentAt, setCodeSentAt] = useState<number | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [accessCodeLoading, setAccessCodeLoading] = useState(false);
@@ -197,12 +198,20 @@ export default function AccountScreen() {
   }
 
   async function requestAccessCode() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!isValidEmail(normalizedEmail)) {
+      setAuthMessage('Informe um e-mail válido.');
+      return;
+    }
     try {
       setAuthMessage(null);
       setAccessCodeLoading(true);
       const token = await startVtexAuthentication();
-      await sendVtexAccessKey(email.trim(), token);
+      await sendVtexAccessKey(normalizedEmail, token);
+      setEmail(normalizedEmail);
       setAuthToken(token);
+      setAccessCode('');
+      setCodeSentAt(Date.now());
       setView('code');
     } catch (error) { setAuthMessage(error instanceof Error ? error.message : 'Não foi possível enviar o código.'); }
     finally { setAccessCodeLoading(false); }
@@ -222,18 +231,41 @@ export default function AccountScreen() {
       setAuthMessage(null);
       setAccessCodeLoading(true);
       // Garante que o cliente também exista no Shopper/Master Data antes de
-      // concluir o cadastro da senha na VTEX.
+      // concluir o cadastro por código na VTEX.
       await updateCustomerProfile(normalizedEmail, { email: normalizedEmail, isNewsletterOptIn: true });
       const token = await startVtexAuthentication();
       await sendVtexAccessKey(normalizedEmail, token);
       setEmail(normalizedEmail);
       setAuthToken(token);
       setAccessCode('');
+      setCodeSentAt(Date.now());
       setNewPassword('');
       setNewPasswordConfirmation('');
-      setView('register-password');
+      setView('register-code');
     } catch (error) {
       setAuthMessage(error instanceof Error ? error.message : 'Não foi possível enviar o código.');
+    } finally {
+      setAccessCodeLoading(false);
+    }
+  }
+
+  async function resendAccessCode() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!isValidEmail(normalizedEmail)) {
+      setAuthMessage('Informe um e-mail válido.');
+      return;
+    }
+    try {
+      setAuthMessage(null);
+      setAccessCodeLoading(true);
+      const token = await startVtexAuthentication();
+      await sendVtexAccessKey(normalizedEmail, token);
+      setEmail(normalizedEmail);
+      setAuthToken(token);
+      setAccessCode('');
+      setCodeSentAt(Date.now());
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : 'Não foi possível reenviar o código.');
     } finally {
       setAccessCodeLoading(false);
     }
@@ -369,18 +401,20 @@ export default function AccountScreen() {
     if (view === 'password' || view === 'email') return setView('access');
     if (view === 'code') return setView('email');
     if (view === 'register') return setView('access');
+    if (view === 'register-code') return setView('register');
     if (view === 'register-password') return setView('register');
     if (view === 'recovery-email') return setView('password');
     if (view === 'recovery-password') return setView('recovery-email');
   };
 
-  const headerTitle = view === 'register' ? 'Registrar' : view === 'register-password' ? 'Criar senha' : view === 'recovery-email' || view === 'recovery-password' ? 'Alterar senha' : 'Acesse sua conta';
+  const headerTitle = view === 'register' || view === 'register-code' ? 'Registrar' : view === 'register-password' ? 'Criar senha' : view === 'recovery-email' || view === 'recovery-password' ? 'Alterar senha' : 'Acesse sua conta';
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={headerTitle} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
     {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
     {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} onForgot={() => { setAuthMessage(null); setView('recovery-email'); }} />}
     {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} loading={accessCodeLoading} onRegister={() => setView('register')} message={authMessage} />}
-    {view === 'code' && <CodeView code={accessCode} setCode={setAccessCode} onValidate={validateAccessCode} loading={codeLoading} onBack={() => setView('email')} message={authMessage} />}
+    {view === 'code' && <CodeView email={email} code={accessCode} setCode={setAccessCode} sentAt={codeSentAt} onValidate={validateAccessCode} onResend={resendAccessCode} loading={codeLoading} resendLoading={accessCodeLoading} onBack={() => setView('email')} message={authMessage} />}
     {view === 'register' && <RegisterView email={email} setEmail={setEmail} accepted={accepted} setAccepted={setAccepted} onSend={sendRegistrationCode} loading={accessCodeLoading} message={authMessage} onBack={() => setView('access')} />}
+    {view === 'register-code' && <RegisterCodeView email={email} code={accessCode} setCode={setAccessCode} accepted={accepted} setAccepted={setAccepted} sentAt={codeSentAt} onValidate={validateAccessCode} onResend={resendAccessCode} loading={codeLoading} resendLoading={accessCodeLoading} message={authMessage} onBack={() => setView('register')} />}
     {view === 'register-password' && <PasswordSetupView mode="register" email={email} code={accessCode} setCode={setAccessCode} newPassword={newPassword} setNewPassword={setNewPassword} newPasswordConfirmation={newPasswordConfirmation} setNewPasswordConfirmation={setNewPasswordConfirmation} onSubmit={completePasswordSetup} loading={codeLoading} message={authMessage} onBack={() => setView('register')} />}
     {view === 'recovery-email' && <RecoveryEmailView email={email} setEmail={setEmail} onSend={sendRecoveryCode} loading={accessCodeLoading} message={authMessage} onBack={() => setView('password')} />}
     {view === 'recovery-password' && <PasswordSetupView mode="recovery" email={email} code={accessCode} setCode={setAccessCode} newPassword={newPassword} setNewPassword={setNewPassword} newPasswordConfirmation={newPasswordConfirmation} setNewPasswordConfirmation={setNewPasswordConfirmation} onSubmit={completePasswordSetup} loading={codeLoading} message={authMessage} onBack={() => setView('recovery-email')} />}
@@ -494,21 +528,66 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
   );
 }
 function EmailAccessView({ email, setEmail, onSend, loading, onRegister, message }: { email: string; setEmail: (value: string) => void; onSend: () => void; loading: boolean; onRegister: () => void; message: string | null }) { return <ThemedView style={styles.card}><ThemedText type="subtitle" style={styles.authTitle}>Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Informe seu e-mail para acessar ou registrar seus dados com segurança</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} /><Pressable disabled={loading} onPress={onSend} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Insira seu e-mail</ThemedText>}</Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<ThemedText themeColor="textSecondary">Ao se cadastrar, você concorda com nossa Política de Privacidade.</ThemedText><Pressable disabled={loading} onPress={onRegister}><ThemedText type="link">Criar uma conta</ThemedText></Pressable></ThemedView>; }
-function CodeView({ code, setCode, onValidate, loading, onBack, message }: { code: string; setCode: (value: string) => void; onValidate: () => void; loading: boolean; onBack: () => void; message: string | null }) { return <ThemedView style={styles.card}><ThemedText type="subtitle" style={styles.authTitle}>Digite o código de acesso</ThemedText><ThemedText themeColor="textSecondary">Enviamos um código para o seu e-mail.</ThemedText><TextInput value={code} onChangeText={setCode} placeholder="Código de acesso" keyboardType="number-pad" style={styles.input} /><Pressable disabled={loading} onPress={onValidate} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Confirmar código</ThemedText>}</Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<Pressable disabled={loading} onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable></ThemedView>; }
+function CodeView({ email, code, setCode, sentAt, onValidate, onResend, loading, resendLoading, onBack, message }: { email: string; code: string; setCode: (value: string) => void; sentAt: number | null; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
+  return <CodeAccessView title="Acesse sua conta" email={email} code={code} setCode={setCode} sentAt={sentAt} onValidate={onValidate} onResend={onResend} loading={loading} resendLoading={resendLoading} onBack={onBack} message={message} />;
+}
+
+function RegisterCodeView({ email, code, setCode, accepted, setAccepted, sentAt, onValidate, onResend, loading, resendLoading, onBack, message }: { email: string; code: string; setCode: (value: string) => void; accepted: boolean; setAccepted: (value: boolean) => void; sentAt: number | null; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
+  return <CodeAccessView title="Acessar com o seu e-mail" email={email} code={code} setCode={setCode} accepted={accepted} setAccepted={setAccepted} sentAt={sentAt} showEmailInput showTerms onValidate={onValidate} onResend={onResend} loading={loading} resendLoading={resendLoading} onBack={onBack} message={message} />;
+}
+
+function CodeAccessView({ title, email, code, setCode, accepted, setAccepted, sentAt, showEmailInput = false, showTerms = false, onValidate, onResend, loading, resendLoading, onBack, message }: { title: string; email: string; code: string; setCode: (value: string) => void; accepted?: boolean; setAccepted?: (value: boolean) => void; sentAt: number | null; showEmailInput?: boolean; showTerms?: boolean; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const hasCode = Boolean(code.trim());
+  const resendDisabled = secondsLeft > 0 || loading || resendLoading;
+
+  useEffect(() => {
+    if (!sentAt) {
+      setSecondsLeft(0);
+      return;
+    }
+    const updateRemaining = () => setSecondsLeft(Math.max(0, 60 - Math.floor((Date.now() - sentAt) / 1000)));
+    updateRemaining();
+    const timer = setInterval(updateRemaining, 1000);
+    return () => clearInterval(timer);
+  }, [sentAt]);
+
+  return <ThemedView style={styles.card}>
+    <ThemedText type="subtitle" style={styles.authTitle}>{title}</ThemedText>
+    {showEmailInput ? <TextInput value={email} editable={false} style={[styles.input, styles.readonly]} /> : <ThemedText themeColor="textSecondary">Enviamos um código para o e-mail {email}.</ThemedText>}
+    {showTerms && accepted !== undefined && setAccepted && <TermsCheckbox accepted={accepted} setAccepted={setAccepted} disabled={showEmailInput || loading || resendLoading} />}
+    <ThemedText themeColor="textSecondary">Código de verificação</ThemedText>
+    <TextInput value={code} onChangeText={setCode} placeholder="Código de verificação" keyboardType="number-pad" style={styles.input} />
+    {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
+    <Pressable disabled={!hasCode || loading || resendLoading} onPress={onValidate} style={[styles.primaryButton, (!hasCode || loading || resendLoading) && styles.disabled]}>
+      {loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Login</ThemedText>}
+    </Pressable>
+    <Pressable disabled={resendDisabled} onPress={() => { void onResend(); }} style={[styles.resendButton, resendDisabled && styles.disabled]}>
+      {resendLoading ? <ActivityIndicator size="small" color="#5d5955" /> : <ThemedText style={styles.resendText}>{secondsLeft > 0 ? `Reenviar código (${secondsLeft})` : 'Reenviar código'}</ThemedText>}
+    </Pressable>
+    <Pressable disabled={loading || resendLoading} onPress={onBack} style={styles.outlineButton}><ThemedText type="smallBold">Voltar</ThemedText></Pressable>
+  </ThemedView>;
+}
+
+function TermsCheckbox({ accepted, setAccepted, disabled = false }: { accepted: boolean; setAccepted: (value: boolean) => void; disabled?: boolean }) {
+  return <Pressable
+    accessibilityRole="checkbox"
+    accessibilityState={{ checked: accepted, disabled }}
+    disabled={disabled}
+    onPress={() => setAccepted(!accepted)}
+    style={styles.checkRow}>
+    <View style={[styles.checkbox, accepted && styles.checked]}>
+      {accepted && <ThemedText style={styles.checkboxMark}>✓</ThemedText>}
+    </View>
+    <ThemedText themeColor="textSecondary">Ao clicar em Registrar você concorda com os termos de serviço.</ThemedText>
+  </Pressable>;
+}
+
 function RegisterView({ email, setEmail, accepted, setAccepted, onSend, loading, message, onBack }: { email: string; setEmail: (value: string) => void; accepted: boolean; setAccepted: (value: boolean) => void; onSend: () => void; loading: boolean; message: string | null; onBack: () => void }) {
   return <ThemedView style={styles.card}>
     <ThemedText type="subtitle" style={styles.authTitle}>Acessar com o seu e-mail</ThemedText>
     <TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} />
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: accepted }}
-      onPress={() => setAccepted(!accepted)}
-      style={styles.checkRow}>
-      <View style={[styles.checkbox, accepted && styles.checked]}>
-        {accepted && <ThemedText style={styles.checkboxMark}>✓</ThemedText>}
-      </View>
-      <ThemedText themeColor="textSecondary">Ao clicar em Registrar você concorda com os termos de serviço.</ThemedText>
-    </Pressable>
+    <TermsCheckbox accepted={accepted} setAccepted={setAccepted} />
     {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
     <Pressable disabled={!accepted || loading} onPress={onSend} style={[styles.primaryButton, (!accepted || loading) && styles.disabled]}>
       {loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Enviar código</ThemedText>}
@@ -576,7 +655,7 @@ function LoggedAccountV2({ email, notifications, setNotifications, onLogout, log
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#313235" size={18} /> },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#313235" size={18} /> },
   ];
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.logoutText}>Sair</ThemedText>}</Pressable><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
+  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><View style={styles.divider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.logoutText}>Sair</ThemedText>}</Pressable><View style={styles.divider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
 }
 
 function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPrivacyPress }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void; onPrivacyPress: () => void }) {
@@ -636,7 +715,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingVertical: Spacing.five }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#0a0a0a' }, primaryText: { color: '#ffffff', fontWeight: '700' }, primaryDadosText: { textDecorationLine: 'underline', color: '#0a0a0a' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#0a0a0a', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, notificationSwitch: { width: 30, height: 16, padding: 3, borderRadius: 14, justifyContent: 'center' }, notificationSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' }, notificationSwitchOff: { backgroundColor: '#dedbd5', alignItems: 'flex-start' }, notificationThumb: { width: 12, height: 12, borderRadius: 11, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] }, genderDropdownIconOpen: { transform: [{ rotate: '-90deg' }] }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, forgotButton: { alignSelf: 'flex-start' }, linkText: { color: '#625d57', textDecorationLine: 'underline' }, authFooter: { flexDirection: 'row', gap: Spacing.two }, authFooterButton: { flex: 1, minHeight: 48, justifyContent: 'center' }, passwordRules: { gap: Spacing.one, paddingVertical: Spacing.one }, passwordRule: { fontSize: 12, lineHeight: 17 }, passwordRuleValid: { color: '#2f8f5b' }, passwordRuleInvalid: { color: '#df5f5f' }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }, checkboxMark: { color: '#ffffff', fontSize: 13, lineHeight: 16, fontWeight: '700' }, checked: { backgroundColor: '#0a0a0a' }, disabled: { opacity: 0.5 },
+  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingVertical: Spacing.five }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#0a0a0a' }, primaryText: { color: '#ffffff', fontWeight: '700' }, primaryDadosText: { textDecorationLine: 'underline', color: '#0a0a0a' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#0a0a0a', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, notificationSwitch: { width: 30, height: 16, padding: 3, borderRadius: 14, justifyContent: 'center' }, notificationSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' }, notificationSwitchOff: { backgroundColor: '#dedbd5', alignItems: 'flex-start' }, notificationThumb: { width: 12, height: 12, borderRadius: 11, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] }, genderDropdownIconOpen: { transform: [{ rotate: '-90deg' }] }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, forgotButton: { alignSelf: 'flex-start' }, linkText: { color: '#625d57', textDecorationLine: 'underline' }, authFooter: { flexDirection: 'row', gap: Spacing.two }, authFooterButton: { flex: 1, minHeight: 48, justifyContent: 'center' }, passwordRules: { gap: Spacing.one, paddingVertical: Spacing.one }, passwordRule: { fontSize: 12, lineHeight: 17 }, passwordRuleValid: { color: '#2f8f5b' }, passwordRuleInvalid: { color: '#df5f5f' }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }, checkboxMark: { color: '#ffffff', fontSize: 13, lineHeight: 16, fontWeight: '700' }, resendButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#e7e3da' }, resendText: { color: '#5d5955', fontWeight: '700' }, checked: { backgroundColor: '#0a0a0a' }, disabled: { opacity: 0.5 },
   authTitle: { fontFamily: Fonts.bold, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   accountTile: { minHeight: 96, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'stretch' },
   tileHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
