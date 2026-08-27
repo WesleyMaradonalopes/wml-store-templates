@@ -186,7 +186,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
             <SafeAreaView edges={['bottom']} style={styles.safeArea}>
               <View style={styles.header}>
                 <ThemedText numberOfLines={2} style={styles.title}>
-                  {isKit ? <>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></> : details.name}
+                  {isKit ? <>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></> : details.name }
                 </ThemedText>
                 <Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.closeButton}>
                   <ThemedText style={styles.closeText}>✕</ThemedText>
@@ -209,7 +209,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
                   />
                 )}
                 {!isKit && (selectedVariant?.price ?? details.price) !== null && (
-                  <ThemedText type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
+                  <ThemedText style={styles.priceQuickView} type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
                 )}
                 {isKit ? (
                   <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
@@ -286,10 +286,12 @@ const styles = StyleSheet.create({
   title: { flex: 1, paddingRight: Spacing.three },
   closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
-  content: { gap: Spacing.three, padding: Spacing.four, paddingBottom: Spacing.five },
+  content: { gap: 5, padding: Spacing.four, paddingBottom: Spacing.five },
   gallery: { gap: 12, paddingRight: Spacing.four },
   image: { width: 160, height: 220, borderRadius: 8, backgroundColor: '#e8e8ea' },
-  variationGroup: { gap: Spacing.two },
+	nameQuickView: { fontSize: 14},
+	priceQuickView: { display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 16, height: 30, margin: 0 },
+  variationGroup: { gap: Spacing.two, },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   option: { minWidth: 42, minHeight: 42, paddingHorizontal: Spacing.three, borderRadius: 21, borderWidth: 1, borderColor: '#d6d0c8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   selectedOption: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
