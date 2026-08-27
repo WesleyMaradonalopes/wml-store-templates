@@ -867,7 +867,7 @@ function ColorOptionsModal({ products, visible, selectedProductId, onClose, onSe
       <ThemedView style={styles.colorModal}>
         <SafeAreaView style={styles.colorModalSafeArea}>
           <View style={styles.colorModalHeader}>
-            <ThemedText type="subtitle">Ver cores ({products.length})</ThemedText>
+            <ThemedText style={styles.titleColorModal} type="subtitle">Ver cores ({products.length})</ThemedText>
             <Pressable accessibilityLabel="Fechar cores" onPress={onClose} style={styles.colorModalClose}>
               <ThemedText style={styles.colorModalCloseText}>✕</ThemedText>
             </Pressable>
@@ -951,6 +951,7 @@ const styles = StyleSheet.create({
   colorCircle: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: '#d7d2ca' },
   moreColorsButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 19, borderWidth: 1, borderColor: '#d7d2ca', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   moreColorsText: { fontSize: 12 },
+	titleColorModal: { fontSize: 16 },
   variantOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   variantOption: { minWidth: 42, height: 42, paddingHorizontal: Spacing.three, borderRadius: 21, borderWidth: 1, borderColor: '#d7d3cc', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   selectedVariant: { backgroundColor: '#0a0a0a', borderColor: '#0a0a0a' },

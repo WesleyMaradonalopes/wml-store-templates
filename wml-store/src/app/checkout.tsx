@@ -497,6 +497,19 @@ export default function CheckoutScreen() {
     if (target) setStep(target); else router.back();
   }
 
+  async function openOrdersAfterCheckout() {
+    try {
+      const session = await getAccountSession();
+      if (session?.email?.trim()) {
+        router.push('/orders');
+        return;
+      }
+    } catch {
+      // If the session cannot be read, continue through the login flow.
+    }
+    router.push('/account?view=access' as never);
+  }
+
   function applyProfile(profile: CustomerProfile, fallbackEmail = '') {
     setEmail(fallbackEmail || profile.email || '');
     setFirstName(profile.firstName || '');
@@ -1295,12 +1308,12 @@ export default function CheckoutScreen() {
         <View style={styles.orderSuccessCard}>
           <View style={styles.orderSuccessIcon}><ThemedText style={styles.orderSuccessCheck}>✓</ThemedText></View>
           <ThemedText style={styles.orderSuccessTitle}>Pronto, compra feita!</ThemedText>
-          <ThemedText style={styles.orderSuccessDescription}>Enviamos uma confirmação com os detalhes do seu pedido para seu email.</ThemedText>
+          <ThemedText style={styles.orderSuccessDescription}>Enviamos uma confirmação com os detalhes do seu pedido para seu e-mail.</ThemedText>
           <ThemedText style={styles.orderSuccessLabel}>Seu código de pedido é</ThemedText>
           <ThemedText style={styles.orderSuccessId}>{orderResult.orderId || orderResult.orderGroup}</ThemedText>
           {!!orderResult.message && <ThemedText style={styles.orderSuccessDescription}>{orderResult.message}</ThemedText>}
         </View>
-      </ScrollView><View style={styles.fixedFooter}><Primary title="Ver meus pedidos" onPress={() => router.push('/orders')} /><Secondary title="Voltar ao início" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
+      </ScrollView><View style={styles.fixedFooter}><Primary title="Ver meus pedidos" onPress={() => { void openOrdersAfterCheckout(); }} /><Secondary title="Voltar ao início" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
     }
     const title = isPending ? 'Pagamento pendente' : 'Pagamento não autorizado';
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Resultado do pedido" onBack={() => router.replace('/')} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>

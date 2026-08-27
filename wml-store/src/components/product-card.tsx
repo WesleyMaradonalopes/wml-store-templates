@@ -93,7 +93,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
           </Pressable>
           <ProductQuickViewButton
             product={product}
-            icon={<ShoppingBagIcon size={17} color="#5d5955" />}
+            icon={<ShoppingBagIcon size={20} color="#000000" />}
             accessibilityLabel="Adicionar à sacola"
             disabled={!product.itemId}
             buttonStyle={styles.addButton}

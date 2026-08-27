@@ -1,4 +1,4 @@
-import { View, Text, Image } from 'eitri-luminus'
+import { Image, Text, View } from 'eitri-luminus'
 import { BottomInset } from 'wml-store-templates-shared'
 import { openProduct } from '../../services/NavigationService'
 
