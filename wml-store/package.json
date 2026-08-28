@@ -6,7 +6,7 @@
     "@expo-google-fonts/montserrat": "^0.4.2",
     "@expo/ui": "~57.0.14",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "~57.0.17",
+    "expo": "~57.0.18",
     "expo-auth-session": "~57.0.10",
     "expo-blur": "~57.0.2",
     "expo-build-properties": "~57.0.15",

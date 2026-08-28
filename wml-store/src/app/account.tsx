@@ -390,7 +390,7 @@ export default function AccountScreen() {
 
   if (view === 'home') {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader back={false} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-      {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} /> : <GuestAccount onEnter={() => setView('access')} onRegister={() => setView('register')} />}
+      {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} /> : <GuestAccount onEnter={() => setView('access')} onRegister={() => setView('register')} />}
     </ScrollView></SafeAreaView></ThemedView>;
   }
 
@@ -403,7 +403,7 @@ export default function AccountScreen() {
     if (view === 'register') return setView('access');
     if (view === 'register-code') return setView('register');
     if (view === 'register-password') return setView('register');
-    if (view === 'recovery-email') return setView('password');
+    if (view === 'recovery-email') return setView(loggedIn ? 'home' : 'password');
     if (view === 'recovery-password') return setView('recovery-email');
   };
 
@@ -438,7 +438,7 @@ function AccountTile({ label, icon, onPress }: AccountTileData) {
 }
 
 function LoggedAccount({ email, notifications, setNotifications, onLogout, onPersonal, onOrders, onFavorites }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; onPersonal: () => void; onOrders: () => void; onFavorites: () => void }) {
-  return <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={onLogout} logoutLoading={false} onPersonal={onPersonal} onOrders={onOrders} onFavorites={onFavorites} />;
+  return <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={onLogout} logoutLoading={false} onPersonal={onPersonal} onOrders={onOrders} onFavorites={onFavorites} onPasswordReset={() => undefined} />;
 }
 
 function UtilityGrid({ onRegister }: { onRegister: () => void }) {
@@ -644,13 +644,13 @@ function PasswordSetupView({ mode, email, code, setCode, newPassword, setNewPass
     </View>
   </ThemedView>;
 }
-function LoggedAccountV2({ email, notifications, setNotifications, onLogout, logoutLoading, onPersonal, onOrders, onFavorites }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void }) {
+function LoggedAccountV2({ email, notifications, setNotifications, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void }) {
   const tiles: AccountTileData[] = [
     { label: 'Meus pedidos', icon: <Box01Icon color="#313235" size={18} />, onPress: onOrders },
     { label: 'Dados pessoais', icon: <UserIcon color="#313235" size={18} />, onPress: onPersonal },
     { label: 'Favoritos', icon: <HeartIcon color="#313235" size={18} />, onPress: onFavorites },
     { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#313235" size={18} /> },
-    { label: 'Redefinição de senha', icon: <LockIcon color="#313235" size={18} /> },
+    { label: 'Redefinição de senha', icon: <LockIcon color="#313235" size={18} />, onPress: onPasswordReset },
     { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#313235" size={18} /> },
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#313235" size={18} /> },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#313235" size={18} /> },
