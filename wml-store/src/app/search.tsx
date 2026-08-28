@@ -13,12 +13,18 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { parseCmsRouteFacets } from '@/services/cms-actions';
-import { getProductFacets, resolveCategoryFacets, searchProductListing, type CatalogFacet, type Product, type SelectedFacet } from '@/services/catalog';
+import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
 import { isFavorite } from '@/services/favorites';
 
 function paramText(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
 }
+
+type ListingResolution = {
+  query: string;
+  facets: SelectedFacet[];
+  source: SmartSearchSource;
+};
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -42,8 +48,10 @@ export default function SearchScreen() {
   const [sort, setSort] = useState(initialSort);
   const [listingTitle, setListingTitle] = useState(initialTitle);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [popularTerms, setPopularTerms] = useState<string[]>([]);
+  const [listingResolution, setListingResolution] = useState<ListingResolution | null>(null);
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const popularTerms = ['Sutiã', 'Naked', 'Calcinha Renda', 'Calcinhas Algodão', 'Pijama', 'Pantufa', 'Calcinha Microfibra', 'Top', 'Camisola', 'Algodão'];
   const facetSignature = JSON.stringify(selectedFacets);
 
   useEffect(() => {
@@ -56,7 +64,33 @@ export default function SearchScreen() {
     setSelectedFacets(nextFacets);
     setSort(paramText(sortParam) || 'score:desc');
     setListingTitle(nextTitle);
+    setSuggestions([]);
+    setListingResolution(null);
   }, [facetsParam, q, sortParam, titleParam]);
+
+  useEffect(() => {
+    const value = term.trim();
+    if (!searchOpen || value.length < 2 || value === activeQuery) {
+      setSuggestions([]);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
+      getSearchSuggestions(value)
+        .then((items) => { if (active) setSuggestions(items); })
+        .catch(() => { if (active) setSuggestions([]); });
+    }, 220);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [activeQuery, searchOpen, term]);
+
+  useEffect(() => {
+    getTopSearchTerms().then(setPopularTerms).catch(() => setPopularTerms([]));
+  }, []);
 
   useEffect(() => {
     const value = term.trim();
@@ -75,27 +109,23 @@ export default function SearchScreen() {
       setProducts([]);
       setFacets([]);
       setResultCount(0);
+      setListingResolution(null);
       setLoading(false);
       return;
     }
     let active = true;
     setLoading(true);
     setMessage(null);
+    setListingResolution(null);
     async function loadListing() {
       let requestFacets = selectedFacets;
-      let [listing, availableFacets] = await Promise.all([
-        searchProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort }),
-        getProductFacets({ query: activeQuery, facets: requestFacets }),
-      ]);
+      let listing = await searchSmartProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort });
 
       if (listing.recordsFiltered === 0 && listing.products.length === 0) {
         const resolvedFacets = await resolveCategoryFacets(requestFacets);
         if (JSON.stringify(resolvedFacets) !== JSON.stringify(requestFacets)) {
           requestFacets = resolvedFacets;
-          [listing, availableFacets] = await Promise.all([
-            searchProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort }),
-            getProductFacets({ query: activeQuery, facets: requestFacets }),
-          ]);
+          listing = await searchSmartProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort });
           if (active) setSelectedFacets(resolvedFacets);
         }
       }
@@ -103,7 +133,8 @@ export default function SearchScreen() {
       if (!active) return;
       setProducts(listing.products);
       setResultCount(listing.recordsFiltered);
-      setFacets(availableFacets);
+      setFacets(listing.facets);
+      setListingResolution({ query: listing.resolvedQuery, facets: listing.resolvedFacets, source: listing.source });
       const saved = await Promise.all(listing.products.map(async (product) => (await isFavorite(product.id) ? product.id : null)));
       if (active) setFavoriteIds(saved.filter((id): id is string => Boolean(id)));
     }
@@ -129,6 +160,7 @@ export default function SearchScreen() {
     setSort('score:desc');
     setListingTitle('');
     setActiveQuery(value);
+    setSuggestions([]);
   }
 
   function clearSearch() {
@@ -138,6 +170,8 @@ export default function SearchScreen() {
     setListingTitle('');
     setActiveQuery('');
     setMessage(null);
+    setSuggestions([]);
+    setListingResolution(null);
   }
 
   function openPopular(value: string) {
@@ -146,6 +180,16 @@ export default function SearchScreen() {
     setSort('score:desc');
     setListingTitle('');
     setActiveQuery(value);
+    setSuggestions([]);
+  }
+
+  function selectSuggestion(value: string) {
+    setTerm(value);
+    setSelectedFacets([]);
+    setSort('score:desc');
+    setListingTitle('');
+    setActiveQuery(value);
+    setSuggestions([]);
   }
 
   async function loadMore() {
@@ -153,7 +197,10 @@ export default function SearchScreen() {
     setLoadingMore(true);
     try {
       const nextPage = Math.floor(products.length / 48) + 1;
-      const listing = await searchProductListing({ query: activeQuery, facets: selectedFacets, count: 48, page: nextPage, sort });
+      const resolution = listingResolution ?? { query: activeQuery, facets: selectedFacets, source: 'intelligent' as const };
+      const listing = resolution.source === 'catalog-fulltext'
+        ? await searchCatalogProductListing({ query: resolution.query, facets: resolution.facets, count: 48, page: nextPage, sort })
+        : await searchProductListing({ query: resolution.query, facets: resolution.facets, count: 48, page: nextPage, sort });
       const newProducts = listing.products.filter((product) => !products.some((current) => current.id === product.id));
       setProducts((current) => [...current, ...newProducts]);
       const saved = await Promise.all(newProducts.map(async (product) => (await isFavorite(product.id) ? product.id : null)));
@@ -183,9 +230,25 @@ export default function SearchScreen() {
         ) : (
           <ScreenHeader onSearch={() => setSearchOpen(true)} />
         )}
+        {searchOpen && suggestions.length > 0 && (
+          <View style={styles.suggestionsPanel}>
+            {suggestions.slice(0, 6).map((suggestion) => {
+              const attributes = suggestion.attributes.map((attribute) => attribute.labelValue).filter(Boolean).slice(0, 2).join(' · ');
+              return (
+                <Pressable key={suggestion.term} onPress={() => selectSuggestion(suggestion.term)} style={styles.suggestionRow}>
+                  <SearchIcon size={15} color="#8b8782" />
+                  <View style={styles.suggestionCopy}>
+                    <ThemedText style={styles.suggestionText}>{suggestion.term}</ThemedText>
+                    {!!attributes && <ThemedText themeColor="textSecondary" style={styles.suggestionMeta}>{attributes}</ThemedText>}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
         <View style={styles.body}>
 
-        {!activeQuery && selectedFacets.length === 0 && (
+        {!activeQuery && selectedFacets.length === 0 && popularTerms.length > 0 && (
           <ThemedView style={styles.trending}>
             <ThemedText type="smallBold">Em alta</ThemedText>
             <View style={styles.chips}>
@@ -235,11 +298,20 @@ export default function SearchScreen() {
           visible={filtersVisible}
           query={activeQuery}
           facets={facets}
+          baseFacets={(listingResolution?.source === 'facet' || listingResolution?.source === 'collection')
+            ? listingResolution.facets.filter((facet) => !selectedFacets.some((selected) => selected.key === facet.key && selected.value === facet.value))
+            : []}
           selectedFacets={selectedFacets}
           sort={sort}
           resultCount={resultCount}
           onClose={() => setFiltersVisible(false)}
-          onApply={(nextFacets, nextSort) => { setSelectedFacets(nextFacets); setSort(nextSort); setFiltersVisible(false); }}
+          onApply={(nextFacets, nextSort) => {
+            const scope = (listingResolution?.source === 'facet' || listingResolution?.source === 'collection') ? listingResolution.facets : [];
+            const merged = Array.from(new Map([...scope, ...nextFacets].map((facet) => [`${facet.key}:${facet.value}`, facet])).values());
+            setSelectedFacets(merged);
+            setSort(nextSort);
+            setFiltersVisible(false);
+          }}
         />
       </SafeAreaView>
     </ThemedView>
@@ -257,6 +329,11 @@ const styles = StyleSheet.create({
   clearText: { fontSize: 14, lineHeight: 18, color: '#625d57', fontWeight: '500' },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
+  suggestionsPanel: { marginHorizontal: Spacing.three, borderBottomLeftRadius: 14, borderBottomRightRadius: 14, borderWidth: 1, borderTopWidth: 0, borderColor: '#e7e3de', backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  suggestionRow: { minHeight: 52, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderTopWidth: 1, borderTopColor: '#f0ede9' },
+  suggestionCopy: { flex: 1, gap: 2 },
+  suggestionText: { fontSize: 14 },
+  suggestionMeta: { fontSize: 11 },
   body: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.three },
   trending: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, borderWidth: 1, borderColor: '#ebe7e1', backgroundColor: '#FFFFFF' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },

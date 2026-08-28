@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
-import { type CatalogFacet, type SelectedFacet, searchProductListing } from '@/services/catalog';
+import { searchSmartProductListing, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -62,7 +62,7 @@ export function ProductFilterModal({ visible, query, facets, baseFacets = [], se
     let active = true;
     setPreviewLoading(true);
     const timer = setTimeout(() => {
-      searchProductListing({ query, facets: [...baseFacets, ...draftFacets], sort: draftSort, count: 1 })
+      searchSmartProductListing({ query, facets: [...baseFacets, ...draftFacets], sort: draftSort, count: 1 })
         .then((result) => { if (active) setPreviewCount(result.recordsFiltered); })
         .catch(() => undefined)
         .finally(() => { if (active) setPreviewLoading(false); });

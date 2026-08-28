@@ -2,6 +2,7 @@ import { storeConfig } from '@/config/store';
 import { compareSizes, isSizeVariationName } from '@/constants/sizes';
 
 import { getJson } from './http';
+import { getStoredJson, setStoredJson } from './storage';
 
 export type ProductVariant = {
   itemId: string;
@@ -52,6 +53,25 @@ export type Product = {
 type SearchResponse = {
   products?: ProductPayload[];
   recordsFiltered?: number;
+};
+
+type SearchSuggestionPayload = {
+  searches?: Array<{
+    term?: string;
+    count?: number;
+    attributes?: Array<{
+      key?: string;
+      labelKey?: string;
+      labelValue?: string;
+      value?: string;
+    }>;
+  }>;
+};
+
+type SearchCorrectionPayload = {
+  correction?: {
+    text?: string;
+  };
 };
 
 type FacetsResponse = {
@@ -131,6 +151,38 @@ export type ProductSearchResult = {
   recordsFiltered: number;
 };
 
+export type SearchSuggestionAttribute = {
+  key: string;
+  labelKey: string;
+  labelValue: string;
+  value: string;
+};
+
+export type SearchSuggestion = {
+  term: string;
+  count: number;
+  attributes: SearchSuggestionAttribute[];
+};
+
+export type SmartSearchSource = 'intelligent' | 'facet' | 'catalog-fulltext' | 'collection';
+
+export type SmartProductSearchResult = ProductSearchResult & {
+  facets: CatalogFacet[];
+  resolvedQuery: string;
+  resolvedFacets: SelectedFacet[];
+  source: SmartSearchSource;
+};
+
+type CollectionSearchItem = {
+  id: string;
+  name: string;
+};
+
+type CachedCollectionIndex = {
+  cachedAt: number;
+  collections: CollectionSearchItem[];
+};
+
 export type SearchParams = {
   query?: string;
   page?: number;
@@ -169,6 +221,16 @@ function normalizedCategorySegment(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+function normalizedSearchText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 function categoryDistance(left: string, right: string) {
@@ -217,6 +279,60 @@ function loadCategoryPaths() {
       });
   }
   return categoryPathsRequest;
+}
+
+const publicCollectionCacheTtl = 24 * 60 * 60 * 1000;
+let publicCollectionIndexRequest: Promise<CollectionSearchItem[]> | null = null;
+
+function productClusterItems(product: Product): CollectionSearchItem[] {
+  const clusters = product.raw?.productClusters;
+  if (Array.isArray(clusters)) {
+    return clusters.flatMap((cluster) => {
+      if (!cluster || typeof cluster !== 'object') return [];
+      const item = cluster as Record<string, unknown>;
+      const id = String(item.id ?? item.Id ?? '').trim();
+      const name = String(item.name ?? item.Name ?? '').trim();
+      return id && name ? [{ id, name }] : [];
+    });
+  }
+
+  if (clusters && typeof clusters === 'object') {
+    return Object.entries(clusters as Record<string, unknown>).flatMap(([id, name]) => {
+      const value = String(name ?? '').trim();
+      return id && value ? [{ id, name: value }] : [];
+    });
+  }
+
+  return [];
+}
+
+async function loadPublicCollectionIndex() {
+  if (publicCollectionIndexRequest) return publicCollectionIndexRequest;
+
+  publicCollectionIndexRequest = (async () => {
+    const cacheKey = `catalog:collection-index:${storeConfig.account}:${storeConfig.salesChannel}`;
+    const cached = await getStoredJson<CachedCollectionIndex>(cacheKey).catch(() => null);
+    if (cached && Date.now() - cached.cachedAt < publicCollectionCacheTtl) return cached.collections;
+
+    // The public product response contains the cluster names attached to each
+    // product. A short, cached index gives stores without collection-read
+    // permission a dynamic fallback without embedding collection IDs in code.
+    const pages = await Promise.all(Array.from({ length: 6 }, (_, index) => searchProductListing({
+      query: '',
+      page: index + 1,
+      count: 50,
+      sort: 'release:desc',
+    }).catch(() => null)));
+    const collections = Array.from(new Map(pages.flatMap((page) => (page?.products ?? []).flatMap(productClusterItems)).map((item) => [item.id, item])).values());
+    await setStoredJson(cacheKey, { cachedAt: Date.now(), collections }).catch(() => undefined);
+    return collections;
+  })();
+
+  try {
+    return await publicCollectionIndexRequest;
+  } finally {
+    publicCollectionIndexRequest = null;
+  }
 }
 
 function closestCategoryPath(values: string[], paths: string[][]) {
@@ -281,6 +397,10 @@ function facetPath(facets: SelectedFacet[]) {
 function intelligentSearchUrl(endpoint: 'product-search' | 'facets', facets: SelectedFacet[]) {
   const path = facetPath(facets);
   return new URL(`${storeConfig.vtexBaseUrl}/api/intelligent-search/v1/${endpoint}${path ? `/${path}` : '/'}`);
+}
+
+function intelligentSearchEndpointUrl(endpoint: string) {
+  return new URL(`${storeConfig.vtexBaseUrl}/api/intelligent-search/v1/${endpoint}`);
 }
 
 function rangeLabel(from: number, to: number) {
@@ -554,6 +674,307 @@ export async function searchProductListing({
   const result = await getJson<SearchResponse>(url.toString());
   const products = (result.products ?? []).map(normalizeProduct).filter((product) => product.id);
   return { products, recordsFiltered: result.recordsFiltered ?? products.length };
+}
+
+function filterAvailableProducts(products: Product[], hideUnavailableItems: boolean) {
+  if (!hideUnavailableItems) return products;
+  return products.filter((product) => product.variants.length === 0 || product.variants.some((variant) => variant.available));
+}
+
+/**
+ * Catalog System is kept as a fallback for stores whose Intelligent Search
+ * index does not contain every full-text term yet. It is deliberately generic
+ * and receives the shopper's query at runtime; no product words are encoded
+ * in the app.
+ */
+export async function searchCatalogProductListing({
+  query = '',
+  page = 1,
+  count = 12,
+  hideUnavailableItems = true,
+  fq = [],
+  sort,
+}: SearchParams = {}): Promise<ProductSearchResult> {
+  const value = query.trim();
+  if (!value) return { products: [], recordsFiltered: 0 };
+
+  const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/search/`);
+  url.searchParams.set('ft', value);
+  url.searchParams.set('_from', String(Math.max(0, (page - 1) * count)));
+  url.searchParams.set('_to', String(Math.max(0, page * count - 1)));
+  url.searchParams.set('sc', storeConfig.salesChannel);
+  fq.filter(Boolean).forEach((filter) => url.searchParams.append('fq', filter));
+
+  const legacySort: Record<string, string> = {
+    'release:desc': 'OrderByReleaseDateDESC',
+    'orders:desc': 'OrderByTopSaleDESC',
+    'price:asc': 'OrderByPriceASC',
+    'price:desc': 'OrderByPriceDESC',
+    'name:asc': 'OrderByNameASC',
+    'name:desc': 'OrderByNameDESC',
+  };
+  const order = sort ? legacySort[sort] : '';
+  if (order) url.searchParams.set('O', order);
+
+  const payload = await getJson<ProductPayload[]>(url.toString());
+  const products = filterAvailableProducts(
+    (payload ?? []).map(normalizeProduct).filter((product) => product.id),
+    hideUnavailableItems,
+  );
+  return { products, recordsFiltered: products.length };
+}
+
+function exactSearchFacet(query: string, facets: CatalogFacet[]) {
+  const target = normalizedSearchText(query);
+  if (target.length < 3) return null;
+
+  const candidates = facets.flatMap((facet) => facet.values.map((value) => {
+    const valueMatch = normalizedSearchText(value.value) === target;
+    const nameMatch = normalizedSearchText(value.name) === target;
+    if (!valueMatch && !nameMatch) return null;
+
+    const key = facet.key.toLowerCase();
+    const priority = /^category-\d+$/.test(key)
+      ? 300
+      : key === 'colecao' || key === 'collection'
+        ? 220
+        : key === 'brand'
+          ? 180
+          : 100;
+    return { facet: { key: value.key || facet.key, value: value.value }, score: priority + Math.min(value.quantity, 99) / 100 };
+  })).filter((candidate): candidate is { facet: SelectedFacet; score: number } => Boolean(candidate));
+
+  return candidates.sort((left, right) => right.score - left.score)[0]?.facet ?? null;
+}
+
+function selectedFacetCoversQuery(query: string, facets: SelectedFacet[]) {
+  const target = normalizedSearchText(query);
+  return facets.some((facet) => {
+    const key = facet.key.toLowerCase();
+    return (key === 'productclusterids' || /^category-\d+$/.test(key) || key === 'colecao' || key === 'collection')
+      && normalizedSearchText(facet.value) === target;
+  });
+}
+
+async function safeProductFacets(query: string, facets: SelectedFacet[]) {
+  try {
+    return await getProductFacets({ query, facets });
+  } catch {
+    return [];
+  }
+}
+
+export async function getSearchSuggestions(query: string): Promise<SearchSuggestion[]> {
+  const value = query.trim();
+  if (!value) return [];
+
+  const url = intelligentSearchEndpointUrl('autocomplete-suggestions');
+  url.searchParams.set('query', value);
+  url.searchParams.set('sc', storeConfig.salesChannel);
+  const result = await getJson<SearchSuggestionPayload>(url.toString());
+  return (result.searches ?? []).flatMap((item) => {
+    const term = item.term?.trim() ?? '';
+    if (!term) return [];
+    return [{
+      term,
+      count: item.count ?? 0,
+      attributes: (item.attributes ?? []).flatMap((attribute) => {
+        const labelValue = attribute.labelValue?.trim() || attribute.value?.trim() || '';
+        if (!labelValue) return [];
+        return [{
+          key: attribute.key ?? '',
+          labelKey: attribute.labelKey ?? '',
+          labelValue,
+          value: attribute.value ?? '',
+        }];
+      }),
+    }];
+  });
+}
+
+export async function getTopSearchTerms(): Promise<string[]> {
+  const url = intelligentSearchEndpointUrl('top-searches');
+  url.searchParams.set('sc', storeConfig.salesChannel);
+  const result = await getJson<SearchSuggestionPayload>(url.toString());
+  return Array.from(new Set((result.searches ?? []).map((item) => item.term?.trim() ?? '').filter(Boolean))).slice(0, 10);
+}
+
+export async function getSearchCorrection(query: string) {
+  const value = query.trim();
+  if (!value) return '';
+
+  try {
+    const url = intelligentSearchEndpointUrl('correction-search');
+    url.searchParams.set('query', value);
+    url.searchParams.set('sc', storeConfig.salesChannel);
+    const result = await getJson<SearchCorrectionPayload>(url.toString());
+    return result.correction?.text?.trim() || value;
+  } catch {
+    return value;
+  }
+}
+
+function collectionItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  const candidate = payload as Record<string, unknown>;
+  for (const key of ['collections', 'items', 'data', 'results']) {
+    if (Array.isArray(candidate[key])) return candidate[key];
+  }
+  return [payload];
+}
+
+function collectionField(item: Record<string, unknown>, names: string[]) {
+  for (const name of names) {
+    const value = item[name];
+    if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+export async function searchCollections(query: string): Promise<CollectionSearchItem[]> {
+  const value = query.trim();
+  if (!value) return [];
+
+  try {
+    const url = new URL(`${storeConfig.backendUrl}/catalog/collections/search`);
+    url.searchParams.set('q', value);
+    const payload = await getJson<unknown>(url.toString());
+    return Array.from(new Map(collectionItems(payload).flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const record = item as Record<string, unknown>;
+      const id = collectionField(record, ['id', 'Id', 'collectionId', 'CollectionId']);
+      const name = collectionField(record, ['name', 'Name', 'collectionName', 'CollectionName']);
+      return id && name ? [{ id, name }] : [];
+    }).map((item) => [item.id, item])).values());
+  } catch {
+    return [];
+  }
+}
+
+async function searchPublicCollections(query: string) {
+  const collections = await loadPublicCollectionIndex();
+  return collections.filter((collection) => collectionMatchScore(query, collection.name) > 0);
+}
+
+function collectionMatchScore(query: string, name: string) {
+  const target = normalizedSearchText(query);
+  const candidate = normalizedSearchText(name);
+  if (!target || !candidate) return 0;
+  if (candidate === target) return 1000;
+  if (candidate.startsWith(target)) return 800;
+  if (candidate.includes(target)) return 650;
+
+  const targetTokens = target.split(' ');
+  const matchedTokens = targetTokens.filter((token) => candidate.split(' ').includes(token)).length;
+  return matchedTokens > 0 ? 400 + (matchedTokens / targetTokens.length) * 100 : 0;
+}
+
+async function searchCollectionProductListing(collections: CollectionSearchItem[], params: SearchParams) {
+  const ranked = collections
+    .map((collection, index) => ({ collection, index, score: collectionMatchScore(params.query ?? '', collection.name) }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  const exact = ranked.filter((item) => item.score >= 1000);
+  const candidates = (exact.length > 0 ? exact : ranked).slice(0, exact.length > 0 ? 1 : 3);
+  if (candidates.length === 0) return null;
+
+  const results = await Promise.all(candidates.map(async ({ collection }) => {
+    try {
+      const listing = await searchProductListing({
+        ...params,
+        query: '',
+        facets: [...(params.facets ?? []), { key: 'productClusterIds', value: collection.id }],
+      });
+      return { collection, listing };
+    } catch {
+      return null;
+    }
+  }));
+
+  return results.find((result) => result && result.listing.products.length > 0) ?? null;
+}
+
+export async function searchSmartProductListing(params: SearchParams = {}): Promise<SmartProductSearchResult> {
+  const query = params.query?.trim() ?? '';
+  const requestedFacets = params.facets ?? [];
+  const baseParams = { ...params, query, facets: requestedFacets };
+  const [baseListing, baseFacets] = await Promise.all([
+    searchProductListing(baseParams),
+    safeProductFacets(query, requestedFacets),
+  ]);
+
+  if (!query) {
+    return { ...baseListing, facets: baseFacets, resolvedQuery: '', resolvedFacets: requestedFacets, source: 'intelligent' };
+  }
+
+  // Once a category or collection has been resolved, keep that scope while
+  // filters are changed instead of sending the original text alone again.
+  if (selectedFacetCoversQuery(query, requestedFacets) || requestedFacets.some((facet) => facet.key.toLowerCase() === 'productclusterids')) {
+    const scopedListing = await searchProductListing({ ...baseParams, query: '', facets: requestedFacets });
+    if (scopedListing.products.length > 0) {
+      const scopedFacets = await safeProductFacets('', requestedFacets);
+      return { ...scopedListing, facets: scopedFacets.length > 0 ? scopedFacets : baseFacets, resolvedQuery: '', resolvedFacets: requestedFacets, source: requestedFacets.some((facet) => facet.key.toLowerCase() === 'productclusterids') ? 'collection' : 'facet' };
+    }
+  }
+
+  const categoryFacet = exactSearchFacet(query, baseFacets);
+  if (categoryFacet) {
+    const scopedFacets = [categoryFacet, ...requestedFacets.filter((facet) => facet.key !== categoryFacet.key || facet.value !== categoryFacet.value)];
+    const scopedListing = await searchProductListing({ ...baseParams, query: '', facets: scopedFacets });
+    if (scopedListing.products.length > 0) {
+      const availableFacets = await safeProductFacets('', scopedFacets);
+      return { ...scopedListing, facets: availableFacets.length > 0 ? availableFacets : baseFacets, resolvedQuery: '', resolvedFacets: scopedFacets, source: categoryFacet.key.toLowerCase() === 'productclusterids' ? 'collection' : 'facet' };
+    }
+  }
+
+  if (baseListing.products.length > 0) {
+    return { ...baseListing, facets: baseFacets, resolvedQuery: query, resolvedFacets: requestedFacets, source: 'intelligent' };
+  }
+
+  const correctedQuery = await getSearchCorrection(query);
+  if (correctedQuery && correctedQuery !== query) {
+    const correctedFacets = await safeProductFacets(correctedQuery, requestedFacets);
+    const correctedFacet = exactSearchFacet(correctedQuery, correctedFacets);
+    if (correctedFacet) {
+      const scopedFacets = [correctedFacet, ...requestedFacets.filter((facet) => facet.key !== correctedFacet.key || facet.value !== correctedFacet.value)];
+      const scopedListing = await searchProductListing({ ...baseParams, query: '', facets: scopedFacets });
+      if (scopedListing.products.length > 0) {
+        const availableFacets = await safeProductFacets('', scopedFacets);
+        return { ...scopedListing, facets: availableFacets.length > 0 ? availableFacets : correctedFacets, resolvedQuery: '', resolvedFacets: scopedFacets, source: 'facet' };
+      }
+    }
+
+    const correctedListing = await searchProductListing({ ...baseParams, query: correctedQuery });
+    if (correctedListing.products.length > 0) {
+      return { ...correctedListing, facets: correctedFacets, resolvedQuery: correctedQuery, resolvedFacets: requestedFacets, source: 'intelligent' };
+    }
+  }
+
+  let catalogListing: ProductSearchResult = { products: [], recordsFiltered: 0 };
+  try {
+    catalogListing = await searchCatalogProductListing({ ...params, query: correctedQuery || query });
+  } catch {
+    // The fallback is optional; an unavailable legacy endpoint must not hide
+    // the original empty-search state or turn it into a fatal screen error.
+  }
+  if (catalogListing.products.length > 0) {
+    return { ...catalogListing, facets: baseFacets, resolvedQuery: correctedQuery || query, resolvedFacets: requestedFacets, source: 'catalog-fulltext' };
+  }
+
+  let collections = await searchCollections(query);
+  let collectionResult = await searchCollectionProductListing(collections, params);
+  if (!collectionResult) {
+    collections = await searchPublicCollections(query);
+    collectionResult = await searchCollectionProductListing(collections, params);
+  }
+  if (collectionResult) {
+    const collectionFacet = { key: 'productClusterIds', value: collectionResult.collection.id };
+    const availableFacets = await safeProductFacets('', [collectionFacet]);
+    return { ...collectionResult.listing, facets: availableFacets.length > 0 ? availableFacets : baseFacets, resolvedQuery: '', resolvedFacets: [collectionFacet], source: 'collection' };
+  }
+
+  return { ...baseListing, facets: baseFacets, resolvedQuery: query, resolvedFacets: requestedFacets, source: 'intelligent' };
 }
 
 export async function searchProducts(params: SearchParams = {}): Promise<Product[]> {

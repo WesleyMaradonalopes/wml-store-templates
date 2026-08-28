@@ -792,6 +792,54 @@ async function saveWishlistByEmail(email, items, token = '', current = null) {
 
 app.get('/health', (_request, response) => response.json({ ok: true, service: 'wml-backend' }));
 
+function collectionSearchItems(body) {
+  if (Array.isArray(body)) return body;
+  if (!body || typeof body !== 'object') return [];
+  for (const key of ['collections', 'items', 'data', 'results']) {
+    if (Array.isArray(body[key])) return body[key];
+  }
+  return [body];
+}
+
+function collectionSearchField(item, names) {
+  for (const name of names) {
+    const value = item?.[name];
+    if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+// Collection names are not available through the public catalog search. Keep
+// the VTEX permission required for this lookup on the backend and expose only
+// the minimal id/name pair needed by the mobile search resolver.
+app.get('/catalog/collections/search', async (request, response) => {
+  const query = String(request.query.q || '').trim();
+  if (!query || query.length > 120) return response.status(400).json({ ok: false, message: 'Termo de coleção inválido.' });
+  if (!hasVtexPaymentCredentials()) return response.status(503).json({ ok: false, message: 'Busca de coleções não configurada.' });
+
+  const url = new URL(`${vtexBaseUrl}/api/catalog_system/pvt/collection/search/${encodeURIComponent(query)}`);
+  url.searchParams.set('page', '1');
+  url.searchParams.set('pageSize', '50');
+
+  try {
+    const result = await fetch(url, { headers: vtexHeaders() });
+    const body = await readResponseBody(result);
+    if (!result.ok) {
+      return response.status(502).json({ ok: false, message: `A VTEX não conseguiu consultar as coleções (HTTP ${result.status}).` });
+    }
+
+    const collections = collectionSearchItems(body).flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const id = collectionSearchField(item, ['id', 'Id', 'collectionId', 'CollectionId']);
+      const name = collectionSearchField(item, ['name', 'Name', 'collectionName', 'CollectionName']);
+      return id && name ? [{ id, name }] : [];
+    });
+    return response.json({ collections });
+  } catch {
+    return response.status(502).json({ ok: false, message: 'Não foi possível consultar as coleções agora.' });
+  }
+});
+
 app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, response) => {
   const orderFormId = String(request.params.orderFormId || '').trim();
   const email = String(request.body?.email || '').trim().toLowerCase();
