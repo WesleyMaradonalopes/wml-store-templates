@@ -82,6 +82,7 @@ async function requestCheckout(url, {
   contentType = false,
   cookie = '',
   fallbackToAppAuth = false,
+  fallbackWithoutUserToken = false,
   singleAttempt = false,
   } = {}) {
   // O login é mantido somente no backend. Quando o token recebido do app
@@ -110,10 +111,13 @@ async function requestCheckout(url, {
   // pode usar a autenticação segura do backend uma única vez.
   const canFallbackToAppAuth = !singleAttempt || result.status === 401;
   if (canFallbackToAppAuth && !result.ok && [401, 403].includes(result.status) && fallbackToAppAuth && hasVtexPaymentCredentials()) {
-    const appAuthUserToken = singleAttempt ? '' : fallbackUserToken;
+    const appAuthUserToken = singleAttempt || fallbackWithoutUserToken ? '' : fallbackUserToken;
+    const appAuthCookie = fallbackWithoutUserToken
+      ? checkoutOwnershipCookieHeader(requestCookie)
+      : requestCookie;
     result = await fetch(url, {
       ...init,
-      headers: checkoutHeaders(appAuthUserToken, contentType, requestCookie),
+      headers: checkoutHeaders(appAuthUserToken, contentType, appAuthCookie),
     });
   }
   return result;
@@ -863,19 +867,18 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
   }
 
   try {
-    // O Checkout VTEX usa esta consulta para confirmar que o e-mail pertence
-    // a um perfil existente. Depois anexamos também os dados do perfil para
-    // que o CPF do cliente correto não seja deixado para trás no orderForm.
+    // Replica a ordem usada pelo checkout Eitri/SmartCheckout: primeiro localiza
+    // o perfil pelo e-mail e depois anexa SOMENTE o e-mail ao orderForm. Enviar
+    // nome, CPF e telefone nesta segunda chamada faz a VTEX tratar os dados como
+    // perfil de convidado em alguns contextos e o userProfileId não é vinculado.
     const profileUrl = new URL(`${vtexBaseUrl}/api/checkout/pub/profiles`);
     profileUrl.searchParams.set('email', email);
     profileUrl.searchParams.set('sc', salesChannel);
-    profileUrl.searchParams.set('ensureComplete', 'false');
     const profileResult = await requestCheckout(profileUrl.toString(), {
       userToken,
-      cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
       fallbackToAppAuth: true,
+      fallbackWithoutUserToken: true,
     });
-    rememberCheckoutOwnershipCookie(orderFormId, profileResult);
     const profileBody = await readResponseBody(profileResult);
     if (!profileResult.ok) {
       return response.status(502).json({
@@ -885,30 +888,12 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
       });
     }
     const profile = Array.isArray(profileBody) ? profileBody[0] : profileBody;
-    const profileFound = Boolean(profile?.userProfileId || profile?.userProfile?.email || profile?.email);
+    const expectedProfileId = String(profile?.userProfileId || '').trim();
+    const profileFound = Boolean(expectedProfileId);
     if (!profileFound) {
       console.info(`[CHECKOUT] profile-by-email -> found=false orderForm=${orderFormId}`);
       return response.status(404).json({ ok: false, message: 'Cliente não encontrado no Checkout VTEX.' });
     }
-
-    const checkoutProfile = normalizeProfile({
-      ...(profile?.userProfile || profile || {}),
-      id: profile?.userProfile?.id || profile?.userProfileId || profile?.id || '',
-      userId: profile?.userProfile?.userId || profile?.userProfileId || profile?.userId || '',
-    });
-    const customerProfile = mergeProfiles(
-      await searchCustomerByEmail(email).catch(() => null),
-      checkoutProfile,
-    );
-    const clientProfile = {
-      email,
-      ...(customerProfile?.firstName ? { firstName: customerProfile.firstName } : {}),
-      ...(customerProfile?.lastName ? { lastName: customerProfile.lastName } : {}),
-      ...(customerProfile?.document ? { document: digits(customerProfile.document), documentType: customerProfile.documentType || 'cpf' } : {}),
-      ...(customerProfile?.phone || customerProfile?.homePhone ? { phone: digits(customerProfile.phone || customerProfile.homePhone) } : {}),
-      ...(customerProfile?.gender ? { gender: customerProfile.gender } : {}),
-      ...(checkoutBirthDate(customerProfile?.birthDate) ? { birthDate: checkoutBirthDate(customerProfile.birthDate) } : {}),
-    };
 
     const attachmentResult = await requestCheckout(
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
@@ -918,7 +903,8 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
         fallbackToAppAuth: true,
-        body: JSON.stringify(clientProfile),
+        fallbackWithoutUserToken: true,
+        body: JSON.stringify({ email }),
       },
     );
     rememberCheckoutOwnershipCookie(orderFormId, attachmentResult);
@@ -930,7 +916,15 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
         message: vtexErrorMessage(attachmentBody, `A VTEX não conseguiu identificar o cliente (HTTP ${attachmentResult.status}).`),
       });
     }
-    console.info(`[CHECKOUT] profile-by-email -> found=true identified=${Boolean(attachmentBody?.userProfileId)} ownershipCookie=${Boolean(checkoutOwnershipCookieForOrderForm(orderFormId))}`);
+    const identifiedProfileId = String(attachmentBody?.userProfileId || '').trim();
+    const profileMatches = Boolean(identifiedProfileId && identifiedProfileId === expectedProfileId);
+    console.info(`[CHECKOUT] profile-by-email -> found=true identified=${Boolean(identifiedProfileId)} profileMatches=${profileMatches} ownershipCookie=${Boolean(checkoutOwnershipCookieForOrderForm(orderFormId))}`);
+    if (!profileMatches) {
+      return response.status(409).json({
+        ok: false,
+        message: 'A VTEX localizou o cliente, mas não vinculou o perfil ao carrinho. Tente informar o e-mail novamente.',
+      });
+    }
     return response.json(attachmentBody);
   } catch (error) {
     return response.status(502).json({

@@ -625,6 +625,13 @@ export default function CheckoutScreen() {
     setSaving(true);
     setMessage('');
     try {
+      // Um perfil existente já identificado pelo SmartCheckout não precisa ser
+      // reenviado por completo. Preservar esse orderForm.userProfileId é
+      // essencial para vales-presentes restritos ao CPF do proprietário.
+      if (customerExists && !editingCustomer && orderForm.userProfileId) {
+        setStep('address');
+        return;
+      }
       const customerOrderForm = await prepareOrderFormForCustomer(orderForm, email, document);
       await updateCustomerProfile(email.trim().toLowerCase(), {
         email: email.trim().toLowerCase(),
@@ -793,8 +800,21 @@ export default function CheckoutScreen() {
     setSaving(true);
     setMessage('');
     try {
-      const customerOrderForm = orderForm ? await prepareOrderFormForCustomer(orderForm, email) : null;
-      if (customerOrderForm && customerOrderForm !== orderForm) setOrderForm(customerOrderForm);
+      let customerOrderForm = orderForm ? await prepareOrderFormForCustomer(orderForm, email) : null;
+      if (customerOrderForm) {
+        try {
+          const identifiedOrderForm = await identifyExistingCustomerByEmail(customerOrderForm.orderFormId, email);
+          if (identifiedOrderForm) {
+            customerOrderForm = identifiedOrderForm;
+            setOrderForm(identifiedOrderForm);
+          }
+        } catch (error) {
+          console.warn('[CHECKOUT] customer identification deferred', {
+            orderFormId: customerOrderForm.orderFormId,
+            message: error instanceof Error ? error.message : String(error || ''),
+          });
+        }
+      }
       const { profile, addresses } = await loadCustomerData(email);
       const hydratedProfile = profile?.existsInMasterData === true
         ? mergeCustomerProfiles(profile, customerOrderForm?.clientProfileData ?? null)
@@ -1184,6 +1204,13 @@ export default function CheckoutScreen() {
         if (identifiedOrderForm) {
           currentOrderForm = identifiedOrderForm;
           setOrderForm(identifiedOrderForm);
+          if (identifiedOrderForm.userProfileId) {
+            console.info('[GIFT CARD] customer identified before apply', {
+              orderFormId: identifiedOrderForm.orderFormId,
+              userProfileIdPresent: true,
+            });
+            return identifiedOrderForm;
+          }
         }
       } catch (error) {
         console.warn('[GIFT CARD] customer identification fallback', {
@@ -1219,6 +1246,10 @@ export default function CheckoutScreen() {
     setVoucherMessageType(null);
     try {
       let giftCardOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
+      console.info('[GIFT CARD] applying to orderForm', {
+        orderFormId: giftCardOrderForm.orderFormId,
+        userProfileIdPresent: Boolean(giftCardOrderForm.userProfileId),
+      });
       const addToOrderForm = (targetOrderForm: OrderForm) => {
         const giftCardApplied = activeGiftCards(targetOrderForm);
         const giftCardProvider = targetOrderForm.paymentData?.giftCards?.find((giftCard) => giftCard.provider)?.provider;

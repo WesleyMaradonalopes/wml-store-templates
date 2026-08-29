@@ -1032,6 +1032,7 @@ export async function addGiftCardToCart(
     const paymentGroups = [...new Set((normalizedOrderForm.paymentData?.paymentSystems ?? []).map((system) => system.group).filter(Boolean))];
     console.warn('[GIFT CARD] add not reflected in orderForm', {
       message,
+      userProfileIdPresent: Boolean(normalizedOrderForm.userProfileId),
       inUseCount: returnedGiftCards.filter((giftCard) => giftCard.inUse).length,
       providers,
       paymentGroups,
