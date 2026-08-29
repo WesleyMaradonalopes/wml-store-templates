@@ -113,7 +113,7 @@ async function requestCheckout(url, {
   if (canFallbackToAppAuth && !result.ok && [401, 403].includes(result.status) && fallbackToAppAuth && hasVtexPaymentCredentials()) {
     const appAuthUserToken = singleAttempt || fallbackWithoutUserToken ? '' : fallbackUserToken;
     const appAuthCookie = fallbackWithoutUserToken
-      ? checkoutOwnershipCookieHeader(requestCookie)
+      ? withoutVtexIdClientAuthCookie(requestCookie)
       : requestCookie;
     result = await fetch(url, {
       ...init,
@@ -319,11 +319,17 @@ function normalizeCookieHeader(raw) {
   return String(raw || '').split(/,(?=[A-Za-z0-9_.-]+=)/).map((part) => part.trim().split(';')[0]).filter(Boolean).join('; ');
 }
 
-function checkoutOwnershipCookieHeader(raw) {
-  return normalizeCookieHeader(raw)
-    .split('; ')
+function withoutVtexIdClientAuthCookie(cookieHeader) {
+  return String(cookieHeader || '')
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .filter(Boolean)
     .filter((cookie) => !/^VtexIdclientAutCookie(?:_|=)/i.test(cookie))
     .join('; ');
+}
+
+function checkoutOwnershipCookieHeader(raw) {
+  return withoutVtexIdClientAuthCookie(normalizeCookieHeader(raw));
 }
 
 function checkoutOwnershipCookieForOrderForm(orderFormId) {
@@ -995,19 +1001,59 @@ app.post('/checkout/order-form/:orderFormId/payment-data', async (request, respo
   const paymentData = request.body && typeof request.body === 'object' ? request.body : {};
   const userToken = String(request.headers.vtexidclientautcookie || '').trim();
   try {
-    const result = await requestCheckout(
-      `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`,
+    const paymentDataUrl = `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`;
+    const serializedPaymentData = JSON.stringify(paymentData);
+    let result = await requestCheckout(
+      paymentDataUrl,
       {
         method: 'POST',
         userToken,
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
         fallbackToAppAuth: true,
-        body: JSON.stringify(paymentData),
+        body: serializedPaymentData,
       },
     );
     rememberCheckoutOwnershipCookie(orderFormId, result);
-    const body = await readResponseBody(result);
+    let body = await readResponseBody(result);
+
+    const requestedGiftCards = (Array.isArray(paymentData.giftCards) ? paymentData.giftCards : [])
+      .filter((giftCard) => giftCard?.inUse && (giftCard?.redemptionCode || giftCard?.id));
+    const returnedGiftCards = Array.isArray(body?.paymentData?.giftCards) ? body.paymentData.giftCards : [];
+    const checkoutMessages = [
+      ...(Array.isArray(body?.paymentData?.giftCardMessages) ? body.paymentData.giftCardMessages : []),
+      ...(Array.isArray(body?.giftCardMessages) ? body.giftCardMessages : []),
+      ...(Array.isArray(body?.messages) ? body.messages : []),
+    ].map((message) => String(message?.text || message?.message || '').trim()).filter(Boolean);
+    const unavailableGiftCardPayment = checkoutMessages.some((message) => (
+      /forma de pagamento selecionada n[aã]o est[aá] mais dispon[ií]vel/i.test(message)
+    ));
+    const giftCardWasNotApplied = requestedGiftCards.length > 0
+      && !returnedGiftCards.some((giftCard) => giftCard?.inUse === true);
+
+    // A VTEX pode responder 200 e registrar a falha apenas em messages. Isso
+    // impede o fallback HTTP normal. Para vale restrito, repetimos uma única
+    // vez com as credenciais do backend e com a identidade já ligada ao cart.
+    if (result.ok && giftCardWasNotApplied && unavailableGiftCardPayment && hasVtexPaymentCredentials()) {
+      console.warn('[CHECKOUT] gift-card unavailable in shopper context; retrying with app auth', {
+        orderFormId,
+        requestedGiftCardCount: requestedGiftCards.length,
+      });
+      result = await fetch(paymentDataUrl, {
+        method: 'POST',
+        headers: checkoutHeaders('', true, checkoutOwnershipCookieForOrderForm(orderFormId)),
+        body: serializedPaymentData,
+      });
+      rememberCheckoutOwnershipCookie(orderFormId, result);
+      body = await readResponseBody(result);
+      console.info('[CHECKOUT] gift-card app-auth retry completed', {
+        orderFormId,
+        status: result.status,
+        inUseCount: (Array.isArray(body?.paymentData?.giftCards) ? body.paymentData.giftCards : [])
+          .filter((giftCard) => giftCard?.inUse === true).length,
+      });
+    }
+
     if (!result.ok) {
       return response.status(502).json({
         ok: false,

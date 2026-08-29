@@ -53,9 +53,7 @@ function isGiftCardOwnershipError(error: unknown) {
 }
 
 function isGiftCardCartContextError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || '');
-  return isGiftCardOwnershipError(error)
-    || /forma de pagamento selecionada não está mais disponível|forma de pagamento selecionada nao esta mais disponivel/i.test(message);
+  return isGiftCardOwnershipError(error);
 }
 
 const DEFAULT_WEB_RECAPTCHA_SITE_KEY = '6LfYDiAqAAAAAPmcjgLXQkKD_sP131cQECisZO27';
@@ -1252,8 +1250,9 @@ export default function CheckoutScreen() {
       });
       const addToOrderForm = (targetOrderForm: OrderForm) => {
         const giftCardApplied = activeGiftCards(targetOrderForm);
-        const giftCardProvider = targetOrderForm.paymentData?.giftCards?.find((giftCard) => giftCard.provider)?.provider;
-        return addGiftCardToCart(targetOrderForm.orderFormId, redemptionCode, giftCardApplied, giftCardProvider, targetOrderForm.paymentData?.payments ?? []);
+        // Nesta tela ainda não existe uma segunda forma selecionada. Reenviar
+        // payments antigos faz a VTEX rejeitar o vale como pagamento indisponível.
+        return addGiftCardToCart(targetOrderForm.orderFormId, redemptionCode, giftCardApplied, []);
       };
       let updatedOrderForm: OrderForm;
       try {

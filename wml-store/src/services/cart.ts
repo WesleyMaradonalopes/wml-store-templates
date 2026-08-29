@@ -982,9 +982,8 @@ type GiftCardAttachment = {
 function giftCardAttachment(
   giftCard: Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>,
   inUse: boolean,
-  providerOverride?: string | null,
 ): GiftCardAttachment {
-  const provider = giftCard.provider || providerOverride || undefined;
+  const provider = giftCard.provider || undefined;
   return {
     ...(giftCard.redemptionCode ? { redemptionCode: giftCard.redemptionCode } : {}),
     ...(giftCard.id ? { id: giftCard.id } : {}),
@@ -998,14 +997,15 @@ export async function addGiftCardToCart(
   orderFormId: string,
   redemptionCode: string,
   existingGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
-  provider?: string | null,
   payments: PaymentDataPayment[] = [],
 ): Promise<OrderForm> {
   const giftCards = [
     ...existingGiftCards
       .filter((giftCard) => giftCard.redemptionCode || giftCard.id)
       .map((giftCard) => giftCardAttachment(giftCard, true)),
-    giftCardAttachment({ redemptionCode: redemptionCode.trim() }, true, provider),
+    // O checkout Eitri não força provider no código recém-digitado; a própria
+    // VTEX resolve VtexGiftCard e devolve id/provider após validar o vale.
+    giftCardAttachment({ redemptionCode: redemptionCode.trim() }, true),
   ];
   const response = await paymentDataFetch(orderFormId, {
     method: 'POST',
