@@ -54,7 +54,9 @@ function checkoutHeaders(userToken = '', contentType = false, cookie = '') {
     cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
   const sessionCookie = sessionCookieForToken(userToken);
-  const cookieHeader = mergeCookieHeaders(cookies.join('; '), sessionCookie, cookie);
+  // Mantém os cookies de propriedade do orderForm, mas a identidade enviada
+  // explicitamente pelo aplicativo sempre prevalece sobre cookies antigos.
+  const cookieHeader = mergeCookieHeaders(sessionCookie, cookie, cookies.join('; '));
   if (cookieHeader) headers.Cookie = cookieHeader;
   return headers;
 }
@@ -68,7 +70,7 @@ function publicCheckoutHeaders(userToken = '', contentType = false, cookie = '')
     cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
   const sessionCookie = sessionCookieForToken(userToken);
-  const cookieHeader = mergeCookieHeaders(cookies.join('; '), sessionCookie, cookie);
+  const cookieHeader = mergeCookieHeaders(sessionCookie, cookie, cookies.join('; '));
   if (cookieHeader) headers.Cookie = cookieHeader;
   return headers;
 }
@@ -313,6 +315,13 @@ function normalizeCookieHeader(raw) {
   return String(raw || '').split(/,(?=[A-Za-z0-9_.-]+=)/).map((part) => part.trim().split(';')[0]).filter(Boolean).join('; ');
 }
 
+function checkoutOwnershipCookieHeader(raw) {
+  return normalizeCookieHeader(raw)
+    .split('; ')
+    .filter((cookie) => !/^VtexIdclientAutCookie(?:_|=)/i.test(cookie))
+    .join('; ');
+}
+
 function checkoutOwnershipCookieForOrderForm(orderFormId) {
   const key = String(orderFormId || '').trim();
   const stored = checkoutOwnershipCookies.get(key);
@@ -327,7 +336,10 @@ function checkoutOwnershipCookieForOrderForm(orderFormId) {
 function rememberCheckoutOwnershipCookie(orderFormId, response) {
   const key = String(orderFormId || '').trim();
   if (!key) return;
-  const received = normalizeCookieHeader(extractSetCookie(response));
+  // A identidade do cliente é mantida em customerVtexSessions. Guardar o
+  // VtexIdclientAutCookie junto do orderForm faria uma resposta antiga trocar
+  // o usuário nas chamadas seguintes e invalidaria vales restritos ao dono.
+  const received = checkoutOwnershipCookieHeader(extractSetCookie(response));
   if (!received) return;
   const merged = mergeCookieHeaders(checkoutOwnershipCookieForOrderForm(key), received);
   checkoutOwnershipCookies.set(key, { cookieHeader: merged, updatedAt: Date.now() });
@@ -861,6 +873,7 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
     const profileResult = await requestCheckout(profileUrl.toString(), {
       userToken,
       cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+      fallbackToAppAuth: true,
     });
     rememberCheckoutOwnershipCookie(orderFormId, profileResult);
     const profileBody = await readResponseBody(profileResult);
@@ -904,6 +917,7 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
         userToken,
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+        fallbackToAppAuth: true,
         body: JSON.stringify(clientProfile),
       },
     );

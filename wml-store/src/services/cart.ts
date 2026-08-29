@@ -623,28 +623,68 @@ export async function selectPaymentMethod({
   installmentsInterestRate?: number;
   giftCards?: GiftCard[];
 }): Promise<OrderForm> {
-  const response = await paymentDataFetch(orderFormId, {
+  const attachedGiftCards = (giftCards ?? [])
+    .filter((giftCard) => giftCard.inUse && (giftCard.redemptionCode || giftCard.id))
+    .map((giftCard) => giftCardAttachment(giftCard, true));
+  const paymentData = {
+    payments: [{
+      paymentSystem,
+      referenceValue: Math.round(value * 100),
+      value: Math.round(value * 100),
+      installments: Math.max(1, Math.round(installments)),
+      installmentsInterestRate: Number(installmentsInterestRate || 0),
+    }],
+    ...(giftCards ? { giftCards: attachedGiftCards } : {}),
+  };
+
+  let targetOrderFormId = orderFormId;
+  if (attachedGiftCards.length > 0) {
+    // O fluxo Eitri remove o vale antes de combinar outra forma de pagamento
+    // e o reaplica no POST seguinte. A VTEX exige essa sequência quando o
+    // vale ficou associado a um contexto anterior do mesmo carrinho.
+    const clearResponse = await paymentDataFetch(targetOrderFormId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payments: [], giftCards: [] }),
+    });
+    const clearErrorBody = !clearResponse.ok
+      ? await clearResponse.clone().json().catch(() => null) as VtexOrderForm | null
+      : null;
+    if (!clearResponse.ok) {
+      const message = giftCardResponseMessage(clearErrorBody);
+      console.warn('[CHECKOUT] payment-data reset rejected', {
+        status: clearResponse.status,
+        code: clearErrorBody?.error?.code,
+        message,
+      });
+      throw new Error(message || `Unable to reset payment data: ${clearResponse.status}`);
+    }
+    const clearedOrderForm = await clearResponse.json() as VtexOrderForm;
+    targetOrderFormId = clearedOrderForm.orderFormId || targetOrderFormId;
+    console.info('[CHECKOUT] gift cards detached before mixed payment', {
+      orderFormId: targetOrderFormId,
+      giftCardCount: attachedGiftCards.length,
+    });
+  }
+
+  const response = await paymentDataFetch(targetOrderFormId, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      payments: [{
-        paymentSystem,
-        referenceValue: Math.round(value * 100),
-        value: Math.round(value * 100),
-        installments: Math.max(1, Math.round(installments)),
-        installmentsInterestRate: Number(installmentsInterestRate || 0),
-      }],
-      ...(giftCards
-        ? {
-            giftCards: giftCards
-              .filter((giftCard) => giftCard.inUse && (giftCard.redemptionCode || giftCard.id))
-              .map((giftCard) => giftCardAttachment(giftCard, true)),
-          }
-        : {}),
-    }),
+    body: JSON.stringify(paymentData),
   });
 
-  if (!response.ok) throw new Error(`Unable to select payment method: ${response.status}`);
+  const errorBody = !response.ok
+    ? await response.clone().json().catch(() => null) as VtexOrderForm | null
+    : null;
+  if (!response.ok) {
+    const message = giftCardResponseMessage(errorBody);
+    console.warn('[CHECKOUT] payment-data rejected', {
+      status: response.status,
+      code: errorBody?.error?.code,
+      message,
+    });
+    throw new Error(message || `Unable to select payment method: ${response.status}`);
+  }
   const orderForm = (await response.json()) as VtexOrderForm;
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   return normalizeOrderForm(orderForm);
