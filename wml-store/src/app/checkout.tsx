@@ -10,6 +10,7 @@ import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { ProductShelf } from '@/components/cms-section';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
+import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import StoreIcon from '@/components/icons/StoreIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import TruckIcon from '@/components/icons/TruckIcon';
@@ -20,8 +21,9 @@ import Recaptcha, { type RecaptchaHandle } from '@/components/recaptcha';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BEST_SELLING_PRODUCTS_SHELF } from '@/constants/product-shelves';
+import { BEST_SELLING_PRODUCTS_SHELF, RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Fonts, Spacing } from '@/constants/theme';
+import { useTabBar } from '@/context/tab-bar-context';
 import { getAccountSession } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, addItemOffering, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
@@ -71,6 +73,11 @@ const CART_BEST_SELLING_PRODUCTS_SHELF: Record<string, unknown> = {
   ...BEST_SELLING_PRODUCTS_SHELF,
   title: 'Mais vendidos',
   showSeeAll: false,
+};
+
+const EMPTY_CART_RECENT_PRODUCTS_SHELF: Record<string, unknown> = {
+  ...RECENT_PRODUCTS_SHELF,
+  title: 'Mais recentes',
 };
 
 function digits(value: string) { return value.replace(/\D/g, ''); }
@@ -342,6 +349,7 @@ function getShippingSelectionId(orderForm: OrderForm, options: ShippingOption[],
 
 export default function CheckoutScreen() {
   const router = useRouter();
+  const { setShowOnCheckout } = useTabBar();
   const [step, setStep] = useState<Step>('cart');
   const [orderForm, setOrderForm] = useState<OrderForm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -444,6 +452,11 @@ export default function CheckoutScreen() {
   useEffect(() => {
     if (step !== 'cart') setCartAddMessage(null);
   }, [step]);
+
+  useEffect(() => {
+    setShowOnCheckout(Boolean(orderForm && orderForm.items.length === 0));
+    return () => setShowOnCheckout(false);
+  }, [orderForm?.items.length, setShowOnCheckout]);
 
   function loadCustomerData(customerEmail: string) {
     const key = customerEmail.trim().toLowerCase();
@@ -1415,7 +1428,15 @@ export default function CheckoutScreen() {
 
   if (loading) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ActivityIndicator color="#0a0a0a" /></SafeAreaView></ThemedView>;
   if (!orderForm) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ThemedText>{message || 'Carrinho vazio.'}</ThemedText></SafeAreaView></ThemedView>;
-  if (orderForm.items.length === 0) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Carrinho" onBack={() => router.replace('/')} showSearch={false} showCart /><View style={styles.emptyState}><ThemedText type="subtitle">Seu carrinho está vazio</ThemedText><ThemedText themeColor="textSecondary">Encontre produtos para continuar sua compra.</ThemedText><Primary title="Encontrar produtos" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
+  if (orderForm.items.length === 0) return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Carrinho" onBack={() => router.replace('/')} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.emptyCartContent} showsVerticalScrollIndicator={false}>
+    <View style={styles.emptyCartMessage}>
+      <ShoppingBagIcon color="#0a0a0a" size={24} />
+      <ThemedText style={styles.emptyCartTitle}>Ops, sua sacola está vazia.</ThemedText>
+      <ThemedText themeColor="textSecondary" style={styles.emptyCartDescription}>Encontre os produtos que precisa navegando pelas categorias ou utilizando a busca.</ThemedText>
+      <Primary title="Encontrar produtos" onPress={() => router.replace('/')} />
+    </View>
+    <ProductShelf data={EMPTY_CART_RECENT_PRODUCTS_SHELF} titleStyle={styles.emptyCartShelfTitle} />
+  </ScrollView></SafeAreaView></ThemedView>;
 
   const giftWrappingAvailable = orderForm.items.some((item) => giftWrappingOffering(item));
 
@@ -1982,7 +2003,11 @@ const styles = StyleSheet.create({
   content: { gap: Spacing.two, paddingVertical: Spacing.two, paddingBottom: 170 },
   checkoutShelfTitle: { fontSize: 16, lineHeight: 22 },
   flex: { flex: 1 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.three, padding: Spacing.five },
+  emptyCartContent: { gap: Spacing.five, paddingTop: Spacing.three, paddingBottom: 170, marginTop: 40 },
+  emptyCartMessage: { alignItems: 'center', gap: 16, paddingHorizontal: Spacing.three },
+  emptyCartTitle: { fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22, textAlign: 'center' },
+  emptyCartDescription: { maxWidth: 330, fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  emptyCartShelfTitle: { fontSize: 16, lineHeight: 22 },
   pageTitle: { fontSize: 16, lineHeight: 21, fontFamily: Fonts.bold, fontWeight: '700' },
   card: { gap: 6, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
   customerDataCard: { gap: 10, padding: 14 },

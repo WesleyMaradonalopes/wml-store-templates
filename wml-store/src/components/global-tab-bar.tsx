@@ -25,9 +25,9 @@ export default function GlobalTabBar() {
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { hidden, setHidden } = useTabBar();
+  const { hidden, setHidden, showOnCheckout } = useTabBar();
   const cartCount = useCartItemCount();
-  const excluded = pathname.startsWith('/checkout') || pathname.startsWith('/product/');
+  const excluded = (pathname.startsWith('/checkout') && !showOnCheckout) || pathname.startsWith('/product/');
 
   useEffect(() => setHidden(false), [pathname, setHidden]);
   if (excluded) return null;

@@ -34,6 +34,7 @@ export type Product = {
   description: string;
   brand: string;
   color: string;
+  colorFilter?: string;
   composition: string;
   care: string;
   images: string[];
@@ -539,7 +540,14 @@ function normalizeProduct(product: ProductPayload): Product {
 
   const defaultVariant = variants.find((variant) => variant.available) ?? variants[0];
   const images = defaultVariant?.images ?? [];
-  const color = getSpecificationValue(product, ['cor', 'cor principal', 'Cor em Atributo de Produto', 'color'], 261) || specificationValues(product, 'Cor em Atributo de Produto')[0] || '';
+  // "Cor" is the generic color family (for example, "Azul"). The product
+  // attribute contains the name customers should see (for example,
+  // "Azul Ginga"). Keep both values so display and catalog filters can use
+  // the appropriate level of detail.
+  const colorFilter = getSpecificationValue(product, ['cor', 'cor principal', 'color'], 261) || '';
+  const color = specificationValues(product, 'Cor em Atributo de Produto')[0]
+    || getSpecificationValue(product, ['cor em atributo de produto'], 261)
+    || colorFilter;
   const collection = getSpecificationValue(product, ['colecao', 'coleção', 'collection'], 269) || specificationValues(product, 'Coleção')[0] || '';
   const gender = getSpecificationValue(product, ['genero', 'gênero', 'gender'], 289) || specificationValues(product, 'Gênero')[0] || '';
   const isKit = product.items?.some((item) => Boolean(item.isKit || item.kitItems?.length)) ?? false;
@@ -552,6 +560,7 @@ function normalizeProduct(product: ProductPayload): Product {
     description: product.description ?? '',
     brand: product.brand ?? '',
     color,
+    colorFilter: colorFilter || color,
     composition: specificationValues(product, 'Composição').join(' · '),
     care: specificationValues(product, 'Cuidados').join(' · '),
     images,
@@ -1075,7 +1084,7 @@ export async function getSimilarProducts(productOrId: Product | string, count = 
 export async function getCompleteLookProducts(product: Product, count = 2): Promise<Product[]> {
   const buildSpecFilter = (fieldId: number, value: string) => value.trim() ? `specificationFilter_${fieldId}:${value.trim()}` : '';
   const collectionFilter = buildSpecFilter(269, product.collection);
-  const colorFilter = buildSpecFilter(261, product.color);
+  const colorFilter = buildSpecFilter(261, product.colorFilter || product.color);
   const genderFilter = buildSpecFilter(289, product.gender);
   const strategies = [
     [collectionFilter, colorFilter, genderFilter],

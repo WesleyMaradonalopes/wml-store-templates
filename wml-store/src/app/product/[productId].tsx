@@ -473,7 +473,7 @@ export default function ProductScreen() {
               {!lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onFeedback={showCartFeedback} />}
 
               <View style={styles.similarSection}>
-                <ThemedText type="subtitle">Produtos similares</ThemedText>
+                <ThemedText style={styles.similarProducts} type="subtitle">Produtos similares</ThemedText>
                 {similarLoading && <ActivityIndicator color="#0a0a0a" />}
                 {!similarLoading && similarProducts.length > 0 && <FlatList data={similarProducts} horizontal nestedScrollEnabled snapToInterval={232} decelerationRate="fast" disableIntervalMomentum showsHorizontalScrollIndicator={false} keyExtractor={(item) => item.id} contentContainerStyle={styles.similarList} renderItem={({ item }) => <ProductCard product={item} style={styles.similarCard} />} />}
               </View>
@@ -931,9 +931,9 @@ const styles = StyleSheet.create({
   viewerImage: { backgroundColor: '#fff' },
   viewerTopBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 5 },
   viewerCounter: { minWidth: 48, height: 36, paddingHorizontal: Spacing.three, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
-  viewerClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
+  viewerClose: { width: 35, height: 35, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
   viewerText: { color: '#FFFFFF', fontSize: 14, lineHeight: 18, fontWeight: '600' },
-  viewerCloseText: { color: '#0a0a0a', fontSize: 24, lineHeight: 28, fontWeight: '400' },
+  viewerCloseText: { color: '#FFFFFF', fontSize: 20, fontWeight: '400' },
   viewerDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 5 },
   viewerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fff' },
   viewerDotActive: { width: 20, backgroundColor: '#fff' },
@@ -1024,6 +1024,7 @@ const styles = StyleSheet.create({
   colorModalImage: { width: '100%', aspectRatio: 0.72, borderRadius: 8, backgroundColor: '#e8e8ea' },
   colorModalName: { minHeight: 34, paddingTop: Spacing.one, fontSize: 11, lineHeight: 15 },
   similarSection: { gap: Spacing.three, marginTop: Spacing.three },
+	similarProducts: { fontSize: 16 },
   similarList: { gap: 12, paddingRight: Spacing.four },
   similarCard: { width: 220 },
 });

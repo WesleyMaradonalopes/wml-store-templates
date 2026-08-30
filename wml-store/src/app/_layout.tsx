@@ -12,6 +12,7 @@ void SplashScreen.preventAutoHideAsync();
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const [hidden, setHidden] = useState(false);
+  const [showOnCheckout, setShowOnCheckout] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     Montserrat_300Light,
     Montserrat_400Regular,
@@ -31,7 +32,7 @@ export default function TabLayout() {
   if (!fontsLoaded && !fontError && Platform.OS !== 'web') return null;
 
   return (
-    <TabBarContext.Provider value={{ hidden, setHidden }}>
+    <TabBarContext.Provider value={{ hidden, setHidden, showOnCheckout, setShowOnCheckout }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
