@@ -13,6 +13,7 @@ import ArrowLeftIAIcon from './icons/ArrowLeftIAicon';
 import ArrowRightAIcon from './icons/ArrowRightAicon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import { ProductCard } from './product-card';
+import { ProductCarousel } from './product-carousel';
 import { FilterGlyph, ProductFilterModal } from './product-filter-modal';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -82,8 +83,6 @@ function richTextBlocks(value: unknown): string[] {
     .map((block) => block && typeof block === 'object' ? text((block as { text?: unknown }).text).trim() : '')
     .filter(Boolean);
 }
-
-const PRODUCT_CARD_WIDTH = 220;
 
 type ProductShelfProps = {
   data: Record<string, unknown>;
@@ -170,25 +169,12 @@ export function ProductShelf({ data, titleStyle, onAdded, showAddedModal = true 
       {!loading && products.length === 0 && (
         <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>
       )}
-      <FlatList
-        data={products}
-        horizontal
-        snapToInterval={PRODUCT_CARD_WIDTH + 12}
-        decelerationRate="fast"
-        disableIntervalMomentum
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(product) => product.id}
-        contentContainerStyle={styles.productList}
-        renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            style={{ width: PRODUCT_CARD_WIDTH }}
-            favorite={favoriteIds.includes(item.id)}
-            onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))}
-            onAdded={onAdded}
-            showAddedModal={showAddedModal}
-          />
-        )}
+      <ProductCarousel
+        products={products}
+        favoriteIds={favoriteIds}
+        onFavoriteChange={(product, favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id))}
+        onAdded={onAdded}
+        showAddedModal={showAddedModal}
       />
     </ThemedView>
   );
@@ -714,7 +700,6 @@ const styles = StyleSheet.create({
   tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: '#111111' },
   selectedTab: { backgroundColor: '#111111' },
   selectedTabText: { color: '#FFFFFF' },
-  productList: { gap: 12 },
   plpSection: { gap: Spacing.three, backgroundColor: '#ffffff' },
   plpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   plpHeading: { flex: 1 },

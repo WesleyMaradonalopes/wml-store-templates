@@ -19,6 +19,7 @@ import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRo
 import { emptyKitSelection, KitSelector, type KitSelection } from '@/components/kit-selector';
 import { LoginRequiredModal } from '@/components/login-required-modal';
 import { ProductCard } from '@/components/product-card';
+import { ProductCarousel } from '@/components/product-carousel';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -475,7 +476,7 @@ export default function ProductScreen() {
               <View style={styles.similarSection}>
                 <ThemedText style={styles.similarProducts} type="subtitle">Produtos similares</ThemedText>
                 {similarLoading && <ActivityIndicator color="#0a0a0a" />}
-                {!similarLoading && similarProducts.length > 0 && <FlatList data={similarProducts} horizontal nestedScrollEnabled snapToInterval={232} decelerationRate="fast" disableIntervalMomentum showsHorizontalScrollIndicator={false} keyExtractor={(item) => item.id} contentContainerStyle={styles.similarList} renderItem={({ item }) => <ProductCard product={item} style={styles.similarCard} />} />}
+                {!similarLoading && similarProducts.length > 0 && <ProductCarousel products={similarProducts} nestedScrollEnabled leftInset={Spacing.four} rightInset={Spacing.four} />}
               </View>
             </View>
           </ScrollView>
@@ -1025,6 +1026,4 @@ const styles = StyleSheet.create({
   colorModalName: { minHeight: 34, paddingTop: Spacing.one, fontSize: 11, lineHeight: 15 },
   similarSection: { gap: Spacing.three, marginTop: Spacing.three },
 	similarProducts: { fontSize: 16 },
-  similarList: { gap: 12, paddingRight: Spacing.four },
-  similarCard: { width: 220 },
 });
