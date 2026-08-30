@@ -1053,32 +1053,144 @@ export async function getProductColorOptions(product: Product): Promise<Product[
   return Array.from(new Map(options.filter((item) => item.id).map((item) => [item.id, item])).values());
 }
 
+function normalizeCatalogCategoryPath(value: string) {
+  const segments = value.split('/').map((segment) => segment.trim()).filter(Boolean);
+  return segments.length > 0 ? `/${segments.join('/')}/` : '';
+}
+
+function categoryPathsForProduct(product: Product) {
+  const raw = product.raw;
+  if (!raw) return [];
+
+  const rawCategoryIds = raw.categoriesIds;
+  const categoryIds = Array.isArray(rawCategoryIds)
+    ? rawCategoryIds.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number').map(String)
+    : [];
+  const categoryPaths = categoryIds.some((value) => value.includes('/'))
+    ? categoryIds.map(normalizeCatalogCategoryPath)
+    : categoryIds.length > 0 ? [normalizeCatalogCategoryPath(categoryIds.join('/'))] : [];
+  if (categoryPaths.length > 0) return Array.from(new Set(categoryPaths.filter(Boolean)));
+
+  const categoryTree = raw.categoryTree;
+  if (Array.isArray(categoryTree)) {
+    const treeIds = categoryTree.flatMap((category) => {
+      if (typeof category === 'string' || typeof category === 'number') return [String(category)];
+      if (!category || typeof category !== 'object') return [];
+      const value = category as Record<string, unknown>;
+      const id = value.id ?? value.categoryId ?? value.Id;
+      return id === undefined || id === null ? [] : [String(id)];
+    });
+    const treePath = normalizeCatalogCategoryPath(treeIds.join('/'));
+    if (treePath) return [treePath];
+  }
+
+  const fallbackCategoryIds = raw.categoryIds;
+  if (Array.isArray(fallbackCategoryIds)) {
+    const ids = fallbackCategoryIds.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number').map(String);
+    const path = normalizeCatalogCategoryPath(ids.join('/'));
+    if (path) return [path];
+  }
+
+  return [];
+}
+
+function categoryAncestorPaths(product: Product) {
+  const paths = new Set<string>();
+  categoryPathsForProduct(product).forEach((path) => {
+    const segments = path.split('/').filter(Boolean);
+    for (let end = segments.length; end > 0; end -= 1) {
+      paths.add(`/${segments.slice(0, end).join('/')}/`);
+    }
+  });
+  return Array.from(paths).sort((left, right) => right.split('/').length - left.split('/').length);
+}
+
+function normalizeCatalogProducts(payload: ProductPayload[], hideUnavailableItems = true) {
+  const products = (payload ?? []).map(normalizeProduct).filter((product) => product.id);
+  return filterAvailableProducts(products, hideUnavailableItems);
+}
+
+async function getProductsFromCatalogCategory(product: Product, categoryPath: string, count: number) {
+  const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/search/`);
+  url.searchParams.append('fq', `C:${categoryPath}`);
+  if (product.gender.trim()) url.searchParams.append('fq', `specificationFilter_289:${product.gender.trim()}`);
+  url.searchParams.set('_from', '0');
+  url.searchParams.set('_to', String(Math.max(count * 2 - 1, 19)));
+  url.searchParams.set('O', 'OrderByTopSaleDESC');
+  url.searchParams.set('sc', storeConfig.salesChannel);
+  const payload = await getJson<ProductPayload[]>(url.toString());
+  return normalizeCatalogProducts(Array.isArray(payload) ? payload : []);
+}
+
+async function getBestSellingProductsForGender(product: Product, count: number) {
+  const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/search/`);
+  if (product.gender.trim()) url.searchParams.append('fq', `specificationFilter_289:${product.gender.trim()}`);
+  url.searchParams.set('_from', '0');
+  url.searchParams.set('_to', String(Math.max(count * 2 - 1, 19)));
+  url.searchParams.set('O', 'OrderByTopSaleDESC');
+  url.searchParams.set('sc', storeConfig.salesChannel);
+  const payload = await getJson<ProductPayload[]>(url.toString());
+  return normalizeCatalogProducts(Array.isArray(payload) ? payload : []);
+}
+
 export async function getSimilarProducts(productOrId: Product | string, count = 12): Promise<Product[]> {
   const productId = typeof productOrId === 'string' ? productOrId : productOrId.id;
+  let current: Product;
+  try {
+    current = typeof productOrId === 'string' ? await getProduct(productId) : productOrId;
+  } catch {
+    return [];
+  }
+
+  const targetCount = Math.max(1, count);
+  const allProducts: Product[] = [];
+  const addUniqueProducts = (products: Product[]) => {
+    products.forEach((product) => {
+      if (!product.id || product.id === productId || allProducts.some((item) => item.id === product.id)) return;
+      allProducts.push(product);
+    });
+  };
+
+  // Primeiro procura na categoria mais específica e sobe para as categorias
+  // pai quando ela não tiver produtos suficientes para preencher a vitrine.
+  for (const categoryPath of categoryAncestorPaths(current)) {
+    try {
+      addUniqueProducts(await getProductsFromCatalogCategory(current, categoryPath, targetCount));
+    } catch {
+      // Uma categoria indisponível não impede as próximas estratégias.
+    }
+    if (allProducts.length >= targetCount) return allProducts.slice(0, targetCount);
+  }
+
   const relationships = ['similars', 'suggestions', 'whosawalsosaw'];
 
   for (const relationship of relationships) {
     try {
-      const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/crossselling/${relationship}/${encodeURIComponent(productId)}`);
+      const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/crossselling/${relationship}/${encodeURIComponent(current.id)}`);
       url.searchParams.set('sc', storeConfig.salesChannel);
       const result = await getJson<ProductPayload[]>(url.toString());
-      const products = Array.from(new Map(result
-        .map(normalizeProduct)
-        .filter((product) => product.id && product.id !== productId)
-        .map((product) => [product.id, product])).values());
-      if (products.length > 0) return products.slice(0, count);
+      addUniqueProducts(normalizeCatalogProducts(Array.isArray(result) ? result : []));
+      if (allProducts.length >= targetCount) return allProducts.slice(0, targetCount);
     } catch {
       // Tenta a próxima relação de catálogo configurada para o produto.
     }
   }
 
   try {
-    const current = typeof productOrId === 'string' ? await getProduct(productId) : productOrId;
-    const products = await searchProducts({ query: current.brand || current.name, count: count + 1 });
-    return products.filter((product) => product.id !== productId).slice(0, count);
+    addUniqueProducts(await getBestSellingProductsForGender(current, targetCount));
   } catch {
-    return [];
+    // Best sellers são apenas o último preenchimento da vitrine.
   }
+
+  if (allProducts.length < targetCount) {
+    try {
+      addUniqueProducts(await searchProducts({ query: current.brand || current.name, count: targetCount + 1 }));
+    } catch {
+      // A busca textual é opcional para a recomendação.
+    }
+  }
+
+  return allProducts.slice(0, targetCount);
 }
 
 export async function getCompleteLookProducts(product: Product, count = 2): Promise<Product[]> {
