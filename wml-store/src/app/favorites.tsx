@@ -9,15 +9,16 @@ import { ProductCard } from '@/components/product-card';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
+import { BEST_SELLING_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { type Product } from '@/services/catalog';
 import { getCachedFavorites, getFavorites } from '@/services/favorites';
 
 const EMPTY_FAVORITES_SHELF: Record<string, unknown> = {
-  ...RECENT_PRODUCTS_SHELF,
-  title: 'Você pode gostar',
+  ...BEST_SELLING_PRODUCTS_SHELF,
+  title: 'Mais vendidos',
+  showSeeAll: false,
 };
 
 export default function FavoritesScreen() {

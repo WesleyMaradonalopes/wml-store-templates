@@ -6,20 +6,21 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
+import { ProductShelf } from '@/components/cms-section';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
 import StoreIcon from '@/components/icons/StoreIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import TruckIcon from '@/components/icons/TruckIcon';
 import UserIcon from '@/components/icons/UserIcon';
-import { ProductShelf } from '@/components/cms-section';
 import { NewsletterOptIn } from '@/components/newsletter-opt-in';
 import { paymentBrandFromLabel, PaymentBrandIcon, type PaymentBrand } from '@/components/payment-brand';
 import Recaptcha, { type RecaptchaHandle } from '@/components/recaptcha';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
+import { BEST_SELLING_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Fonts, Spacing } from '@/constants/theme';
 import { getAccountSession } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, addItemOffering, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
@@ -66,9 +67,10 @@ const CONFIGURED_RECAPTCHA_SITE_KEY = Platform.OS === 'android'
     ? String(process.env.EXPO_PUBLIC_VTEX_RECAPTCHA_IOS_SITE_KEY || WEB_RECAPTCHA_SITE_KEY).trim()
     : WEB_RECAPTCHA_SITE_KEY;
 
-const CART_RECENT_PRODUCTS_SHELF: Record<string, unknown> = {
-  ...RECENT_PRODUCTS_SHELF,
-  title: 'Mais recentes',
+const CART_BEST_SELLING_PRODUCTS_SHELF: Record<string, unknown> = {
+  ...BEST_SELLING_PRODUCTS_SHELF,
+  title: 'Mais vendidos',
+  showSeeAll: false,
 };
 
 function digits(value: string) { return value.replace(/\D/g, ''); }
@@ -345,6 +347,8 @@ export default function CheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [cartAddMessage, setCartAddMessage] = useState<string | null>(null);
+  const [cartAddFeedbackKey, setCartAddFeedbackKey] = useState(0);
   const [email, setEmail] = useState('');
   const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const [firstName, setFirstName] = useState('');
@@ -436,6 +440,10 @@ export default function CheckoutScreen() {
   useEffect(() => () => {
     if (couponMessageTimeoutRef.current) clearTimeout(couponMessageTimeoutRef.current);
   }, []);
+
+  useEffect(() => {
+    if (step !== 'cart') setCartAddMessage(null);
+  }, [step]);
 
   function loadCustomerData(customerEmail: string) {
     const key = customerEmail.trim().toLowerCase();
@@ -534,6 +542,12 @@ export default function CheckoutScreen() {
 
   function scrollToCheckoutTop() {
     setTimeout(() => checkoutScrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
+  }
+
+  function showCheckoutAddFeedback() {
+    setCartAddMessage('Adicionado à sacola com sucesso!');
+    setCartAddFeedbackKey((current) => current + 1);
+    scrollToCheckoutTop();
   }
 
   async function openOrdersAfterCheckout() {
@@ -1546,7 +1560,7 @@ export default function CheckoutScreen() {
   const cardErrors = getCardErrors();
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{recaptchaSiteKey && (step === 'payment' || step === 'card' || step === 'review') && <Recaptcha ref={recaptchaRef} siteKey={recaptchaSiteKey} />}<ScrollView ref={checkoutScrollRef} contentContainerStyle={styles.content}>
-     {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}{giftWrappingAvailable && <Pressable disabled={giftWrapLoading || saving} onPress={toggleGiftWrapping} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrapLoading ? <ActivityIndicator size="small" color={giftWrap ? '#FFFFFF' : '#0a0a0a'} /> : giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable>}</ThemedView>{giftWrap && <View style={styles.giftMessage}><ThemedText style={styles.giftMessageText}>Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC.</ThemedText></View>}<ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /><ProductShelf data={CART_RECENT_PRODUCTS_SHELF} titleStyle={styles.checkoutShelfTitle} onAdded={scrollToCheckoutTop} /></>}
+     {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}{giftWrappingAvailable && <Pressable disabled={giftWrapLoading || saving} onPress={toggleGiftWrapping} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrapLoading ? <ActivityIndicator size="small" color={giftWrap ? '#FFFFFF' : '#0a0a0a'} /> : giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable>}</ThemedView>{giftWrap && <View style={styles.giftMessage}><ThemedText style={styles.giftMessageText}>Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC.</ThemedText></View>}<ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /><ProductShelf data={CART_BEST_SELLING_PRODUCTS_SHELF} titleStyle={styles.checkoutShelfTitle} onAdded={showCheckoutAddFeedback} showAddedModal={false} /></>}
     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={() => router.push('/privacy-policy' as never)} /></Card>}
     {step === 'customer' && <>
       {customerExists && !editingCustomer
@@ -1625,7 +1639,7 @@ export default function CheckoutScreen() {
        </Card>
        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
      </>}
-  </ScrollView><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
+  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
 }
 
 function cardGradient(brand: PaymentBrand): [string, string, string] {
@@ -1997,9 +2011,9 @@ const styles = StyleSheet.create({
   quantityCount: { minWidth: 14, textAlign: 'center' },
   removeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   giftRow: { marginTop: Spacing.three, paddingTop: Spacing.three, borderTopWidth: 1, borderTopColor: '#ece8e2', flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  giftCheckbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: '#aaa49c', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  giftCheckbox: { width: 16, height: 16, borderRadius: 4, borderWidth: 1, borderColor: '#aaa49c', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   giftCheckboxSelected: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
-  giftCheck: { color: '#FFFFFF', fontSize: 13, lineHeight: 15 },
+  giftCheck: { color: '#FFFFFF', fontSize: 11, lineHeight: 15 },
   giftText: { flex: 1, fontSize: 11 },
   giftMessage: { padding: Spacing.three, borderRadius: 4, borderWidth: 1, borderColor: '#e5c95a', backgroundColor: '#fffbe7' },
   giftMessageText: { color: '#9a7b2f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },

@@ -20,13 +20,14 @@ type Props = {
   favorite?: boolean;
   onFavoriteChange?: (favorite: boolean) => void;
   onAdded?: (product: Product) => void;
+  showAddedModal?: boolean;
 };
 
 function money(value: number) {
   return `R$ ${value.toFixed(2).replace('.', ',')}`;
 }
 
-export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded }: Props) {
+export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true }: Props) {
   const router = useRouter();
   const [localFavorite, setLocalFavorite] = useState(Boolean(controlledFavorite));
   const [favoriteLoading, setFavoriteLoading] = useState(false);
@@ -98,6 +99,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
             disabled={!product.itemId}
             buttonStyle={styles.addButton}
             onAdded={() => onAdded?.(product)}
+            showAddedModal={showAddedModal}
           />
         </View>
         <ThemedText numberOfLines={2} style={styles.name}>{product.name}</ThemedText>

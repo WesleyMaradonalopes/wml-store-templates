@@ -89,9 +89,10 @@ type ProductShelfProps = {
   data: Record<string, unknown>;
   titleStyle?: StyleProp<TextStyle>;
   onAdded?: (product: Product) => void;
+  showAddedModal?: boolean;
 };
 
-export function ProductShelf({ data, titleStyle, onAdded }: ProductShelfProps) {
+export function ProductShelf({ data, titleStyle, onAdded, showAddedModal = true }: ProductShelfProps) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,6 +186,7 @@ export function ProductShelf({ data, titleStyle, onAdded }: ProductShelfProps) {
             favorite={favoriteIds.includes(item.id)}
             onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))}
             onAdded={onAdded}
+            showAddedModal={showAddedModal}
           />
         )}
       />

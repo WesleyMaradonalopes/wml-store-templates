@@ -19,6 +19,7 @@ type QuickViewProps = {
   visible: boolean;
   onClose: () => void;
   onAdded?: (product: Product) => void;
+  showAddedModal?: boolean;
   kitSelection?: KitSelection;
   onKitSelectionChange?: (selection: KitSelection) => void;
 };
@@ -32,6 +33,7 @@ type QuickViewButtonProps = {
   buttonStyle?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   onAdded?: (product: Product) => void;
+  showAddedModal?: boolean;
 };
 
 function money(value: number | null) {
@@ -42,7 +44,7 @@ function matchesSelection(variant: ProductVariant, selected: Record<string, stri
   return Object.entries(selected).every(([name, value]) => name === ignoredName || variant.variations[name] === value);
 }
 
-export function ProductQuickView({ product, visible, onClose, onAdded, kitSelection, onKitSelectionChange }: QuickViewProps) {
+export function ProductQuickView({ product, visible, onClose, onAdded, showAddedModal = true, kitSelection, onKitSelectionChange }: QuickViewProps) {
   const router = useRouter();
   const [details, setDetails] = useState(product);
   const [loading, setLoading] = useState(false);
@@ -105,9 +107,9 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
     return groups.filter((group) => !currentKitSelection.checkedProducts[group.productId] || !currentKitSelection.selectedSizes[group.productId]);
   }
 
-  function showAddedModal(addedProduct: AddedProductInfo) {
+  function handleProductAdded(addedProduct: AddedProductInfo) {
     setMessage('');
-    setAddedItem(addedProduct);
+    setAddedItem(showAddedModal ? addedProduct : null);
     onAdded?.(details);
     onClose();
   }
@@ -138,7 +140,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
             quantity: selectedItem.amount,
           });
         }
-        showAddedModal({ product: details, price: details.price });
+        handleProductAdded({ product: details, price: details.price });
       } catch {
         setMessage('Não foi possível adicionar o conjunto agora.');
       } finally {
@@ -164,7 +166,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
         itemId: selectedVariant.itemId,
         sellerId: selectedVariant.sellerId,
       });
-      showAddedModal({ product: details, variant: selectedVariant, selectedOptions });
+      handleProductAdded({ product: details, variant: selectedVariant, selectedOptions });
     } catch {
       setMessage('Não foi possível adicionar o produto agora.');
     } finally {
@@ -248,20 +250,20 @@ export function ProductQuickView({ product, visible, onClose, onAdded, kitSelect
           </ThemedView>
         </View>
       </Modal>
-      <AddedToCartModal
-        item={addedItem}
-        visible={Boolean(addedItem)}
-        onClose={() => setAddedItem(null)}
-        onViewCart={() => {
-          setAddedItem(null);
-          router.push('/checkout');
-        }}
-      />
+      {showAddedModal && <AddedToCartModal
+          item={addedItem}
+          visible={Boolean(addedItem)}
+          onClose={() => setAddedItem(null)}
+          onViewCart={() => {
+            setAddedItem(null);
+            router.push('/checkout');
+          }}
+        />}
     </>
   );
 }
 
-export function ProductQuickViewButton({ product, label = 'Adicionar', icon, accessibilityLabel, disabled, buttonStyle, textStyle, onAdded }: QuickViewButtonProps) {
+export function ProductQuickViewButton({ product, label = 'Adicionar', icon, accessibilityLabel, disabled, buttonStyle, textStyle, onAdded, showAddedModal = true }: QuickViewButtonProps) {
   const [visible, setVisible] = useState(false);
   return (
     <>
@@ -272,7 +274,7 @@ export function ProductQuickViewButton({ product, label = 'Adicionar', icon, acc
         style={({ pressed }) => [buttonStyle, pressed && styles.pressed, disabled && styles.disabled]}>
         {icon ?? <ThemedText style={textStyle}>{label}</ThemedText>}
       </Pressable>
-      <ProductQuickView product={product} visible={visible} onClose={() => setVisible(false)} onAdded={onAdded} />
+      <ProductQuickView product={product} visible={visible} onClose={() => setVisible(false)} onAdded={onAdded} showAddedModal={showAddedModal} />
     </>
   );
 }
