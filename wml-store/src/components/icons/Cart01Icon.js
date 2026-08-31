@@ -1,7 +1,6 @@
-import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
-export default function Cart01Icon({ color = '#313235', size = 24 }) {
+export default function Cart01Icon({ color = '#0a0a0a', size = 24 }) {
   return (
     <Svg width={size * (49 / 48)} height={size} viewBox="0 0 49 48" fill="none">
       <Path

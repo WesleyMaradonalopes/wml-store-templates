@@ -443,17 +443,17 @@ function LoggedAccount({ email, notifications, setNotifications, onLogout, onPer
 
 function UtilityGrid({ onRegister }: { onRegister: () => void }) {
   const tiles: AccountTileData[] = [
-    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#313235" size={18} /> },
-    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#313235" size={18} /> },
-    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#313235" size={18} /> },
-    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#313235" size={18} />, onPress: onRegister },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#0a0a0a" size={18} /> },
+    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#0a0a0a" size={18} /> },
+    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#0a0a0a" size={18} /> },
+    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#0a0a0a" size={18} />, onPress: onRegister },
   ];
   return <View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View>;
 }
 function Preference({ value = true, onChange }: { value?: boolean; onChange?: (value: boolean) => void }) {
   return <View style={styles.preference}>
     <View style={styles.preferenceLabel}>
-      <HomeNotificationsIcon color="#313235" size={18} />
+      <HomeNotificationsIcon color="#0a0a0a" size={18} />
       <ThemedText style={styles.preferenceText}>Notificações</ThemedText>
     </View>
     <Pressable
@@ -646,14 +646,14 @@ function PasswordSetupView({ mode, email, code, setCode, newPassword, setNewPass
 }
 function LoggedAccountV2({ email, notifications, setNotifications, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void }) {
   const tiles: AccountTileData[] = [
-    { label: 'Meus pedidos', icon: <Box01Icon color="#313235" size={18} />, onPress: onOrders },
-    { label: 'Dados pessoais', icon: <UserIcon color="#313235" size={18} />, onPress: onPersonal },
-    { label: 'Favoritos', icon: <HeartIcon color="#313235" size={18} />, onPress: onFavorites },
-    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#313235" size={18} /> },
-    { label: 'Redefinição de senha', icon: <LockIcon color="#313235" size={18} />, onPress: onPasswordReset },
-    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#313235" size={18} /> },
-    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#313235" size={18} /> },
-    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#313235" size={18} /> },
+    { label: 'Meus pedidos', icon: <Box01Icon color="#0a0a0a" size={18} />, onPress: onOrders },
+    { label: 'Dados pessoais', icon: <UserIcon color="#0a0a0a" size={18} />, onPress: onPersonal },
+    { label: 'Favoritos', icon: <HeartIcon color="#0a0a0a" size={18} />, onPress: onFavorites },
+    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#0a0a0a" size={18} /> },
+    { label: 'Redefinição de senha', icon: <LockIcon color="#0a0a0a" size={18} />, onPress: onPasswordReset },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#0a0a0a" size={18} /> },
+    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#0a0a0a" size={18} /> },
+    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#0a0a0a" size={18} /> },
   ];
   return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><View style={styles.divider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.logoutText}>Sair</ThemedText>}</Pressable><View style={styles.divider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
 }
@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
   accountTile: { minHeight: 96, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'stretch' },
   tileHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   tileIcon: { width: 20, height: 20, alignItems: 'flex-start', justifyContent: 'flex-start' },
-  tileLabel: { color: '#313235', fontSize: 13, lineHeight: 18 },
+  tileLabel: { color: '#0a0a0a', fontSize: 13, lineHeight: 18 },
   preferenceLabel: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  preferenceText: { color: '#313235', fontSize: 14 },
+  preferenceText: { color: '#0a0a0a', fontSize: 14 },
 });

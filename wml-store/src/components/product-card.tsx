@@ -90,11 +90,11 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
             disabled={favoriteLoading}
             onPress={(event) => { event.stopPropagation(); void changeFavorite(); }}
             style={styles.favoriteButton}>
-            <HeartIcon size={28} color={favorite ? '#C62828' : '#514c47'} filled={favorite} />
+            <HeartIcon size={28} color={favorite ? '#C62828' : '#0a0a0a'} filled={favorite} />
           </Pressable>
           <ProductQuickViewButton
             product={product}
-            icon={<ShoppingBagIcon size={20} color="#000000" />}
+            icon={<ShoppingBagIcon size={20} color="#0a0a0a" />}
             accessibilityLabel="Adicionar à sacola"
             disabled={!product.itemId}
             buttonStyle={styles.addButton}

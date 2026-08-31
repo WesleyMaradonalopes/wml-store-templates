@@ -395,7 +395,7 @@ export default function ProductScreen() {
                   {currentPrice !== null && <ThemedText type="subtitle" style={styles.bestPrice}>{money(currentPrice)}</ThemedText>}
                 </View>
                 <Pressable accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} disabled={favoriteLoading} onPress={changeFavorite} style={styles.favoriteButton}>
-                  <HeartIcon size={32} color={favorite ? '#C62828' : '#423d39'} filled={favorite} />
+                  <HeartIcon size={32} color={favorite ? '#C62828' : '#000000'} filled={favorite} />
                 </Pressable>
               </View>
 
@@ -475,7 +475,7 @@ export default function ProductScreen() {
               {!lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onFeedback={showCartFeedback} />}
 
               <View style={styles.similarSection}>
-                <ThemedText style={styles.similarProducts} type="subtitle">Produtos similares</ThemedText>
+                <ThemedText style={styles.similarProducts} type="subtitle">Quem viu isso, viu também</ThemedText>
                 {similarLoading && <ActivityIndicator color="#0a0a0a" />}
                 {!similarLoading && similarProducts.length > 0 && <ProductCarousel products={similarProducts} nestedScrollEnabled leftInset={Spacing.four} rightInset={Spacing.four} />}
               </View>
@@ -969,12 +969,12 @@ const styles = StyleSheet.create({
   helperButtons: { flexDirection: 'row', gap: Spacing.two },
   helperButton: { flex: 1, minHeight: 44, paddingHorizontal: Spacing.two, borderRadius: 8, borderWidth: 1, borderColor: '#bdb6ad', flexDirection: 'row', gap: Spacing.one, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   shippingSection: { gap: Spacing.three, paddingTop: Spacing.two },
-  sectionTitle: { fontSize: 17, lineHeight: 23 },
+  sectionTitle: { fontSize: 15, lineHeight: 23 },
   shippingRow: { minHeight: 48, flexDirection: 'row' },
   shippingInput: { flex: 1, paddingHorizontal: Spacing.three, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
   shippingButton: { minWidth: 108, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#0a0a0a' },
   shippingButtonText: { color: '#FFFFFF', fontWeight: '700' },
-  shippingQuote: { padding: Spacing.three, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#f7f4ef' },
+  shippingQuote: { padding: Spacing.three, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#eee' },
   accordion: { marginHorizontal: -Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
   accordionHeader: { minHeight: 52, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   accordionContent: { gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
