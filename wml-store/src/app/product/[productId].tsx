@@ -18,7 +18,6 @@ import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRoundedIcon';
 import { emptyKitSelection, KitSelector, type KitSelection } from '@/components/kit-selector';
 import { LoginRequiredModal } from '@/components/login-required-modal';
-import { ProductCard } from '@/components/product-card';
 import { ProductCarousel } from '@/components/product-carousel';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
@@ -105,6 +104,7 @@ export default function ProductScreen() {
   const [shippingMessage, setShippingMessage] = useState('');
   const [descriptionOpen, setDescriptionOpen] = useState(true);
   const [compositionOpen, setCompositionOpen] = useState(false);
+  const [careOpen, setCareOpen] = useState(false);
   const galleryListRef = useRef<FlatList<string>>(null);
 
   const variantGroups = useMemo(() => product?.isKit ? {} : buildVariationGroups(product), [product]);
@@ -464,10 +464,11 @@ export default function ProductScreen() {
               <Accordion title="Descrição" open={descriptionOpen} onToggle={() => setDescriptionOpen((value) => !value)}>
                 <ThemedText style={styles.accordionText}>{product.description || 'Descrição não cadastrada.'}</ThemedText>
               </Accordion>
-              <Accordion title="Composição e Cuidados" open={compositionOpen} onToggle={() => setCompositionOpen((value) => !value)}>
-                {!!product.composition && <ThemedText style={styles.accordionText}><ThemedText type="smallBold">Composição: </ThemedText>{product.composition}</ThemedText>}
-                {!!product.care && <ThemedText style={styles.accordionText}><ThemedText type="smallBold">Cuidados: </ThemedText>{product.care}</ThemedText>}
-                {!product.composition && !product.care && <ThemedText style={styles.accordionText}>Informações não cadastradas.</ThemedText>}
+              <Accordion title="Composição" open={compositionOpen} onToggle={() => setCompositionOpen((value) => !value)}>
+                <ThemedText style={styles.accordionText}>{product.composition || 'Informações não cadastradas.'}</ThemedText>
+              </Accordion>
+              <Accordion title="Cuidados" open={careOpen} onToggle={() => setCareOpen((value) => !value)}>
+                <ThemedText style={styles.accordionText}>{product.care || 'Informações não cadastradas.'}</ThemedText>
               </Accordion>
 
               {lookLoading && <ActivityIndicator color="#0a0a0a" />}
@@ -855,7 +856,7 @@ function PdpHeader({ scrolled, onBack, onLogo, onSearch, onCart }: { scrolled: b
 }
 
 function Accordion({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
-  return <View style={styles.accordion}><Pressable accessibilityState={{ expanded: open }} onPress={onToggle} style={styles.accordionHeader}><ThemedText style={styles.sectionTitle}>{title}</ThemedText><DropdownChevron open={open} /></Pressable>{open && <View style={styles.accordionContent}>{children}</View>}</View>;
+  return <View style={styles.accordion}><Pressable accessibilityState={{ expanded: open }} onPress={onToggle} style={styles.accordionHeader}><ThemedText style={styles.accordionTitle}>{title}</ThemedText><DropdownChevron open={open} /></Pressable>{open && <View style={styles.accordionContent}>{children}</View>}</View>;
 }
 
 function DropdownChevron({ open }: { open: boolean }) {
@@ -977,7 +978,8 @@ const styles = StyleSheet.create({
   accordion: { marginHorizontal: -Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
   accordionHeader: { minHeight: 52, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   accordionContent: { gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
-  accordionText: { color: '#625d57', lineHeight: 21 },
+  accordionTitle: { fontSize: 16, lineHeight: 23, fontWeight: '500' },
+  accordionText: { color: '#625d57', lineHeight: 21, fontSize: 12 },
   dropdownChevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
   dropdownChevronOpen: { transform: [{ rotate: '-90deg' }] },
   floatingBar: { position: 'absolute', left: 10, right: 10, bottom: 20, minHeight: 50, borderRadius: 50, paddingHorizontal: 20, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#0a0a0a', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
