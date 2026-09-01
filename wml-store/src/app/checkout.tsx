@@ -24,8 +24,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BEST_SELLING_PRODUCTS_SHELF, RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
-import { getAccountSession } from '@/services/auth';
-import { addCouponToCart, addGiftCardToCart, addItemOffering, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
+import { getAccountSession, loginVtexPassword, saveAccountSession, sendVtexAccessKey, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
+import { addCouponToCart, addGiftCardToCart, addItemOffering, checkGiftCardAvailability, clearCart, createFreshOrderForm, getCustomerGiftCards, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
@@ -34,6 +34,7 @@ type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' |
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
 type ShippingOption = NonNullable<OrderForm['shippingData']>['logisticsInfo'][number]['slas'][number];
 type PaymentMethod = NonNullable<OrderForm['paymentData']>['paymentSystems'][number];
+type GiftCardAvailability = 'unknown' | 'loading' | 'available' | 'none';
 
 function mergeCustomerProfiles(primary: CustomerProfile | null, fallback: NonNullable<OrderForm['clientProfileData']> | null): CustomerProfile | null {
   if (!primary && !fallback) return null;
@@ -399,6 +400,12 @@ export default function CheckoutScreen() {
   const [voucherMessage, setVoucherMessage] = useState('');
   const [voucherMessageType, setVoucherMessageType] = useState<'success' | 'error' | null>(null);
   const [removingGiftCard, setRemovingGiftCard] = useState<string | null>(null);
+  const [giftCardAvailability, setGiftCardAvailability] = useState<GiftCardAvailability>('unknown');
+  const [giftCardIdentityVerified, setGiftCardIdentityVerified] = useState(false);
+  const [giftCardIdentityVisible, setGiftCardIdentityVisible] = useState(false);
+  const [availableGiftCards, setAvailableGiftCards] = useState<GiftCard[]>([]);
+  const [giftCardDetailsLoading, setGiftCardDetailsLoading] = useState(false);
+  const [applyingAvailableGiftCard, setApplyingAvailableGiftCard] = useState<string | null>(null);
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<CartItem | null>(null);
   const [customerExists, setCustomerExists] = useState(false);
@@ -415,6 +422,8 @@ export default function CheckoutScreen() {
   const recaptchaRef = useRef<RecaptchaHandle>(null);
   const checkoutScrollRef = useRef<ScrollView>(null);
   const couponMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const giftCardAvailabilityKeyRef = useRef('');
+  const giftCardVerifiedEmailRef = useRef('');
   const newsletterOptInTouched = useRef(false);
   const genders: { value: string; text: string; disabled?: boolean; selected?: boolean }[] = [
     { value: '', text: 'Opcional', disabled: true, selected: true },
@@ -470,6 +479,29 @@ export default function CheckoutScreen() {
     return request;
   }
 
+  function resetGiftCardIdentityIfEmailChanged(nextEmail: string) {
+    const normalizedEmail = nextEmail.trim().toLowerCase();
+    if (!giftCardVerifiedEmailRef.current || giftCardVerifiedEmailRef.current === normalizedEmail) return;
+    giftCardVerifiedEmailRef.current = '';
+    setGiftCardIdentityVerified(false);
+    setAvailableGiftCards([]);
+    setGiftCardAvailability('unknown');
+    giftCardAvailabilityKeyRef.current = '';
+  }
+
+  async function loadGiftCardDetails(targetOrderForm = orderForm) {
+    if (!targetOrderForm || !email.trim()) return [];
+    setGiftCardDetailsLoading(true);
+    try {
+      const cards = await getCustomerGiftCards(targetOrderForm.orderFormId, email);
+      setAvailableGiftCards(cards);
+      setGiftCardAvailability(cards.length > 0 ? 'available' : 'none');
+      return cards;
+    } finally {
+      setGiftCardDetailsLoading(false);
+    }
+  }
+
   useEffect(() => {
     let active = true;
     Promise.all([getOrderForm(), getAccountSession()]).then(async ([value, session]) => {
@@ -487,6 +519,11 @@ export default function CheckoutScreen() {
       setFirstName(''); setLastName(''); setDocument(''); setPhone(''); setBirthDate(''); setGender('');
       setCustomerExists(false); setEditingCustomer(false);
       setCustomerAddresses([]); setAddressSaved(false); setEditingAddress(false);
+      setGiftCardAvailability('unknown');
+      setGiftCardIdentityVerified(Boolean(loggedEmail));
+      setAvailableGiftCards([]);
+      giftCardAvailabilityKeyRef.current = '';
+      giftCardVerifiedEmailRef.current = loggedEmail;
       setLoading(false);
       if (!loggedEmail) return;
       const { profile: customer, addresses } = await loadCustomerData(loggedEmail);
@@ -512,6 +549,28 @@ export default function CheckoutScreen() {
       setGiftWrap(allGiftWrappingApplied(value.items));
     });
   }, [step]);
+
+  useEffect(() => {
+    if (step !== 'payment' || !orderForm || !email.trim() || (!customerExists && !orderForm.userProfileId)) return;
+    const requestKey = `${orderForm.orderFormId}|${email.trim().toLowerCase()}|${giftCardIdentityVerified ? 'verified' : 'guest'}`;
+    if (giftCardAvailabilityKeyRef.current === requestKey) return;
+    giftCardAvailabilityKeyRef.current = requestKey;
+    let active = true;
+    setGiftCardAvailability('loading');
+    if (!giftCardIdentityVerified) setAvailableGiftCards([]);
+    void checkGiftCardAvailability(orderForm.orderFormId, email).then(async (available) => {
+      if (!active) return;
+      setGiftCardAvailability(available ? 'available' : 'none');
+      if (available && giftCardIdentityVerified) {
+        try { await loadGiftCardDetails(orderForm); } catch { if (active) setGiftCardAvailability('available'); }
+      }
+    }).catch(() => {
+      if (!active) return;
+      setGiftCardAvailability('none');
+      setAvailableGiftCards([]);
+    });
+    return () => { active = false; };
+  }, [step, orderForm?.orderFormId, email, customerExists, giftCardIdentityVerified]);
 
   useEffect(() => {
     if (!orderResult || orderResult.status !== 'pending_payment' || !orderResult.transactionId) return;
@@ -647,6 +706,7 @@ export default function CheckoutScreen() {
 
   async function persistCustomer() {
     if (!orderForm) return;
+    resetGiftCardIdentityIfEmailChanged(email);
     setSaving(true);
     setMessage('');
     try {
@@ -822,6 +882,7 @@ export default function CheckoutScreen() {
   async function continueWithEmail() {
     setEmailValidationAttempted(true);
     if (!validEmail(email)) return;
+    resetGiftCardIdentityIfEmailChanged(email);
     setSaving(true);
     setMessage('');
     try {
@@ -1264,9 +1325,9 @@ export default function CheckoutScreen() {
     return updatedOrderForm;
   }
 
-  async function applyVoucher() {
-    const redemptionCode = voucher.trim();
-    if (!orderForm || !redemptionCode) return;
+  async function applyGiftCardCode(redemptionCode: string) {
+    const normalizedCode = redemptionCode.trim();
+    if (!orderForm || !normalizedCode) return false;
     setSaving(true);
     setVoucherLoading(true);
     setVoucherMessage('');
@@ -1281,7 +1342,7 @@ export default function CheckoutScreen() {
         const giftCardApplied = activeGiftCards(targetOrderForm);
         // Nesta tela ainda não existe uma segunda forma selecionada. Reenviar
         // payments antigos faz a VTEX rejeitar o vale como pagamento indisponível.
-        return addGiftCardToCart(targetOrderForm.orderFormId, redemptionCode, giftCardApplied, [], email);
+        return addGiftCardToCart(targetOrderForm.orderFormId, normalizedCode, giftCardApplied, [], email);
       };
       let updatedOrderForm: OrderForm;
       try {
@@ -1295,11 +1356,75 @@ export default function CheckoutScreen() {
       setVoucher('');
       setVoucherMessage('Vale-presente aplicado.');
       setVoucherMessageType('success');
+      return true;
     } catch (error) {
       setVoucherMessage(error instanceof Error ? error.message : 'Não foi possível adicionar o vale-presente.');
       setVoucherMessageType('error');
+      return false;
     } finally {
       setVoucherLoading(false);
+      setSaving(false);
+    }
+  }
+
+  async function applyVoucher() {
+    const redemptionCode = voucher.trim();
+    if (!redemptionCode) return;
+    if (giftCardAvailability === 'available' && !giftCardIdentityVerified) {
+      setVoucherMessage('Confirme sua identidade para usar os créditos vinculados a este e-mail.');
+      setVoucherMessageType('error');
+      setGiftCardIdentityVisible(true);
+      return;
+    }
+    await applyGiftCardCode(redemptionCode);
+  }
+
+  async function applyAvailableGiftCard(giftCard: GiftCard) {
+    const redemptionCode = giftCard.redemptionCode.trim();
+    if (!redemptionCode) {
+      setVoucherMessage('Este crédito não está disponível para aplicação agora.');
+      setVoucherMessageType('error');
+      return;
+    }
+    setApplyingAvailableGiftCard(giftCard.id || redemptionCode);
+    const applied = await applyGiftCardCode(redemptionCode);
+    if (applied) {
+      setAvailableGiftCards((current) => current.filter((item) => (
+        (giftCard.id && item.id !== giftCard.id)
+        || (!giftCard.id && item.redemptionCode !== giftCard.redemptionCode)
+      )));
+    }
+    setApplyingAvailableGiftCard(null);
+  }
+
+  async function completeGiftCardIdentity(authenticatedEmail: string) {
+    const normalizedEmail = authenticatedEmail.trim().toLowerCase();
+    if (!orderForm || normalizedEmail !== email.trim().toLowerCase()) {
+      throw new Error('Use o mesmo e-mail informado no checkout para consultar os créditos.');
+    }
+    setSaving(true);
+    try {
+      let authenticatedOrderForm = orderForm;
+      try {
+        const identifiedOrderForm = await identifyExistingCustomerByEmail(orderForm.orderFormId, normalizedEmail);
+        if (identifiedOrderForm) {
+          authenticatedOrderForm = identifiedOrderForm;
+          setOrderForm(identifiedOrderForm);
+        }
+      } catch {
+        // A autenticação já confirmou a identidade; se a reidentificação do
+        // orderForm falhar momentaneamente, a consulta protegida ainda pode
+        // usar o perfil que já está no carrinho.
+      }
+      const cards = await getCustomerGiftCards(authenticatedOrderForm.orderFormId, normalizedEmail);
+      giftCardAvailabilityKeyRef.current = `${authenticatedOrderForm.orderFormId}|${normalizedEmail}|verified`;
+      giftCardVerifiedEmailRef.current = normalizedEmail;
+      setGiftCardIdentityVerified(true);
+      setAvailableGiftCards(cards);
+      setGiftCardAvailability(cards.length > 0 ? 'available' : 'none');
+      setVoucherMessage('');
+      setVoucherMessageType(null);
+    } finally {
       setSaving(false);
     }
   }
@@ -1327,7 +1452,11 @@ export default function CheckoutScreen() {
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
-      setOrderForm(await removeGiftCardFromCart(orderForm.orderFormId, giftCard, appliedGiftCards, orderForm.paymentData?.payments ?? [], email));
+      const updatedOrderForm = await removeGiftCardFromCart(orderForm.orderFormId, giftCard, appliedGiftCards, orderForm.paymentData?.payments ?? [], email);
+      setOrderForm(updatedOrderForm);
+      if (giftCardIdentityVerified) {
+        void loadGiftCardDetails(updatedOrderForm).catch(() => undefined);
+      }
     } catch (error) {
       if (isGiftCardOwnershipError(error)) {
         try {
@@ -1610,8 +1739,8 @@ export default function CheckoutScreen() {
          <View style={styles.paymentDivider} />
          <ThemedText style={styles.bodyText} themeColor="textSecondary">+ novo cartão</ThemedText>
        </Pressable>
-       <GiftCardPaymentSection
-         voucher={voucher}
+        <GiftCardPaymentSection
+          voucher={voucher}
          onVoucherChange={(text) => { setVoucher(text.normalize('NFC')); if (voucherMessage) { setVoucherMessage(''); setVoucherMessageType(null); } }}
          voucherLoading={voucherLoading}
          saving={saving}
@@ -1620,10 +1749,17 @@ export default function CheckoutScreen() {
          orderValue={orderForm.value}
          removingGiftCard={removingGiftCard}
          onRemove={removeVoucher}
-         voucherMessage={voucherMessage}
-         voucherMessageType={voucherMessageType}
-         onContinue={continueWithGiftCard}
-       />
+          voucherMessage={voucherMessage}
+          voucherMessageType={voucherMessageType}
+          onContinue={continueWithGiftCard}
+          giftCardAvailability={giftCardAvailability}
+          giftCardIdentityVerified={giftCardIdentityVerified}
+          availableGiftCards={availableGiftCards}
+          giftCardDetailsLoading={giftCardDetailsLoading}
+          applyingAvailableGiftCard={applyingAvailableGiftCard}
+          onShowCredits={() => setGiftCardIdentityVisible(true)}
+          onApplyAvailableGiftCard={(giftCard) => { void applyAvailableGiftCard(giftCard); }}
+        />
        {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}
        <Pressable disabled={saving} onPress={() => pixMethod ? choosePayment(pixMethod.id, pixMethod.name || 'Pix') : setMessage('Pix não está disponível para este carrinho.')} style={styles.paymentCard}>
          <ThemedText style={styles.sectionTitle}>Pix</ThemedText>
@@ -1663,7 +1799,7 @@ export default function CheckoutScreen() {
        </Card>
        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
      </>}
-  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
+  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover {pendingRemoval?.name} do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><GiftCardIdentityModal visible={giftCardIdentityVisible} checkoutEmail={email} onClose={() => setGiftCardIdentityVisible(false)} onAuthenticated={completeGiftCardIdentity} /><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
 }
 
 function cardGradient(brand: PaymentBrand): [string, string, string] {
@@ -1956,32 +2092,194 @@ function ReviewHeader({ icon, title }: { icon: 'user' | 'truck' | 'card'; title:
   return <View style={styles.reviewHeader}>{icon === 'user' && <UserIcon color="#0a0a0a" size={20} />}{icon === 'truck' && <TruckIcon color="#0a0a0a" size={20} />}{icon === 'card' && <CreditCardIcon color="#0a0a0a" size={20} />}<ThemedText style={styles.sectionTitle}>{title}</ThemedText></View>;
 }
 
-function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, saving, onApply, appliedGiftCards, orderValue, removingGiftCard, onRemove, voucherMessage, voucherMessageType, onContinue }: { voucher: string; onVoucherChange: (value: string) => void; voucherLoading: boolean; saving: boolean; onApply: () => void; appliedGiftCards: GiftCard[]; orderValue: number; removingGiftCard: string | null; onRemove: (giftCard: GiftCard) => void; voucherMessage: string; voucherMessageType: 'success' | 'error' | null; onContinue: () => void }) {
+function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, saving, onApply, appliedGiftCards, orderValue, removingGiftCard, onRemove, voucherMessage, voucherMessageType, onContinue, giftCardAvailability, giftCardIdentityVerified, availableGiftCards, giftCardDetailsLoading, applyingAvailableGiftCard, onShowCredits, onApplyAvailableGiftCard }: { voucher: string; onVoucherChange: (value: string) => void; voucherLoading: boolean; saving: boolean; onApply: () => void; appliedGiftCards: GiftCard[]; orderValue: number; removingGiftCard: string | null; onRemove: (giftCard: GiftCard) => void; voucherMessage: string; voucherMessageType: 'success' | 'error' | null; onContinue: () => void; giftCardAvailability: GiftCardAvailability; giftCardIdentityVerified: boolean; availableGiftCards: GiftCard[]; giftCardDetailsLoading: boolean; applyingAvailableGiftCard: string | null; onShowCredits: () => void; onApplyAvailableGiftCard: (giftCard: GiftCard) => void }) {
   const appliedValue = giftCardsTotal(appliedGiftCards);
   const canContinue = appliedGiftCards.length > 0 && giftCardsCoverOrder(appliedGiftCards, orderValue);
   const remainingValue = Math.max(0, orderValue - appliedValue);
-  return <View style={styles.paymentCard}>
-    <ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>
-    <View style={styles.paymentDivider} />
-    <View style={styles.inline}>
-      <TextInput value={voucher} onChangeText={onVoucherChange} autoCapitalize="characters" autoCorrect={false} placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} />
-      <Pressable disabled={saving || voucherLoading || !voucher.trim()} onPress={onApply} style={[styles.smallButton, (saving || voucherLoading || !voucher.trim()) && styles.giftCardButtonDisabled]}>
-        {voucherLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}
-      </Pressable>
-    </View>
-    {appliedGiftCards.map((giftCard, index) => <View key={(giftCard.id || giftCard.redemptionCode) + '-' + index} style={styles.giftCardRow}>
-      <View style={styles.giftCardDetails}>
-        <ThemedText style={styles.giftCardCode}>{giftCard.redemptionCode.toUpperCase()}</ThemedText>
-        <ThemedText style={styles.giftCardAmount}>{money(giftCardAppliedValue(giftCard))}</ThemedText>
+  const appliedKeys = new Set(appliedGiftCards.map((giftCard) => giftCard.id || giftCard.redemptionCode));
+  const unappliedGiftCards = availableGiftCards.filter((giftCard) => !appliedKeys.has(giftCard.id || giftCard.redemptionCode));
+  return <View style={styles.giftCardSection}>
+    {giftCardAvailability === 'loading' && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#625d57" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Consultando créditos disponíveis...</ThemedText></View>}
+    {giftCardAvailability === 'available' && !giftCardIdentityVerified && <Pressable accessibilityRole="button" onPress={onShowCredits} style={styles.giftCardNotice}><ThemedText style={styles.giftCardNoticeText}>Você possui créditos para usar na compra! Deseja exibi-los?</ThemedText></Pressable>}
+    {giftCardIdentityVerified && giftCardDetailsLoading && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#625d57" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Carregando seus créditos...</ThemedText></View>}
+    {giftCardIdentityVerified && !giftCardDetailsLoading && unappliedGiftCards.length > 0 && <View style={styles.availableGiftCardsCard}>
+      <ThemedText style={styles.sectionTitle}>Créditos disponíveis</ThemedText>
+      <ThemedText style={styles.bodyText} themeColor="textSecondary">Escolha um vale-presente para usar nesta compra.</ThemedText>
+      {unappliedGiftCards.map((giftCard, index) => {
+        const key = giftCard.id || giftCard.redemptionCode || String(index);
+        const applying = applyingAvailableGiftCard === key;
+        return <View key={key} style={styles.availableGiftCardRow}>
+          <View style={styles.giftCardDetails}>
+            <ThemedText style={styles.giftCardCode}>{giftCard.caption || giftCard.name || 'Vale-presente'}</ThemedText>
+            <ThemedText style={styles.giftCardAmount}>{money(giftCardAppliedValue(giftCard))}</ThemedText>
+          </View>
+          <Pressable disabled={saving || voucherLoading || Boolean(applyingAvailableGiftCard)} onPress={() => onApplyAvailableGiftCard(giftCard)} style={[styles.smallButton, (saving || voucherLoading || Boolean(applyingAvailableGiftCard)) && styles.giftCardButtonDisabled]}>
+            {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Usar</ThemedText>}
+          </Pressable>
+        </View>;
+      })}
+    </View>}
+    <View style={styles.paymentCard}>
+      <ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>
+      <View style={styles.paymentDivider} />
+      <View style={styles.inline}>
+        <TextInput value={voucher} onChangeText={onVoucherChange} autoCapitalize="characters" autoCorrect={false} placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} />
+        <Pressable disabled={saving || voucherLoading || !voucher.trim()} onPress={onApply} style={[styles.smallButton, (saving || voucherLoading || !voucher.trim()) && styles.giftCardButtonDisabled]}>
+          {voucherLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}
+        </Pressable>
       </View>
-      <Pressable disabled={saving || removingGiftCard === giftCard.redemptionCode} onPress={() => onRemove(giftCard)}>
-        <ThemedText style={styles.giftCardRemove}>{removingGiftCard === giftCard.redemptionCode ? 'Removendo...' : 'Remover'}</ThemedText>
-      </Pressable>
-    </View>)}
-    {appliedGiftCards.length > 0 && !canContinue && <ThemedText style={styles.giftCardRemaining}>Pagamento restante de {money(remainingValue)}. Por favor, combine com outra forma de pagamento</ThemedText>}
-    {!!voucherMessage && <ThemedText style={voucherMessageType === 'success' ? styles.successText : styles.errorText}>{voucherMessage}</ThemedText>}
-    {canContinue && <Pressable disabled={saving || voucherLoading} onPress={onContinue} style={[styles.giftCardContinueButton, (saving || voucherLoading) && styles.giftCardButtonDisabled]}><ThemedText style={styles.buttonText}>Continuar</ThemedText></Pressable>}
+      {appliedGiftCards.map((giftCard, index) => <View key={(giftCard.id || giftCard.redemptionCode) + '-' + index} style={styles.giftCardRow}>
+        <View style={styles.giftCardDetails}>
+          <ThemedText style={styles.giftCardCode}>{giftCard.redemptionCode.toUpperCase()}</ThemedText>
+          <ThemedText style={styles.giftCardAmount}>{money(giftCardAppliedValue(giftCard))}</ThemedText>
+        </View>
+        <Pressable disabled={saving || removingGiftCard === giftCard.redemptionCode} onPress={() => onRemove(giftCard)}>
+          <ThemedText style={styles.giftCardRemove}>{removingGiftCard === giftCard.redemptionCode ? 'Removendo...' : 'Remover'}</ThemedText>
+        </Pressable>
+      </View>)}
+      {appliedGiftCards.length > 0 && !canContinue && <ThemedText style={styles.giftCardRemaining}>Pagamento restante de {money(remainingValue)}. Por favor, combine com outra forma de pagamento</ThemedText>}
+      {!!voucherMessage && <ThemedText style={voucherMessageType === 'success' ? styles.successText : styles.errorText}>{voucherMessage}</ThemedText>}
+      {canContinue && <Pressable disabled={saving || voucherLoading} onPress={onContinue} style={[styles.giftCardContinueButton, (saving || voucherLoading) && styles.giftCardButtonDisabled]}><ThemedText style={styles.buttonText}>Continuar</ThemedText></Pressable>}
+    </View>
   </View>;
+}
+
+type GiftCardIdentityModalProps = {
+  visible: boolean;
+  checkoutEmail: string;
+  onClose: () => void;
+  onAuthenticated: (email: string) => Promise<void>;
+};
+
+type GiftCardIdentityView = 'choice' | 'password' | 'email' | 'code';
+
+function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthenticated }: GiftCardIdentityModalProps) {
+  const [view, setView] = useState<GiftCardIdentityView>('choice');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [authenticationToken, setAuthenticationToken] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    setView('choice');
+    setEmail(checkoutEmail.trim().toLowerCase());
+    setPassword('');
+    setAccessCode('');
+    setAuthenticationToken('');
+    setLoading(false);
+    setMessage('');
+  }, [visible, checkoutEmail]);
+
+  function ensureIdentityEmail() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!validEmail(normalizedEmail)) {
+      setMessage('Informe um e-mail válido.');
+      return '';
+    }
+    if (normalizedEmail !== checkoutEmail.trim().toLowerCase()) {
+      setMessage('Use o mesmo e-mail informado no checkout.');
+      return '';
+    }
+    return normalizedEmail;
+  }
+
+  async function authenticate(normalizedEmail: string, action: () => Promise<void>) {
+    try {
+      setMessage('');
+      setLoading(true);
+      await action();
+      await saveAccountSession(normalizedEmail);
+      await onAuthenticated(normalizedEmail);
+      onClose();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível confirmar sua identidade.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitPassword() {
+    const normalizedEmail = ensureIdentityEmail();
+    if (!normalizedEmail) return;
+    if (!password.trim()) {
+      setMessage('Informe sua senha.');
+      return;
+    }
+    await authenticate(normalizedEmail, () => loginVtexPassword(normalizedEmail, password).then(() => undefined));
+  }
+
+  async function requestCode() {
+    const normalizedEmail = ensureIdentityEmail();
+    if (!normalizedEmail) return;
+    await authenticateCodeRequest(normalizedEmail);
+  }
+
+  async function authenticateCodeRequest(normalizedEmail: string) {
+    try {
+      setMessage('');
+      setLoading(true);
+      const token = await startVtexAuthentication();
+      await sendVtexAccessKey(normalizedEmail, token);
+      setAuthenticationToken(token);
+      setAccessCode('');
+      setView('code');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível enviar o código.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function validateCode() {
+    const normalizedEmail = ensureIdentityEmail();
+    if (!normalizedEmail) return;
+    if (!accessCode.trim()) {
+      setMessage('Informe o código enviado para o seu e-mail.');
+      return;
+    }
+    await authenticate(normalizedEmail, () => validateVtexAccessKey(normalizedEmail, accessCode.trim(), authenticationToken).then(() => undefined));
+  }
+
+  async function resendCode() {
+    const normalizedEmail = ensureIdentityEmail();
+    if (!normalizedEmail) return;
+    await authenticateCodeRequest(normalizedEmail);
+  }
+
+  const title = view === 'choice' ? 'Use uma das opções para confirmar sua identidade' : view === 'password' ? 'Login com e-mail e senha' : view === 'email' ? 'Receba seu código de acesso' : 'Digite o código enviado por e-mail';
+  return <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+    <View style={styles.modalOverlay}><ThemedView style={styles.giftCardIdentityModalCard}>
+      <View style={styles.giftCardIdentityHeader}><ThemedText style={styles.giftCardIdentityTitle}>{title}</ThemedText><Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.giftCardIdentityClose}><ThemedText style={styles.giftCardIdentityCloseText}>×</ThemedText></Pressable></View>
+      {view === 'choice' && <>
+        <ThemedText style={styles.bodyText} themeColor="textSecondary">Para exibir os créditos vinculados ao seu e-mail, confirme sua identidade.</ThemedText>
+        <Pressable disabled={loading} onPress={() => { setMessage(''); setView('email'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Receber código de acesso por e-mail</ThemedText></Pressable>
+        <Pressable disabled={loading} onPress={() => { setMessage(''); setView('password'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Entrar com e-mail e senha</ThemedText></Pressable>
+      </>}
+      {view === 'password' && <>
+        <Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" placeholder="seu@email.com" />
+        <View style={styles.field}><ThemedText style={styles.fieldLabel}>Senha</ThemedText><TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Digite sua senha" placeholderTextColor="#96918b" style={styles.input} /></View>
+        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
+        <View style={styles.giftCardIdentityActionRow}><Pressable disabled={loading} onPress={() => setView('choice')} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Voltar</ThemedText></Pressable><Pressable disabled={loading} onPress={() => { void submitPassword(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Entrar</ThemedText>}</Pressable></View>
+      </>}
+      {view === 'email' && <>
+        <Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" placeholder="seu@email.com" />
+        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
+        <Pressable disabled={loading} onPress={() => { void requestCode(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Enviar código</ThemedText>}</Pressable>
+        <Pressable disabled={loading} onPress={() => setView('choice')} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Voltar</ThemedText></Pressable>
+      </>}
+      {view === 'code' && <>
+        <ThemedText style={styles.bodyText} themeColor="textSecondary">Enviamos um código para {email}.</ThemedText>
+        <View style={styles.field}><ThemedText style={styles.fieldLabel}>Código de acesso</ThemedText><TextInput value={accessCode} onChangeText={setAccessCode} keyboardType="numeric" autoCapitalize="none" autoCorrect={false} placeholder="Digite o código" placeholderTextColor="#96918b" style={styles.input} /></View>
+        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
+        <Pressable disabled={loading} onPress={() => { void validateCode(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Confirmar e exibir créditos</ThemedText>}</Pressable>
+        <Pressable disabled={loading} onPress={() => { void resendCode(); }} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Reenviar código</ThemedText></Pressable>
+        <Pressable disabled={loading} onPress={() => setView('email')}><ThemedText style={styles.link}>Alterar e-mail</ThemedText></Pressable>
+      </>}
+    </ThemedView></View>
+  </Modal>;
 }
 
 function GiftCardPaymentReview({ giftCards }: { giftCards: GiftCard[] }) {
@@ -2111,6 +2409,12 @@ const styles = StyleSheet.create({
   progressLabel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.one },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#e3ded5' },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: '#2f8f5b' },
+  giftCardSection: { gap: Spacing.two },
+  giftCardNotice: { minHeight: 54, justifyContent: 'center', paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#1b100c' },
+  giftCardNoticeText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 19, fontWeight: '700', textDecorationLine: 'underline' },
+  giftCardLookup: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.two, borderRadius: 8, backgroundColor: '#f8f6f2' },
+  availableGiftCardsCard: { gap: Spacing.two, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
+  availableGiftCardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.two, borderTopWidth: 1, borderTopColor: '#ece8e2' },
   paymentCard: { gap: 6, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
   paymentHeader: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, justifyContent: 'space-between' },
   paymentDivider: { height: 1, backgroundColor: '#eeeae5' },
@@ -2210,4 +2514,11 @@ const styles = StyleSheet.create({
   modalTitle: { textAlign: 'center', lineHeight: 26, fontSize: 18, marginBottom: Spacing.two, fontFamily: Fonts.bold, fontWeight: '700' },
   modalDeleteButton: { minHeight: 48, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   modalCancelButton: { minHeight: 48, borderRadius: 4, borderWidth: 1, borderColor: '#4c433c', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  giftCardIdentityModalCard: { width: '100%', maxWidth: 360, gap: Spacing.two, padding: Spacing.four, borderRadius: 8, backgroundColor: '#FFFFFF' },
+  giftCardIdentityHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
+  giftCardIdentityTitle: { flex: 1, fontFamily: Fonts.bold, fontSize: 17, lineHeight: 23, fontWeight: '700' },
+  giftCardIdentityClose: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  giftCardIdentityCloseText: { color: '#2f2d2b', fontSize: 25, lineHeight: 27 },
+  giftCardIdentityPrimary: { minHeight: 48, flex: 1, paddingHorizontal: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1b100c' },
+  giftCardIdentityActionRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'stretch' },
 });

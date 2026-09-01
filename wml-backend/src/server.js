@@ -519,6 +519,116 @@ async function searchCustomerByEmail(email) {
   return normalizeProfile(match);
 }
 
+function giftCardSearchItems(body) {
+  if (Array.isArray(body)) return body;
+  if (!body || typeof body !== 'object') return [];
+  return Array.isArray(body.items) ? body.items : Array.isArray(body.giftCards) ? body.giftCards : [];
+}
+
+function giftCardSearchCart(orderForm) {
+  const items = (Array.isArray(orderForm?.items) ? orderForm.items : []).map((item) => ({
+    productId: String(item?.productId || item?.id || '').trim(),
+    id: String(item?.id || item?.productId || '').trim(),
+    refId: String(item?.refId || item?.productRefId || item?.id || item?.productId || '').trim(),
+    name: String(item?.name || '').trim(),
+    price: Number(item?.price || 0),
+    quantity: Math.max(0, Number(item?.quantity || 0)),
+  })).filter((item) => item.productId && item.id && item.quantity > 0);
+  const itemsTotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
+  const shipping = (Array.isArray(orderForm?.shippingData?.logisticsInfo) ? orderForm.shippingData.logisticsInfo : [])
+    .reduce((total, info) => {
+      const selected = (Array.isArray(info?.slas) ? info.slas : []).find((sla) => sla?.id === info?.selectedSla) || info?.slas?.[0];
+      return total + Number(selected?.price || 0);
+    }, 0);
+  return {
+    grandTotal: Number(orderForm?.value || 0),
+    relationName: null,
+    redemptionCode: '',
+    discounts: 0,
+    shipping,
+    taxes: 0,
+    items,
+    itemsTotal,
+  };
+}
+
+function giftCardIsUsable(card) {
+  const balance = Number(card?.balance || 0);
+  if (!Number.isFinite(balance) || balance <= 0) return false;
+  const expiration = String(card?.expiringDate || '').trim();
+  if (!expiration) return true;
+  const expirationTime = Date.parse(expiration);
+  return !Number.isFinite(expirationTime) || expirationTime > Date.now();
+}
+
+function publicGiftCard(card) {
+  return {
+    id: String(card?.id || '').trim(),
+    redemptionCode: String(card?.redemptionCode || '').trim(),
+    value: 0,
+    balance: Number(card?.balance || 0),
+    caption: String(card?.caption || card?.relationName || '').trim() || null,
+    name: String(card?.name || '').trim() || null,
+    provider: String(card?.provider || '').trim() || null,
+    groupName: String(card?.groupName || '').trim() || null,
+    inUse: false,
+    isSpecialCard: card?.isSpecialCard === true,
+    expiringDate: String(card?.expiringDate || '').trim() || null,
+  };
+}
+
+async function giftCardsForOrderForm(orderForm, email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const profileEmail = String(orderForm?.clientProfileData?.email || '').trim().toLowerCase();
+  if (!normalizedEmail || !profileEmail || profileEmail !== normalizedEmail) {
+    throw new Error('O e-mail do carrinho não corresponde ao perfil informado.');
+  }
+  const profileId = String(orderForm?.userProfileId || '').trim() || normalizedEmail;
+  const client = {
+    id: profileId,
+    email: normalizedEmail,
+    document: digits(orderForm?.clientProfileData?.document || ''),
+  };
+  if (!client.document) {
+    // The Giftcard API requires the document field even when the profile is
+    // identified by e-mail. An empty value is accepted by the endpoint and
+    // keeps the lookup read-only for profiles whose CPF is not in the cart.
+    client.document = '';
+  }
+
+  const searchResult = await fetch(`${vtexBaseUrl}/api/giftcards/_search`, {
+    method: 'POST',
+    headers: {
+      ...vtexHeaders(),
+      'Content-Type': 'application/json',
+      'REST-Range': 'resources=0-49',
+    },
+    body: JSON.stringify({ cart: giftCardSearchCart(orderForm), client }),
+  });
+  const searchBody = await readResponseBody(searchResult);
+  if (!searchResult.ok) {
+    throw new Error(vtexErrorMessage(searchBody, `A VTEX não conseguiu consultar os créditos (HTTP ${searchResult.status}).`));
+  }
+
+  const summaries = giftCardSearchItems(searchBody).slice(0, 50);
+  const cards = await Promise.all(summaries.map(async (summary) => {
+    const id = String(summary?.id || '').trim();
+    if (!id) return null;
+    const detailResult = await fetch(`${vtexBaseUrl}/api/giftcards/${encodeURIComponent(id)}`, { headers: vtexHeaders() }).catch(() => null);
+    if (!detailResult?.ok) return giftCardIsUsable(summary) ? summary : null;
+    const detail = await readResponseBody(detailResult);
+    const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
+    return giftCardIsUsable(card) ? card : null;
+  }));
+
+  return cards.filter(Boolean).map(publicGiftCard).filter((card) => (
+    card.id
+    && card.redemptionCode
+    && !card.redemptionCode.includes('*')
+    && card.balance > 0
+  ));
+}
+
 async function resolveCustomerProfile(email) {
   const masterDataProfile = await searchCustomerByEmail(email).catch(() => null);
   const needsCheckoutFallback = !masterDataProfile
@@ -941,6 +1051,70 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
       ok: false,
       message: error instanceof Error ? error.message : 'Não foi possível identificar o cliente no Checkout VTEX.',
     });
+  }
+});
+
+async function loadGiftCardOrderForm(orderFormId, userToken = '') {
+  const result = await requestCheckout(
+    `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}`,
+    {
+      userToken,
+      cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
+      // Availability is read-only. When there is no shopper session, the
+      // backend app credentials are the same protected context used by the
+      // existing profile lookup.
+      fallbackToAppAuth: !userToken,
+      fallbackWithoutUserToken: !userToken,
+    },
+  );
+  rememberCheckoutOwnershipCookie(orderFormId, result);
+  const body = await readResponseBody(result);
+  if (!result.ok) {
+    throw new Error(vtexErrorMessage(body, `A VTEX não conseguiu consultar o carrinho (HTTP ${result.status}).`));
+  }
+  return body;
+}
+
+app.post('/checkout/order-form/:orderFormId/gift-cards/availability', async (request, response) => {
+  const orderFormId = String(request.params.orderFormId || '').trim();
+  const email = String(request.body?.email || '').trim().toLowerCase();
+  if (!isSafeCheckoutId(orderFormId) || !email || !email.includes('@')) {
+    return response.status(400).json({ ok: false, message: 'Carrinho ou e-mail inválido.' });
+  }
+
+  try {
+    const orderForm = await loadGiftCardOrderForm(orderFormId);
+    const cards = await giftCardsForOrderForm(orderForm, email);
+    console.info(`[CHECKOUT] gift-card availability -> orderForm=${orderFormId} email=${email} available=${cards.length > 0}`);
+    // Do not return card ids, codes, balances, or profile data before the
+    // shopper confirms the identity with VTEX ID.
+    return response.json({ ok: true, available: cards.length > 0 });
+  } catch (error) {
+    console.warn(`[CHECKOUT] gift-card availability failed -> orderForm=${orderFormId}`);
+    return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Não foi possível consultar os créditos.' });
+  }
+});
+
+app.post('/checkout/order-form/:orderFormId/gift-cards', async (request, response) => {
+  const orderFormId = String(request.params.orderFormId || '').trim();
+  const email = String(request.body?.email || '').trim().toLowerCase();
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  const authenticatedEmail = customerEmailForToken(userToken);
+  if (!isSafeCheckoutId(orderFormId) || !email || !email.includes('@')) {
+    return response.status(400).json({ ok: false, message: 'Carrinho ou e-mail inválido.' });
+  }
+  if (!userToken || !authenticatedEmail || authenticatedEmail !== email) {
+    return response.status(401).json({ ok: false, message: 'Confirme sua identidade para consultar os créditos.' });
+  }
+
+  try {
+    const orderForm = await loadGiftCardOrderForm(orderFormId, userToken);
+    const cards = await giftCardsForOrderForm(orderForm, email);
+    console.info(`[CHECKOUT] gift-card details -> orderForm=${orderFormId} email=${email} count=${cards.length}`);
+    return response.json({ ok: true, giftCards: cards });
+  } catch (error) {
+    console.warn(`[CHECKOUT] gift-card details failed -> orderForm=${orderFormId}`);
+    return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Não foi possível carregar os créditos.' });
   }
 });
 

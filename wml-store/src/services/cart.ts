@@ -1103,6 +1103,51 @@ export async function identifyExistingCustomerByEmail(
   return normalizedOrderForm;
 }
 
+export async function checkGiftCardAvailability(orderFormId: string, email: string): Promise<boolean> {
+  const response = await fetch(
+    `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/gift-cards/availability`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    },
+  ).catch(() => null);
+  if (!response) throw new Error('Não foi possível consultar os créditos do cliente.');
+  const payload = await response.json().catch(() => ({})) as { available?: boolean; message?: string };
+  if (!response.ok) throw new Error(payload.message || `Não foi possível consultar os créditos (HTTP ${response.status}).`);
+  return payload.available === true;
+}
+
+export async function getCustomerGiftCards(orderFormId: string, email: string): Promise<GiftCard[]> {
+  const authHeaders = await userTokenHeaders();
+  const response = await fetch(
+    `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/gift-cards`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    },
+  ).catch(() => null);
+  if (!response) throw new Error('Não foi possível carregar os créditos do cliente.');
+  const payload = await response.json().catch(() => ({})) as {
+    giftCards?: Array<Partial<GiftCard>>;
+    message?: string;
+  };
+  if (!response.ok) throw new Error(payload.message || `Não foi possível carregar os créditos (HTTP ${response.status}).`);
+  return (Array.isArray(payload.giftCards) ? payload.giftCards : []).map((giftCard) => ({
+    redemptionCode: String(giftCard.redemptionCode || '').trim(),
+    value: Number(giftCard.value || 0),
+    balance: Number(giftCard.balance || 0),
+    name: giftCard.name || null,
+    caption: giftCard.caption || null,
+    id: giftCard.id || null,
+    provider: giftCard.provider || null,
+    groupName: giftCard.groupName || null,
+    inUse: giftCard.inUse === true,
+    isSpecialCard: giftCard.isSpecialCard === true,
+  })).filter((giftCard) => giftCard.redemptionCode || giftCard.id);
+}
+
 export async function removeGiftCardFromCart(
   orderFormId: string,
   giftCardToRemove: Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>,
