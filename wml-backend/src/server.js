@@ -3,6 +3,7 @@ import cors from 'cors';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isGiftCardPaymentData, shopperTokenForPaymentData } from './checkout-context.js';
 import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
 
 const app = express();
@@ -375,6 +376,17 @@ function sessionCookieForToken(token = '') {
   for (const stored of customerVtexSessions.values()) {
     if (stored?.authToken === requestedToken || tokenFromCookie(stored?.cookieHeader) === requestedToken) {
       return stored?.cookieHeader || '';
+    }
+  }
+  return '';
+}
+
+function customerEmailForToken(token = '') {
+  const requestedToken = String(token || '').trim();
+  if (!requestedToken) return '';
+  for (const [email, stored] of customerVtexSessions.entries()) {
+    if (stored?.authToken === requestedToken || tokenFromCookie(stored?.cookieHeader) === requestedToken) {
+      return String(email || '').trim().toLowerCase();
     }
   }
   return '';
@@ -861,7 +873,6 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
   const email = String(request.body?.email || '').trim().toLowerCase();
   const requestedSalesChannel = String(request.body?.salesChannel || '1').trim();
   const salesChannel = /^\d+$/.test(requestedSalesChannel) ? requestedSalesChannel : '1';
-  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
   if (!isSafeCheckoutId(orderFormId) || !email) {
     return response.status(400).json({ ok: false, message: 'Carrinho ou e-mail inválido.' });
   }
@@ -871,11 +882,11 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
     // o perfil pelo e-mail e depois anexa SOMENTE o e-mail ao orderForm. Enviar
     // nome, CPF e telefone nesta segunda chamada faz a VTEX tratar os dados como
     // perfil de convidado em alguns contextos e o userProfileId não é vinculado.
+    // A sessão VTEX ID do aparelho não participa: o titular é o e-mail informado.
     const profileUrl = new URL(`${vtexBaseUrl}/api/checkout/pub/profiles`);
     profileUrl.searchParams.set('email', email);
     profileUrl.searchParams.set('sc', salesChannel);
     const profileResult = await requestCheckout(profileUrl.toString(), {
-      userToken,
       fallbackToAppAuth: true,
       fallbackWithoutUserToken: true,
     });
@@ -899,7 +910,6 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
       {
         method: 'POST',
-        userToken,
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
         fallbackToAppAuth: true,
@@ -941,7 +951,6 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
   }
 
   const source = request.body && typeof request.body === 'object' ? request.body : {};
-  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
   const profile = {
     email: String(source.email || '').trim(),
     ...(source.firstName ? { firstName: String(source.firstName).trim() } : {}),
@@ -960,7 +969,6 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
       `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/clientProfileData`,
       {
         method: 'POST',
-        userToken,
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
         fallbackToAppAuth: true,
@@ -993,7 +1001,19 @@ app.post('/checkout/order-form/:orderFormId/payment-data', async (request, respo
   }
 
   const paymentData = request.body && typeof request.body === 'object' ? request.body : {};
-  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  const requestedGiftCards = (Array.isArray(paymentData.giftCards) ? paymentData.giftCards : [])
+    .filter((giftCard) => giftCard?.inUse && (giftCard?.redemptionCode || giftCard?.id));
+  const requestUserToken = String(request.headers.vtexidclientautcookie || '').trim();
+  const checkoutProfileEmail = String(request.headers['x-checkout-profile-email'] || '').trim().toLowerCase();
+  const claimedAccountEmail = String(request.headers['x-checkout-account-email'] || '').trim().toLowerCase();
+  const accountEmail = customerEmailForToken(requestUserToken) || claimedAccountEmail;
+  const userToken = shopperTokenForPaymentData(
+    paymentData,
+    requestUserToken,
+    checkoutProfileEmail,
+    accountEmail,
+  );
+  const giftCardFlow = isGiftCardPaymentData(paymentData);
   try {
     const paymentDataUrl = `${vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`;
     const serializedPaymentData = JSON.stringify(paymentData);
@@ -1004,15 +1024,13 @@ app.post('/checkout/order-form/:orderFormId/payment-data', async (request, respo
         userToken,
         contentType: true,
         cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
-        fallbackToAppAuth: true,
+        fallbackToAppAuth: !giftCardFlow,
         body: serializedPaymentData,
       },
     );
     rememberCheckoutOwnershipCookie(orderFormId, result);
-    let body = await readResponseBody(result);
+    const body = await readResponseBody(result);
 
-    const requestedGiftCards = (Array.isArray(paymentData.giftCards) ? paymentData.giftCards : [])
-      .filter((giftCard) => giftCard?.inUse && (giftCard?.redemptionCode || giftCard?.id));
     const returnedGiftCards = Array.isArray(body?.paymentData?.giftCards) ? body.paymentData.giftCards : [];
     const checkoutMessages = [
       ...(Array.isArray(body?.paymentData?.giftCardMessages) ? body.paymentData.giftCardMessages : []),
@@ -1025,27 +1043,16 @@ app.post('/checkout/order-form/:orderFormId/payment-data', async (request, respo
     const giftCardWasNotApplied = requestedGiftCards.length > 0
       && !returnedGiftCards.some((giftCard) => giftCard?.inUse === true);
 
-    // A VTEX pode responder 200 e registrar a falha apenas em messages. Isso
-    // impede o fallback HTTP normal. Repetimos uma única vez com as credenciais
-    // do backend, preservando a identidade do titular usada na primeira chamada.
-    if (result.ok && giftCardWasNotApplied && unavailableGiftCardPayment && hasVtexPaymentCredentials()) {
-      console.warn('[CHECKOUT] gift-card unavailable in shopper context; retrying with app auth', {
+    // A VTEX registra algumas recusas de vale em messages mesmo retornando 200.
+    // Não repetimos com app auth: isso substituiria o perfil convidado vinculado
+    // ao orderForm por uma identidade técnica ou pela conta logada no aparelho.
+    if (result.ok && giftCardWasNotApplied) {
+      console.warn('[CHECKOUT] gift-card not applied in checkout profile context', {
         orderFormId,
         requestedGiftCardCount: requestedGiftCards.length,
+        ownershipCookiePresent: Boolean(checkoutOwnershipCookieForOrderForm(orderFormId)),
         shopperAuthPresent: Boolean(userToken),
-      });
-      result = await fetch(paymentDataUrl, {
-        method: 'POST',
-        headers: checkoutHeaders(userToken, true, checkoutOwnershipCookieForOrderForm(orderFormId)),
-        body: serializedPaymentData,
-      });
-      rememberCheckoutOwnershipCookie(orderFormId, result);
-      body = await readResponseBody(result);
-      console.info('[CHECKOUT] gift-card app-auth retry completed', {
-        orderFormId,
-        status: result.status,
-        inUseCount: (Array.isArray(body?.paymentData?.giftCards) ? body.paymentData.giftCards : [])
-          .filter((giftCard) => giftCard?.inUse === true).length,
+        unavailableMessagePresent: unavailableGiftCardPayment,
       });
     }
 

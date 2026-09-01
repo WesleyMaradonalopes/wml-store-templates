@@ -1,7 +1,7 @@
 import { storeConfig } from '@/config/store';
 
 import { getStoredJson, removeStoredValue, setStoredJson } from './storage';
-import { getVtexUserToken } from './auth';
+import { getAccountSession, getVtexUserToken } from './auth';
 
 export type CartOffering = {
   id: string;
@@ -349,6 +349,31 @@ async function userTokenHeaders(): Promise<Record<string, string>> {
   return token ? { VtexIdclientAutCookie: token } : {};
 }
 
+async function paymentProfileHeaders(profileEmail = ''): Promise<{
+  authHeaders: Record<string, string>;
+  backendHeaders: Record<string, string>;
+}> {
+  const normalizedProfileEmail = profileEmail.trim().toLowerCase();
+  if (!normalizedProfileEmail) {
+    const authHeaders = await userTokenHeaders();
+    return { authHeaders, backendHeaders: authHeaders };
+  }
+
+  const [token, session] = await Promise.all([getVtexUserToken(), getAccountSession()]);
+  const accountEmail = session?.email?.trim().toLowerCase() ?? '';
+  const authHeaders: Record<string, string> = token && accountEmail === normalizedProfileEmail
+    ? { VtexIdclientAutCookie: token }
+    : {};
+  return {
+    authHeaders,
+    backendHeaders: {
+      ...authHeaders,
+      'X-Checkout-Profile-Email': normalizedProfileEmail,
+      ...(accountEmail ? { 'X-Checkout-Account-Email': accountEmail } : {}),
+    },
+  };
+}
+
 async function checkoutFetch(url: string, init: RequestInit = {}) {
   const baseHeaders = { 'Cache-Control': 'no-cache', Pragma: 'no-cache', ...(init.headers || {}) };
   // O Checkout da VTEX aceita o orderForm público mesmo quando o cliente está
@@ -361,14 +386,20 @@ async function checkoutFetch(url: string, init: RequestInit = {}) {
   return fetch(url, { ...init, cache: 'no-store', headers: { ...authHeaders, ...baseHeaders } });
 }
 
-async function paymentDataFetch(orderFormId: string, init: RequestInit = {}) {
+async function paymentDataFetch(orderFormId: string, init: RequestInit = {}, profileEmail = '') {
   const baseHeaders = { 'Cache-Control': 'no-cache', Pragma: 'no-cache', ...(init.headers || {}) };
-  const authHeaders = await userTokenHeaders();
+  const { authHeaders, backendHeaders } = await paymentProfileHeaders(profileEmail);
   const backendResponse = await fetch(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/payment-data`,
-    { ...init, cache: 'no-store', headers: { ...authHeaders, ...baseHeaders } },
+    { ...init, cache: 'no-store', headers: { ...backendHeaders, ...baseHeaders } },
   ).catch(() => null);
   if (backendResponse) return backendResponse;
+  if (profileEmail) {
+    return fetch(
+      `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`,
+      { ...init, cache: 'no-store', headers: { ...authHeaders, ...baseHeaders } },
+    );
+  }
   return checkoutFetch(
     `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(orderFormId)}/attachments/paymentData`,
     init,
@@ -615,6 +646,7 @@ export async function selectPaymentMethod({
   installments = 1,
   installmentsInterestRate = 0,
   giftCards,
+  profileEmail = '',
 }: {
   orderFormId: string;
   paymentSystem: string;
@@ -622,6 +654,7 @@ export async function selectPaymentMethod({
   installments?: number;
   installmentsInterestRate?: number;
   giftCards?: GiftCard[];
+  profileEmail?: string;
 }): Promise<OrderForm> {
   const attachedGiftCards = (giftCards ?? [])
     .filter((giftCard) => giftCard.inUse && (giftCard.redemptionCode || giftCard.id))
@@ -646,7 +679,7 @@ export async function selectPaymentMethod({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ payments: [], giftCards: [] }),
-    });
+    }, profileEmail);
     const clearErrorBody = !clearResponse.ok
       ? await clearResponse.clone().json().catch(() => null) as VtexOrderForm | null
       : null;
@@ -671,7 +704,7 @@ export async function selectPaymentMethod({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(paymentData),
-  });
+  }, profileEmail);
 
   const errorBody = !response.ok
     ? await response.clone().json().catch(() => null) as VtexOrderForm | null
@@ -998,6 +1031,7 @@ export async function addGiftCardToCart(
   redemptionCode: string,
   existingGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
   payments: PaymentDataPayment[] = [],
+  profileEmail = '',
 ): Promise<OrderForm> {
   const giftCards = [
     ...existingGiftCards
@@ -1011,7 +1045,7 @@ export async function addGiftCardToCart(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payments, giftCards }),
-  });
+  }, profileEmail);
   const errorBody = !response.ok
     ? await response.clone().json().catch(() => null) as VtexOrderForm | null
     : null;
@@ -1074,6 +1108,7 @@ export async function removeGiftCardFromCart(
   giftCardToRemove: Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>,
   currentGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
   payments: PaymentDataPayment[] = [],
+  profileEmail = '',
 ): Promise<OrderForm> {
   const targetCode = normalizeGiftCardCode(giftCardToRemove.redemptionCode);
   const targetId = String(giftCardToRemove.id || '').trim();
@@ -1092,7 +1127,7 @@ export async function removeGiftCardFromCart(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payments, giftCards }),
-  });
+  }, profileEmail);
   const errorBody = !response.ok
     ? await response.clone().json().catch(() => null) as VtexOrderForm | null
     : null;

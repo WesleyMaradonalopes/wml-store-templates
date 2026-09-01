@@ -24,7 +24,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BEST_SELLING_PRODUCTS_SHELF, RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
-import { getAccountSession, getVtexUserToken } from '@/services/auth';
+import { getAccountSession } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, addItemOffering, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
@@ -965,7 +965,7 @@ export default function CheckoutScreen() {
     setSaving(true);
     setMessage('');
     try {
-      const updatedOrderForm = await selectPaymentMethod({ orderFormId: orderForm.orderFormId, paymentSystem, value: orderForm.value, giftCards: activeGiftCards(orderForm) });
+      const updatedOrderForm = await selectPaymentMethod({ orderFormId: orderForm.orderFormId, paymentSystem, value: orderForm.value, giftCards: activeGiftCards(orderForm), profileEmail: email });
       setOrderForm(updatedOrderForm);
       const requestedSiteKey = getRecaptchaSiteKey(updatedOrderForm);
       if (requestedSiteKey) setRecaptchaSiteKey(requestedSiteKey);
@@ -1024,6 +1024,7 @@ export default function CheckoutScreen() {
         installments: option.count,
         installmentsInterestRate: option.interestRate,
         giftCards: activeGiftCards(orderForm),
+        profileEmail: email,
       });
       setOrderForm(updatedOrderForm);
       setSelectedInstallment(option);
@@ -1061,6 +1062,7 @@ export default function CheckoutScreen() {
         installments: paymentKind === 'card' ? selectedInstallment?.count ?? 1 : 1,
         installmentsInterestRate: paymentKind === 'card' ? selectedInstallment?.interestRate ?? 0 : 0,
         giftCards: activeGiftCards(paymentOrderForm),
+        profileEmail: email,
       });
       setOrderForm(paymentOrderForm);
       let activeRecaptchaSiteKey = getRecaptchaSiteKey(paymentOrderForm) || recaptchaSiteKey;
@@ -1270,16 +1272,6 @@ export default function CheckoutScreen() {
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
-      const [accountSession, userToken] = await Promise.all([getAccountSession(), getVtexUserToken()]);
-      const accountEmail = accountSession?.email?.trim().toLowerCase() ?? '';
-      const checkoutEmail = email.trim().toLowerCase();
-      if (!userToken || !accountEmail) {
-        throw new Error('Para usar um vale-presente vinculado ao CPF, entre na conta do titular com o mesmo e-mail informado no checkout.');
-      }
-      if (accountEmail !== checkoutEmail) {
-        throw new Error('Você está conectado com outro e-mail. Saia da conta atual e entre na conta do titular do vale-presente.');
-      }
-
       let giftCardOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
       console.info('[GIFT CARD] applying to orderForm', {
         orderFormId: giftCardOrderForm.orderFormId,
@@ -1289,7 +1281,7 @@ export default function CheckoutScreen() {
         const giftCardApplied = activeGiftCards(targetOrderForm);
         // Nesta tela ainda não existe uma segunda forma selecionada. Reenviar
         // payments antigos faz a VTEX rejeitar o vale como pagamento indisponível.
-        return addGiftCardToCart(targetOrderForm.orderFormId, redemptionCode, giftCardApplied, []);
+        return addGiftCardToCart(targetOrderForm.orderFormId, redemptionCode, giftCardApplied, [], email);
       };
       let updatedOrderForm: OrderForm;
       try {
@@ -1335,7 +1327,7 @@ export default function CheckoutScreen() {
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
-      setOrderForm(await removeGiftCardFromCart(orderForm.orderFormId, giftCard, appliedGiftCards, orderForm.paymentData?.payments ?? []));
+      setOrderForm(await removeGiftCardFromCart(orderForm.orderFormId, giftCard, appliedGiftCards, orderForm.paymentData?.payments ?? [], email));
     } catch (error) {
       if (isGiftCardOwnershipError(error)) {
         try {
