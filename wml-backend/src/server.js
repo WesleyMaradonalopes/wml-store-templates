@@ -3,6 +3,7 @@ import cors from 'cors';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
 
 const app = express();
 const port = Number(process.env.PORT || 6001);
@@ -296,13 +297,9 @@ function normalizeTransactionStatus(body) {
 }
 
 function extractSetCookie(response) {
-  if (typeof response.headers.getSetCookie === 'function') return response.headers.getSetCookie().join(', ');
-  return response.headers.get('set-cookie') || '';
-}
-
-function extractCookieValue(cookieHeader, name) {
-  const match = String(cookieHeader || '').match(new RegExp(`${name}=([^;]+)`, 'i'));
-  return match?.[1] || '';
+  if (typeof response.headers.getSetCookie === 'function') return response.headers.getSetCookie();
+  const header = response.headers.get('set-cookie');
+  return header ? [header] : [];
 }
 
 function transactionAuthCookie(response) {
@@ -313,10 +310,6 @@ function transactionAuthCookie(response) {
     vtexAuth ? `Vtex_CHKO_Auth=${vtexAuth}` : '',
     checkoutAccess ? `CheckoutDataAccess=${checkoutAccess}` : '',
   ].filter(Boolean).join('; ');
-}
-
-function normalizeCookieHeader(raw) {
-  return String(raw || '').split(/,(?=[A-Za-z0-9_.-]+=)/).map((part) => part.trim().split(';')[0]).filter(Boolean).join('; ');
 }
 
 function withoutVtexIdClientAuthCookie(cookieHeader) {
@@ -353,7 +346,8 @@ function rememberCheckoutOwnershipCookie(orderFormId, response) {
   if (!received) return;
   const merged = mergeCookieHeaders(checkoutOwnershipCookieForOrderForm(key), received);
   checkoutOwnershipCookies.set(key, { cookieHeader: merged, updatedAt: Date.now() });
-  console.info(`[CHECKOUT] ownership cookie stored -> orderForm=${key}`);
+  const ownershipStored = merged.split(';').some((cookie) => /^\s*CheckoutOrderFormOwnership=/i.test(cookie));
+  console.info(`[CHECKOUT] checkout cookies stored -> orderForm=${key} ownership=${ownershipStored}`);
 }
 
 function tokenFromCookie(cookieHeader) {
@@ -1032,16 +1026,17 @@ app.post('/checkout/order-form/:orderFormId/payment-data', async (request, respo
       && !returnedGiftCards.some((giftCard) => giftCard?.inUse === true);
 
     // A VTEX pode responder 200 e registrar a falha apenas em messages. Isso
-    // impede o fallback HTTP normal. Para vale restrito, repetimos uma única
-    // vez com as credenciais do backend e com a identidade já ligada ao cart.
+    // impede o fallback HTTP normal. Repetimos uma única vez com as credenciais
+    // do backend, preservando a identidade do titular usada na primeira chamada.
     if (result.ok && giftCardWasNotApplied && unavailableGiftCardPayment && hasVtexPaymentCredentials()) {
       console.warn('[CHECKOUT] gift-card unavailable in shopper context; retrying with app auth', {
         orderFormId,
         requestedGiftCardCount: requestedGiftCards.length,
+        shopperAuthPresent: Boolean(userToken),
       });
       result = await fetch(paymentDataUrl, {
         method: 'POST',
-        headers: checkoutHeaders('', true, checkoutOwnershipCookieForOrderForm(orderFormId)),
+        headers: checkoutHeaders(userToken, true, checkoutOwnershipCookieForOrderForm(orderFormId)),
         body: serializedPaymentData,
       });
       rememberCheckoutOwnershipCookie(orderFormId, result);

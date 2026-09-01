@@ -24,7 +24,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BEST_SELLING_PRODUCTS_SHELF, RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
-import { getAccountSession } from '@/services/auth';
+import { getAccountSession, getVtexUserToken } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, addItemOffering, clearCart, createFreshOrderForm, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
@@ -1270,6 +1270,16 @@ export default function CheckoutScreen() {
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
+      const [accountSession, userToken] = await Promise.all([getAccountSession(), getVtexUserToken()]);
+      const accountEmail = accountSession?.email?.trim().toLowerCase() ?? '';
+      const checkoutEmail = email.trim().toLowerCase();
+      if (!userToken || !accountEmail) {
+        throw new Error('Para usar um vale-presente vinculado ao CPF, entre na conta do titular com o mesmo e-mail informado no checkout.');
+      }
+      if (accountEmail !== checkoutEmail) {
+        throw new Error('Você está conectado com outro e-mail. Saia da conta atual e entre na conta do titular do vale-presente.');
+      }
+
       let giftCardOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
       console.info('[GIFT CARD] applying to orderForm', {
         orderFormId: giftCardOrderForm.orderFormId,
