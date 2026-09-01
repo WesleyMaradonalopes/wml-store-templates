@@ -395,7 +395,7 @@ export default function ProductScreen() {
                   {currentPrice !== null && <ThemedText type="subtitle" style={styles.bestPrice}>{money(currentPrice)}</ThemedText>}
                 </View>
                 <Pressable accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} disabled={favoriteLoading} onPress={changeFavorite} style={styles.favoriteButton}>
-                  <HeartIcon size={32} color={favorite ? '#C62828' : '#000000'} filled={favorite} />
+                  <HeartIcon size={26} color={favorite ? '#C62828' : '#000000'} filled={favorite} />
                 </Pressable>
               </View>
 
@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
   productHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
   headingText: { flex: 1, gap: 4 },
   productName: { fontSize: 16, lineHeight: 23 },
-  favoriteButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  favoriteButton: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   listPrice: { color: '#8c8781', fontSize: 16, textDecorationLine: 'line-through'  },
 	bestPrice: { color: '#0a0a0a', fontSize: 20},
   selectorGroup: { gap: Spacing.two },
