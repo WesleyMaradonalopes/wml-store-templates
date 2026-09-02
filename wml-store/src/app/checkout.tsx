@@ -410,6 +410,7 @@ export default function CheckoutScreen() {
   const [giftCardCreditsHidden, setGiftCardCreditsHidden] = useState(false);
   const [giftCardIdentityVisible, setGiftCardIdentityVisible] = useState(false);
   const [availableGiftCards, setAvailableGiftCards] = useState<GiftCard[]>([]);
+  const [giftCardVoucherDetails, setGiftCardVoucherDetails] = useState<GiftCard | null>(null);
   const [giftCardDetailsLoading, setGiftCardDetailsLoading] = useState(false);
   const [applyingAvailableGiftCard, setApplyingAvailableGiftCard] = useState<string | null>(null);
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
@@ -492,6 +493,7 @@ export default function CheckoutScreen() {
     setGiftCardIdentityVerified(false);
     setGiftCardCreditsHidden(false);
     setAvailableGiftCards([]);
+    setGiftCardVoucherDetails(null);
     setGiftCardAvailability('unknown');
     giftCardAvailabilityKeyRef.current = '';
   }
@@ -530,6 +532,7 @@ export default function CheckoutScreen() {
       setGiftCardIdentityVerified(Boolean(loggedEmail));
       setGiftCardCreditsHidden(false);
       setAvailableGiftCards([]);
+      setGiftCardVoucherDetails(null);
       giftCardAvailabilityKeyRef.current = '';
       giftCardVerifiedEmailRef.current = loggedEmail;
       setLoading(false);
@@ -566,13 +569,29 @@ export default function CheckoutScreen() {
     let active = true;
     setGiftCardAvailability('loading');
     if (!giftCardIdentityVerified) setAvailableGiftCards([]);
-    void checkGiftCardAvailability(orderForm.orderFormId, email).then(async (available) => {
+    void (async () => {
+      // A conta pode ter sido autenticada antes do checkout. Sincronize o
+      // perfil/CPF antes de consultar e aplicar os créditos, para que o
+      // orderForm usado pelo botão "Usar" seja o mesmo contexto do cliente.
+      let targetOrderForm = orderForm;
+      if (giftCardIdentityVerified) {
+        try {
+          targetOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
+        } catch (error) {
+          console.warn('[GIFT CARD] profile synchronization before availability failed', {
+            orderFormId: orderForm.orderFormId,
+            message: error instanceof Error ? error.message : String(error || ''),
+          });
+        }
+      }
+      if (!active) return;
+      const available = await checkGiftCardAvailability(targetOrderForm.orderFormId, email);
       if (!active) return;
       setGiftCardAvailability(available ? 'available' : 'none');
       if (available && giftCardIdentityVerified) {
-        try { await loadGiftCardDetails(orderForm); } catch { if (active) setGiftCardAvailability('available'); }
+        try { await loadGiftCardDetails(targetOrderForm); } catch { if (active) setGiftCardAvailability('available'); }
       }
-    }).catch(() => {
+    })().catch(() => {
       if (!active) return;
       setGiftCardAvailability('none');
       setAvailableGiftCards([]);
@@ -1382,6 +1401,7 @@ export default function CheckoutScreen() {
   async function applyGiftCardCode(
     redemptionCode: string,
     sourceOrderForm = orderForm,
+    giftCardDetails?: Pick<GiftCard, 'id' | 'provider' | 'isSpecialCard'>,
   ) {
     const normalizedCode = redemptionCode.trim();
     if (!sourceOrderForm || !normalizedCode) return false;
@@ -1402,7 +1422,7 @@ export default function CheckoutScreen() {
         const giftCardApplied = activeGiftCards(targetOrderForm);
         // Nesta tela ainda não existe uma segunda forma selecionada. Reenviar
         // payments antigos faz a VTEX rejeitar o vale como pagamento indisponível.
-        return addGiftCardToCart(targetOrderForm.orderFormId, normalizedCode, giftCardApplied, [], email);
+        return addGiftCardToCart(targetOrderForm.orderFormId, normalizedCode, giftCardApplied, [], email, giftCardDetails);
       };
       let updatedOrderForm: OrderForm;
       try {
@@ -1414,6 +1434,7 @@ export default function CheckoutScreen() {
       }
       setOrderForm(updatedOrderForm);
       setVoucher('');
+      setGiftCardVoucherDetails(null);
       setVoucherMessage('Vale-presente aplicado.');
       setVoucherMessageType('success');
       return true;
@@ -1440,7 +1461,12 @@ export default function CheckoutScreen() {
       setGiftCardIdentityVisible(true);
       return;
     }
-    await applyGiftCardCode(redemptionCode);
+    let applied = await applyGiftCardCode(redemptionCode, orderForm);
+    if (!applied && giftCardVoucherDetails) {
+      // Se o código digitado veio do fallback de um cartão autenticado,
+      // repita com os metadados retornados pela API antes de informar falha.
+      await applyGiftCardCode(redemptionCode, orderForm, giftCardVoucherDetails);
+    }
   }
 
   async function applyAvailableGiftCard(
@@ -1455,12 +1481,30 @@ export default function CheckoutScreen() {
     }
     setApplyingAvailableGiftCard(giftCard.id || redemptionCode);
     try {
-      const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm);
+      // O botão manual envia somente o código e esse continua sendo o
+      // caminho principal para cartões comuns, inclusive os criados pelo
+      // ERP. Alguns cartões restritos retornados pela Giftcard API também
+      // exigem id/provider; nesses casos fazemos uma segunda tentativa com
+      // os metadados do cartão selecionado.
+      let applied = await applyGiftCardCode(redemptionCode, sourceOrderForm);
+      if (!applied && (giftCard.id || giftCard.provider || giftCard.isSpecialCard)) {
+        applied = await applyGiftCardCode(redemptionCode, sourceOrderForm, giftCard);
+      }
       if (applied) {
         // Once the identity is confirmed, the selected credit belongs in the
         // Vale presente card below. Do not leave the same credit duplicated in
         // a separate "Créditos disponíveis" section.
         setAvailableGiftCards([]);
+      } else {
+        // Keep a failed protected-card attempt recoverable through the same
+        // field used by manual entry. Retain the API metadata as well, since
+        // ERP cards may require id/provider when the customer taps Adicionar.
+        setGiftCardVoucherDetails(giftCard);
+        setVoucher(redemptionCode);
+        setGiftCardCreditsHidden(true);
+        setAvailableGiftCards([]);
+        setVoucherMessage('Vale-presente encontrado. Clique em Adicionar para aplicar.');
+        setVoucherMessageType('success');
       }
       return applied;
     } finally {
@@ -1534,6 +1578,7 @@ export default function CheckoutScreen() {
           // no campo manual; o cliente só precisa tocar em "Adicionar".
           const fallbackCode = cardToApply.redemptionCode.trim();
           if (fallbackCode) {
+            setGiftCardVoucherDetails(cardToApply);
             setVoucher(fallbackCode);
             setVoucherMessage('Vale-presente encontrado. Clique em Adicionar para aplicar.');
             setVoucherMessageType('success');
@@ -1872,7 +1917,7 @@ export default function CheckoutScreen() {
        </Pressable>
         <GiftCardPaymentSection
           voucher={voucher}
-         onVoucherChange={(text) => { setVoucher(text.normalize('NFC')); if (voucherMessage) { setVoucherMessage(''); setVoucherMessageType(null); } }}
+         onVoucherChange={(text) => { setVoucher(text.normalize('NFC')); setGiftCardVoucherDetails(null); if (voucherMessage) { setVoucherMessage(''); setVoucherMessageType(null); } }}
          voucherLoading={voucherLoading}
          saving={saving}
          onApply={applyVoucher}

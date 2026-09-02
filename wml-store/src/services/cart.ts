@@ -1043,16 +1043,22 @@ export async function addGiftCardToCart(
   existingGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
   payments: PaymentDataPayment[] = [],
   profileEmail = '',
+  giftCardDetails?: Pick<GiftCard, 'id' | 'provider' | 'isSpecialCard'>,
 ): Promise<OrderForm> {
   const giftCards = [
     ...existingGiftCards
       .filter((giftCard) => giftCard.redemptionCode || giftCard.id)
       .map((giftCard) => giftCardAttachment(giftCard, true)),
-    // A aplicação automática deve reproduzir exatamente a aplicação manual:
-    // enviamos somente o código e deixamos a VTEX resolver id, provider e o
-    // tipo do cartão. Metadados retornados pela busca fazem alguns vales
-    // criados pelo ERP serem recusados como forma de pagamento indisponível.
-    giftCardAttachment({ redemptionCode: redemptionCode.trim() }, true),
+    // Para um cartão escolhido na consulta autenticada, mantemos o id,
+    // provider e isSpecialCard devolvidos pela Giftcard API. Esses campos
+    // identificam corretamente vales externos/ERP; a digitação manual, que
+    // não passa esses detalhes, continua usando apenas o código.
+    giftCardAttachment({
+      redemptionCode: redemptionCode.trim(),
+      id: giftCardDetails?.id || undefined,
+      provider: giftCardDetails?.provider || undefined,
+      isSpecialCard: giftCardDetails?.isSpecialCard,
+    }, true),
   ];
   const response = await paymentDataFetch(orderFormId, {
     method: 'POST',
@@ -1071,8 +1077,10 @@ export async function addGiftCardToCart(
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   const normalizedOrderForm = normalizeOrderForm(orderForm);
   const normalizedCode = normalizeGiftCardCode(redemptionCode);
-  const applied = normalizedOrderForm.paymentData?.giftCards?.some((giftCard) => (
-    giftCard.inUse && normalizeGiftCardCode(giftCard.redemptionCode) === normalizedCode
+  const requestedGiftCardId = String(giftCardDetails?.id || '').trim();
+  const applied = normalizedOrderForm.paymentData?.giftCards?.some((giftCard) => giftCard.inUse && (
+    normalizeGiftCardCode(giftCard.redemptionCode) === normalizedCode
+    || Boolean(requestedGiftCardId && String(giftCard.id || '').trim() === requestedGiftCardId)
   ));
   if (!applied) {
     const message = giftCardApplicationMessage(giftCardResponseMessage(orderForm));
