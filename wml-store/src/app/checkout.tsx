@@ -406,6 +406,7 @@ export default function CheckoutScreen() {
   const [removingGiftCard, setRemovingGiftCard] = useState<string | null>(null);
   const [giftCardAvailability, setGiftCardAvailability] = useState<GiftCardAvailability>('unknown');
   const [giftCardIdentityVerified, setGiftCardIdentityVerified] = useState(false);
+  const [giftCardCreditsHidden, setGiftCardCreditsHidden] = useState(false);
   const [giftCardIdentityVisible, setGiftCardIdentityVisible] = useState(false);
   const [availableGiftCards, setAvailableGiftCards] = useState<GiftCard[]>([]);
   const [giftCardDetailsLoading, setGiftCardDetailsLoading] = useState(false);
@@ -488,6 +489,7 @@ export default function CheckoutScreen() {
     if (!giftCardVerifiedEmailRef.current || giftCardVerifiedEmailRef.current === normalizedEmail) return;
     giftCardVerifiedEmailRef.current = '';
     setGiftCardIdentityVerified(false);
+    setGiftCardCreditsHidden(false);
     setAvailableGiftCards([]);
     setGiftCardAvailability('unknown');
     giftCardAvailabilityKeyRef.current = '';
@@ -525,6 +527,7 @@ export default function CheckoutScreen() {
       setCustomerAddresses([]); setAddressSaved(false); setEditingAddress(false);
       setGiftCardAvailability('unknown');
       setGiftCardIdentityVerified(Boolean(loggedEmail));
+      setGiftCardCreditsHidden(false);
       setAvailableGiftCards([]);
       giftCardAvailabilityKeyRef.current = '';
       giftCardVerifiedEmailRef.current = loggedEmail;
@@ -1357,7 +1360,12 @@ export default function CheckoutScreen() {
     return updatedOrderForm;
   }
 
-  async function applyGiftCardCode(redemptionCode: string, sourceOrderForm = orderForm, giftCardDetails?: GiftCard) {
+  async function applyGiftCardCode(
+    redemptionCode: string,
+    sourceOrderForm = orderForm,
+    giftCardDetails?: GiftCard,
+    customerProfileReady = false,
+  ) {
     const normalizedCode = redemptionCode.trim();
     if (!sourceOrderForm || !normalizedCode) return false;
     setSaving(true);
@@ -1365,7 +1373,13 @@ export default function CheckoutScreen() {
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
-      let giftCardOrderForm = await ensureCustomerProfileForGiftCard(sourceOrderForm);
+      // The authenticated-credit flow has just synchronized the checkout
+      // profile before loading the protected cards. Repeating that step here
+      // can make VTEX rebuild the payment context between the lookup and the
+      // application, which makes a valid card return without `inUse`.
+      let giftCardOrderForm = customerProfileReady
+        ? sourceOrderForm
+        : await ensureCustomerProfileForGiftCard(sourceOrderForm);
       console.info('[GIFT CARD] applying to orderForm', {
         orderFormId: giftCardOrderForm.orderFormId,
         userProfileIdPresent: Boolean(giftCardOrderForm.userProfileId),
@@ -1401,7 +1415,11 @@ export default function CheckoutScreen() {
 
   async function applyVoucher() {
     const redemptionCode = voucher.trim();
-    if (!redemptionCode) return;
+    if (!redemptionCode) {
+      setVoucherMessage('Informe o código do vale-presente.');
+      setVoucherMessageType('error');
+      return;
+    }
     if (giftCardAvailability === 'available' && !giftCardIdentityVerified) {
       setVoucherMessage('Confirme sua identidade para usar os créditos vinculados a este e-mail.');
       setVoucherMessageType('error');
@@ -1411,7 +1429,11 @@ export default function CheckoutScreen() {
     await applyGiftCardCode(redemptionCode);
   }
 
-  async function applyAvailableGiftCard(giftCard: GiftCard, sourceOrderForm = orderForm): Promise<boolean> {
+  async function applyAvailableGiftCard(
+    giftCard: GiftCard,
+    sourceOrderForm = orderForm,
+    customerProfileReady = false,
+  ): Promise<boolean> {
     const redemptionCode = giftCard.redemptionCode.trim();
     if (!redemptionCode) {
       setVoucherMessage('Este crédito não está disponível para aplicação agora.');
@@ -1420,12 +1442,12 @@ export default function CheckoutScreen() {
     }
     setApplyingAvailableGiftCard(giftCard.id || redemptionCode);
     try {
-      const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm, giftCard);
+      const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm, giftCard, customerProfileReady);
       if (applied) {
-        setAvailableGiftCards((current) => current.filter((item) => (
-          (giftCard.id && item.id !== giftCard.id)
-          || (!giftCard.id && item.redemptionCode !== giftCard.redemptionCode)
-        )));
+        // Once the identity is confirmed, the selected credit belongs in the
+        // Vale presente card below. Do not leave the same credit duplicated in
+        // a separate "Créditos disponíveis" section.
+        setAvailableGiftCards([]);
       }
       return applied;
     } finally {
@@ -1441,11 +1463,13 @@ export default function CheckoutScreen() {
     setSaving(true);
     try {
       let authenticatedOrderForm = orderForm;
+      let customerProfileReady = false;
       try {
         // Sincroniza o CPF do checkout antes da consulta protegida. A
         // autenticação confirma o e-mail, mas os cartões criados pela API
         // continuam vinculados ao CPF informado no orderForm.
         authenticatedOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
+        customerProfileReady = true;
       } catch (error) {
         // A autenticação já confirmou a identidade; se a sincronização do
         // perfil falhar momentaneamente, a consulta protegida ainda pode
@@ -1465,7 +1489,11 @@ export default function CheckoutScreen() {
       giftCardAvailabilityKeyRef.current = `${authenticatedOrderForm.orderFormId}|${normalizedEmail}|verified`;
       giftCardVerifiedEmailRef.current = normalizedEmail;
       setGiftCardIdentityVerified(true);
-      setAvailableGiftCards(cards);
+      setGiftCardCreditsHidden(true);
+      // The authenticated card is applied directly in the Vale presente
+      // section. Keeping this list in state would render a duplicate credits
+      // block after the modal closes.
+      setAvailableGiftCards([]);
       setGiftCardAvailability(cards.length > 0 ? 'available' : 'none');
       setVoucherMessage('');
       setVoucherMessageType(null);
@@ -1479,10 +1507,10 @@ export default function CheckoutScreen() {
         // A identidade foi confirmada para este e-mail. Aplicamos o crédito
         // automaticamente para que o cliente não precise copiar o código
         // exibido no modal. Quando houver mais de um, priorizamos um que já
-        // cubra todo o pedido; caso contrário, usamos o primeiro e deixamos
-        // as demais opções disponíveis para uma nova aplicação.
+        // cubra todo o pedido; caso contrário, usamos o primeiro e exibimos
+        // o valor restante para que outra forma de pagamento seja escolhida.
         const cardToApply = unappliedCards.find((card) => giftCardAppliedValue(card) >= authenticatedOrderForm.value) || unappliedCards[0];
-        const applied = await applyAvailableGiftCard(cardToApply, authenticatedOrderForm);
+        const applied = await applyAvailableGiftCard(cardToApply, authenticatedOrderForm, customerProfileReady);
         console.info('[GIFT CARD] authenticated card auto-apply', {
           orderFormId: authenticatedOrderForm.orderFormId,
           applied,
@@ -1831,6 +1859,7 @@ export default function CheckoutScreen() {
           onContinue={continueWithGiftCard}
           giftCardAvailability={giftCardAvailability}
           giftCardIdentityVerified={giftCardIdentityVerified}
+          giftCardCreditsHidden={giftCardCreditsHidden}
           availableGiftCards={availableGiftCards}
           giftCardDetailsLoading={giftCardDetailsLoading}
           applyingAvailableGiftCard={applyingAvailableGiftCard}
@@ -2169,7 +2198,7 @@ function ReviewHeader({ icon, title }: { icon: 'user' | 'truck' | 'card'; title:
   return <View style={styles.reviewHeader}>{icon === 'user' && <UserIcon color="#0a0a0a" size={20} />}{icon === 'truck' && <TruckIcon color="#0a0a0a" size={20} />}{icon === 'card' && <CreditCardIcon color="#0a0a0a" size={20} />}<ThemedText style={styles.sectionTitle}>{title}</ThemedText></View>;
 }
 
-function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, saving, onApply, appliedGiftCards, orderValue, removingGiftCard, onRemove, voucherMessage, voucherMessageType, onContinue, giftCardAvailability, giftCardIdentityVerified, availableGiftCards, giftCardDetailsLoading, applyingAvailableGiftCard, onShowCredits, onApplyAvailableGiftCard }: { voucher: string; onVoucherChange: (value: string) => void; voucherLoading: boolean; saving: boolean; onApply: () => void; appliedGiftCards: GiftCard[]; orderValue: number; removingGiftCard: string | null; onRemove: (giftCard: GiftCard) => void; voucherMessage: string; voucherMessageType: 'success' | 'error' | null; onContinue: () => void; giftCardAvailability: GiftCardAvailability; giftCardIdentityVerified: boolean; availableGiftCards: GiftCard[]; giftCardDetailsLoading: boolean; applyingAvailableGiftCard: string | null; onShowCredits: () => void; onApplyAvailableGiftCard: (giftCard: GiftCard) => void }) {
+function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, saving, onApply, appliedGiftCards, orderValue, removingGiftCard, onRemove, voucherMessage, voucherMessageType, onContinue, giftCardAvailability, giftCardIdentityVerified, giftCardCreditsHidden, availableGiftCards, giftCardDetailsLoading, applyingAvailableGiftCard, onShowCredits, onApplyAvailableGiftCard }: { voucher: string; onVoucherChange: (value: string) => void; voucherLoading: boolean; saving: boolean; onApply: () => void; appliedGiftCards: GiftCard[]; orderValue: number; removingGiftCard: string | null; onRemove: (giftCard: GiftCard) => void; voucherMessage: string; voucherMessageType: 'success' | 'error' | null; onContinue: () => void; giftCardAvailability: GiftCardAvailability; giftCardIdentityVerified: boolean; giftCardCreditsHidden: boolean; availableGiftCards: GiftCard[]; giftCardDetailsLoading: boolean; applyingAvailableGiftCard: string | null; onShowCredits: () => void; onApplyAvailableGiftCard: (giftCard: GiftCard) => void }) {
   const appliedValue = giftCardsTotal(appliedGiftCards);
   const canContinue = appliedGiftCards.length > 0 && giftCardsCoverOrder(appliedGiftCards, orderValue);
   const remainingValue = Math.max(0, orderValue - appliedValue);
@@ -2179,7 +2208,7 @@ function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, savi
     {giftCardAvailability === 'loading' && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#625d57" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Consultando créditos disponíveis...</ThemedText></View>}
     {giftCardAvailability === 'available' && !giftCardIdentityVerified && <Pressable accessibilityRole="button" onPress={onShowCredits} style={styles.giftCardNotice}><ThemedText style={styles.giftCardNoticeText}>Você possui créditos para usar na compra! Deseja exibi-los?</ThemedText></Pressable>}
     {giftCardIdentityVerified && giftCardDetailsLoading && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#625d57" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Carregando seus créditos...</ThemedText></View>}
-    {giftCardIdentityVerified && !giftCardDetailsLoading && unappliedGiftCards.length > 0 && <View style={styles.availableGiftCardsCard}>
+    {giftCardIdentityVerified && !giftCardCreditsHidden && !giftCardDetailsLoading && unappliedGiftCards.length > 0 && <View style={styles.availableGiftCardsCard}>
       <ThemedText style={styles.sectionTitle}>Créditos disponíveis</ThemedText>
       <ThemedText style={styles.bodyText} themeColor="textSecondary">Escolha um vale-presente para usar nesta compra.</ThemedText>
       {unappliedGiftCards.map((giftCard, index) => {
@@ -2201,7 +2230,7 @@ function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, savi
       <View style={styles.paymentDivider} />
       <View style={styles.inline}>
         <TextInput value={voucher} onChangeText={onVoucherChange} autoCapitalize="characters" autoCorrect={false} placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} />
-        <Pressable disabled={saving || voucherLoading || !voucher.trim()} onPress={onApply} style={[styles.smallButton, (saving || voucherLoading || !voucher.trim()) && styles.giftCardButtonDisabled]}>
+        <Pressable disabled={saving || voucherLoading} onPress={onApply} style={[styles.smallButton, (saving || voucherLoading) && styles.giftCardButtonDisabled]}>
           {voucherLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}
         </Pressable>
       </View>

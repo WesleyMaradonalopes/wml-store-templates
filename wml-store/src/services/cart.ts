@@ -494,6 +494,17 @@ function giftCardResponseMessage(payload?: VtexOrderForm | null): string | undef
     ?? payload?.message?.trim();
 }
 
+function giftCardApplicationMessage(message?: string): string | undefined {
+  const normalized = message?.trim();
+  if (!normalized) return undefined;
+  // The orderForm can also carry unrelated checkout messages (for example,
+  // that shipping changed). Do not present those as if the gift card itself
+  // had been rejected when the payment-data response simply omitted `inUse`.
+  return /vale[\s-]?presente|gift[\s-]?card|voucher|cr[eé]dit|forma de pagamento|pagamento.*dispon[íi]vel/i.test(normalized)
+    ? normalized
+    : undefined;
+}
+
 function normalizeGiftCardCode(value: string): string {
   return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
@@ -1059,7 +1070,7 @@ export async function addGiftCardToCart(
     ? await response.clone().json().catch(() => null) as VtexOrderForm | null
     : null;
   if (!response.ok) {
-    const message = giftCardResponseMessage(errorBody);
+    const message = giftCardApplicationMessage(giftCardResponseMessage(errorBody));
     console.warn('[GIFT CARD] add rejected', { status: response.status, code: errorBody?.error?.code, message });
     throw new Error(message || 'Não foi possível adicionar o vale-presente.');
   }
@@ -1073,7 +1084,7 @@ export async function addGiftCardToCart(
     || Boolean(requestedGiftCardId && String(giftCard.id || '').trim() === requestedGiftCardId)
   ));
   if (!applied) {
-    const message = giftCardResponseMessage(orderForm);
+    const message = giftCardApplicationMessage(giftCardResponseMessage(orderForm));
     const returnedGiftCards = normalizedOrderForm.paymentData?.giftCards ?? [];
     const providers = [...new Set(returnedGiftCards.map((giftCard) => giftCard.provider).filter(Boolean))];
     const paymentGroups = [...new Set((normalizedOrderForm.paymentData?.paymentSystems ?? []).map((system) => system.group).filter(Boolean))];
