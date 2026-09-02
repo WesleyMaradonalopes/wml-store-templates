@@ -10,6 +10,7 @@ import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { ProductShelf } from '@/components/cms-section';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
+import EyeIcon from '@/components/icons/EyeIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import StoreIcon from '@/components/icons/StoreIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
@@ -1363,8 +1364,6 @@ export default function CheckoutScreen() {
   async function applyGiftCardCode(
     redemptionCode: string,
     sourceOrderForm = orderForm,
-    giftCardDetails?: GiftCard,
-    customerProfileReady = false,
   ) {
     const normalizedCode = redemptionCode.trim();
     if (!sourceOrderForm || !normalizedCode) return false;
@@ -1373,13 +1372,10 @@ export default function CheckoutScreen() {
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
-      // The authenticated-credit flow has just synchronized the checkout
-      // profile before loading the protected cards. Repeating that step here
-      // can make VTEX rebuild the payment context between the lookup and the
-      // application, which makes a valid card return without `inUse`.
-      let giftCardOrderForm = customerProfileReady
-        ? sourceOrderForm
-        : await ensureCustomerProfileForGiftCard(sourceOrderForm);
+      // Também no fluxo autenticado repetimos o mesmo preparo executado ao
+      // digitar o código manualmente. Assim a aplicação automática usa o
+      // perfil e o payload que já são aceitos pela VTEX.
+      let giftCardOrderForm = await ensureCustomerProfileForGiftCard(sourceOrderForm);
       console.info('[GIFT CARD] applying to orderForm', {
         orderFormId: giftCardOrderForm.orderFormId,
         userProfileIdPresent: Boolean(giftCardOrderForm.userProfileId),
@@ -1388,7 +1384,7 @@ export default function CheckoutScreen() {
         const giftCardApplied = activeGiftCards(targetOrderForm);
         // Nesta tela ainda não existe uma segunda forma selecionada. Reenviar
         // payments antigos faz a VTEX rejeitar o vale como pagamento indisponível.
-        return addGiftCardToCart(targetOrderForm.orderFormId, normalizedCode, giftCardApplied, [], email, giftCardDetails);
+        return addGiftCardToCart(targetOrderForm.orderFormId, normalizedCode, giftCardApplied, [], email);
       };
       let updatedOrderForm: OrderForm;
       try {
@@ -1432,7 +1428,6 @@ export default function CheckoutScreen() {
   async function applyAvailableGiftCard(
     giftCard: GiftCard,
     sourceOrderForm = orderForm,
-    customerProfileReady = false,
   ): Promise<boolean> {
     const redemptionCode = giftCard.redemptionCode.trim();
     if (!redemptionCode) {
@@ -1442,7 +1437,7 @@ export default function CheckoutScreen() {
     }
     setApplyingAvailableGiftCard(giftCard.id || redemptionCode);
     try {
-      const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm, giftCard, customerProfileReady);
+      const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm);
       if (applied) {
         // Once the identity is confirmed, the selected credit belongs in the
         // Vale presente card below. Do not leave the same credit duplicated in
@@ -1463,13 +1458,11 @@ export default function CheckoutScreen() {
     setSaving(true);
     try {
       let authenticatedOrderForm = orderForm;
-      let customerProfileReady = false;
       try {
         // Sincroniza o CPF do checkout antes da consulta protegida. A
         // autenticação confirma o e-mail, mas os cartões criados pela API
         // continuam vinculados ao CPF informado no orderForm.
         authenticatedOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
-        customerProfileReady = true;
       } catch (error) {
         // A autenticação já confirmou a identidade; se a sincronização do
         // perfil falhar momentaneamente, a consulta protegida ainda pode
@@ -1510,7 +1503,7 @@ export default function CheckoutScreen() {
         // cubra todo o pedido; caso contrário, usamos o primeiro e exibimos
         // o valor restante para que outra forma de pagamento seja escolhida.
         const cardToApply = unappliedCards.find((card) => giftCardAppliedValue(card) >= authenticatedOrderForm.value) || unappliedCards[0];
-        const applied = await applyAvailableGiftCard(cardToApply, authenticatedOrderForm, customerProfileReady);
+        const applied = await applyAvailableGiftCard(cardToApply, authenticatedOrderForm);
         console.info('[GIFT CARD] authenticated card auto-apply', {
           orderFormId: authenticatedOrderForm.orderFormId,
           applied,
@@ -2263,6 +2256,7 @@ function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthenticate
   const [view, setView] = useState<GiftCardIdentityView>('choice');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [accessCode, setAccessCode] = useState('');
   const [authenticationToken, setAuthenticationToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -2273,6 +2267,7 @@ function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthenticate
     setView('choice');
     setEmail(checkoutEmail.trim().toLowerCase());
     setPassword('');
+    setShowPassword(false);
     setAccessCode('');
     setAuthenticationToken('');
     setLoading(false);
@@ -2371,11 +2366,17 @@ function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthenticate
             {view === 'choice' && <>
               <ThemedText style={styles.bodyText} themeColor="textSecondary">Para exibir os créditos vinculados ao seu e-mail, confirme sua identidade.</ThemedText>
               <Pressable disabled={loading} onPress={() => { setMessage(''); setView('email'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Receber código de acesso por e-mail</ThemedText></Pressable>
-              <Pressable disabled={loading} onPress={() => { setMessage(''); setView('password'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Entrar com e-mail e senha</ThemedText></Pressable>
+              <Pressable disabled={loading} onPress={() => { setMessage(''); setShowPassword(false); setView('password'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Entrar com e-mail e senha</ThemedText></Pressable>
             </>}
             {view === 'password' && <>
               <Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" placeholder="seu@email.com" style={styles.giftCardIdentityField} />
-              <View style={[styles.field, styles.giftCardIdentityField]}><ThemedText style={styles.fieldLabel}>Senha</ThemedText><TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Digite sua senha" placeholderTextColor="#96918b" style={[styles.input, styles.giftCardIdentityInput]} /></View>
+              <View style={[styles.field, styles.giftCardIdentityField]}>
+                <ThemedText style={styles.fieldLabel}>Senha</ThemedText>
+                <View style={styles.giftCardIdentityPasswordWrap}>
+                  <TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} placeholder="Digite sua senha" placeholderTextColor="#96918b" style={[styles.input, styles.giftCardIdentityInput, styles.giftCardIdentityPasswordInput]} />
+                  <Pressable accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowPassword((current) => !current)} style={styles.giftCardIdentityPasswordToggle}><EyeIcon color="#5d5955" size={20} off={!showPassword} /></Pressable>
+                </View>
+              </View>
               {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
               <View style={styles.giftCardIdentityActionRow}><Pressable disabled={loading} onPress={() => setView('choice')} style={[styles.modalCancelButton, styles.giftCardIdentityCancelButton]}><ThemedText style={styles.dataLabel}>Voltar</ThemedText></Pressable><Pressable disabled={loading} onPress={() => { void submitPassword(); }} style={[styles.giftCardIdentityPrimary, styles.giftCardIdentityPrimaryInRow]}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Entrar</ThemedText>}</Pressable></View>
             </>}
@@ -2643,6 +2644,9 @@ const styles = StyleSheet.create({
   giftCardIdentityCloseText: { color: '#0a0a0a', fontSize: 20, lineHeight: 20 },
   giftCardIdentityField: { flex: 0, flexGrow: 0, flexShrink: 0, width: '100%' },
   giftCardIdentityInput: { width: '100%' },
+  giftCardIdentityPasswordWrap: { position: 'relative', width: '100%' },
+  giftCardIdentityPasswordInput: { paddingRight: 48 },
+  giftCardIdentityPasswordToggle: { position: 'absolute', right: 8, top: 7, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   giftCardIdentityPrimary: { minHeight: 48, alignSelf: 'stretch', paddingHorizontal: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   giftCardIdentityPrimaryInRow: { flex: 1, minWidth: 0 },
   giftCardIdentityCancelButton: { minWidth: 96, paddingHorizontal: Spacing.three },
