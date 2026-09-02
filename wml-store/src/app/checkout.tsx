@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
@@ -2022,7 +2022,7 @@ function PixPaymentScreen({
           <ThemedText style={styles.pixToastCheck}>✓</ThemedText>
           <ThemedText style={styles.pixToastText}>Código PIX copiado!</ThemedText>
           <Pressable accessibilityLabel="Fechar aviso" onPress={() => setCopied(false)} style={styles.pixToastClose}>
-            <ThemedText style={styles.pixToastCloseText}>×</ThemedText>
+            <ThemedText style={styles.pixToastCloseText}>✕</ThemedText>
           </Pressable>
         </View>}
       </View>
@@ -2064,10 +2064,10 @@ function PickupStoreCard({ option, selected, disabled, onPress }: { option: Ship
     </View>
   </Pressable>;
 }
-function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '', accessory }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string; accessory?: ReactNode }) {
+function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '', accessory, style }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string; accessory?: ReactNode; style?: StyleProp<ViewStyle> }) {
   const isFreeText = !keyboardType || keyboardType === 'default';
   const inputMode = isFreeText ? 'text' : keyboardType === 'email-address' ? 'email' : keyboardType === 'phone-pad' ? 'tel' : 'numeric';
-  return <View style={styles.field}><ThemedText style={styles.fieldLabel}>{label + (required ? ' *' : '')}</ThemedText><View style={styles.inputWrap}><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} inputMode={inputMode} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={false} spellCheck={false} placeholderTextColor="#96918b" style={[styles.input, accessory ? styles.inputWithAccessory : undefined, error ? styles.inputError : undefined]} />{accessory && <View style={styles.fieldAccessory}>{accessory}</View>}</View>{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
+  return <View style={[styles.field, style]}><ThemedText style={styles.fieldLabel}>{label + (required ? ' *' : '')}</ThemedText><View style={styles.inputWrap}><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} inputMode={inputMode} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={false} spellCheck={false} placeholderTextColor="#96918b" style={[styles.input, accessory ? styles.inputWithAccessory : undefined, error ? styles.inputError : undefined]} />{accessory && <View style={styles.fieldAccessory}>{accessory}</View>}</View>{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
 }
 function Primary({ title, onPress, loading }: { title: string; onPress: () => void; loading?: boolean }) {
   const isLoading = loading ?? title.endsWith('...');
@@ -2251,34 +2251,46 @@ function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthenticate
 
   const title = view === 'choice' ? 'Use uma das opções para confirmar sua identidade' : view === 'password' ? 'Login com e-mail e senha' : view === 'email' ? 'Receba seu código de acesso' : 'Digite o código enviado por e-mail';
   return <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-    <View style={styles.modalOverlay}><ThemedView style={styles.giftCardIdentityModalCard}>
-      <View style={styles.giftCardIdentityHeader}><ThemedText style={styles.giftCardIdentityTitle}>{title}</ThemedText><Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.giftCardIdentityClose}><ThemedText style={styles.giftCardIdentityCloseText}>×</ThemedText></Pressable></View>
-      {view === 'choice' && <>
-        <ThemedText style={styles.bodyText} themeColor="textSecondary">Para exibir os créditos vinculados ao seu e-mail, confirme sua identidade.</ThemedText>
-        <Pressable disabled={loading} onPress={() => { setMessage(''); setView('email'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Receber código de acesso por e-mail</ThemedText></Pressable>
-        <Pressable disabled={loading} onPress={() => { setMessage(''); setView('password'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Entrar com e-mail e senha</ThemedText></Pressable>
-      </>}
-      {view === 'password' && <>
-        <Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" placeholder="seu@email.com" />
-        <View style={styles.field}><ThemedText style={styles.fieldLabel}>Senha</ThemedText><TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Digite sua senha" placeholderTextColor="#96918b" style={styles.input} /></View>
-        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
-        <View style={styles.giftCardIdentityActionRow}><Pressable disabled={loading} onPress={() => setView('choice')} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Voltar</ThemedText></Pressable><Pressable disabled={loading} onPress={() => { void submitPassword(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Entrar</ThemedText>}</Pressable></View>
-      </>}
-      {view === 'email' && <>
-        <Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" placeholder="seu@email.com" />
-        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
-        <Pressable disabled={loading} onPress={() => { void requestCode(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Enviar código</ThemedText>}</Pressable>
-        <Pressable disabled={loading} onPress={() => setView('choice')} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Voltar</ThemedText></Pressable>
-      </>}
-      {view === 'code' && <>
-        <ThemedText style={styles.bodyText} themeColor="textSecondary">Enviamos um código para {email}.</ThemedText>
-        <View style={styles.field}><ThemedText style={styles.fieldLabel}>Código de acesso</ThemedText><TextInput value={accessCode} onChangeText={setAccessCode} keyboardType="numeric" autoCapitalize="none" autoCorrect={false} placeholder="Digite o código" placeholderTextColor="#96918b" style={styles.input} /></View>
-        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
-        <Pressable disabled={loading} onPress={() => { void validateCode(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Confirmar e exibir créditos</ThemedText>}</Pressable>
-        <Pressable disabled={loading} onPress={() => { void resendCode(); }} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Reenviar código</ThemedText></Pressable>
-        <Pressable disabled={loading} onPress={() => setView('email')}><ThemedText style={styles.link}>Alterar e-mail</ThemedText></Pressable>
-      </>}
-    </ThemedView></View>
+    <View style={styles.giftCardIdentityOverlay}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.giftCardIdentityKeyboard}>
+        <ThemedView style={styles.giftCardIdentityModalCard}>
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.giftCardIdentityModalContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={styles.giftCardIdentityScroll}
+          >
+            <View style={styles.giftCardIdentityHeader}><ThemedText style={styles.giftCardIdentityTitle}>{title}</ThemedText><Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.giftCardIdentityClose}><ThemedText style={styles.giftCardIdentityCloseText}>✕</ThemedText></Pressable></View>
+            {view === 'choice' && <>
+              <ThemedText style={styles.bodyText} themeColor="textSecondary">Para exibir os créditos vinculados ao seu e-mail, confirme sua identidade.</ThemedText>
+              <Pressable disabled={loading} onPress={() => { setMessage(''); setView('email'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Receber código de acesso por e-mail</ThemedText></Pressable>
+              <Pressable disabled={loading} onPress={() => { setMessage(''); setView('password'); }} style={styles.giftCardIdentityPrimary}><ThemedText style={styles.buttonText}>Entrar com e-mail e senha</ThemedText></Pressable>
+            </>}
+            {view === 'password' && <>
+              <Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" placeholder="seu@email.com" style={styles.giftCardIdentityField} />
+              <View style={[styles.field, styles.giftCardIdentityField]}><ThemedText style={styles.fieldLabel}>Senha</ThemedText><TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Digite sua senha" placeholderTextColor="#96918b" style={[styles.input, styles.giftCardIdentityInput]} /></View>
+              {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
+              <View style={styles.giftCardIdentityActionRow}><Pressable disabled={loading} onPress={() => setView('choice')} style={[styles.modalCancelButton, styles.giftCardIdentityCancelButton]}><ThemedText style={styles.dataLabel}>Voltar</ThemedText></Pressable><Pressable disabled={loading} onPress={() => { void submitPassword(); }} style={[styles.giftCardIdentityPrimary, styles.giftCardIdentityPrimaryInRow]}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Entrar</ThemedText>}</Pressable></View>
+            </>}
+            {view === 'email' && <>
+              <Field label="E-mail" value={email} setValue={setEmail} keyboardType="email-address" placeholder="seu@email.com" style={styles.giftCardIdentityField} />
+              {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
+              <Pressable disabled={loading} onPress={() => { void requestCode(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Enviar código</ThemedText>}</Pressable>
+              <Pressable disabled={loading} onPress={() => setView('choice')} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Voltar</ThemedText></Pressable>
+            </>}
+            {view === 'code' && <>
+              <ThemedText style={styles.bodyText} themeColor="textSecondary">Enviamos um código para {email}.</ThemedText>
+              <View style={[styles.field, styles.giftCardIdentityField]}><ThemedText style={styles.fieldLabel}>Código de acesso</ThemedText><TextInput value={accessCode} onChangeText={setAccessCode} keyboardType="numeric" autoCapitalize="none" autoCorrect={false} placeholder="Digite o código" placeholderTextColor="#96918b" style={[styles.input, styles.giftCardIdentityInput]} /></View>
+              {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
+              <Pressable disabled={loading} onPress={() => { void validateCode(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Confirmar e exibir créditos</ThemedText>}</Pressable>
+              <Pressable disabled={loading} onPress={() => { void resendCode(); }} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Reenviar código</ThemedText></Pressable>
+              <Pressable disabled={loading} onPress={() => setView('email')} style={styles.giftCardIdentityLinkButton}><ThemedText style={styles.link}>Alterar e-mail</ThemedText></Pressable>
+            </>}
+          </ScrollView>
+        </ThemedView>
+      </KeyboardAvoidingView>
+    </View>
   </Modal>;
 }
 
@@ -2316,9 +2328,9 @@ const styles = StyleSheet.create({
   customerDataRows: { gap: 20 },
   customerDataRow: { gap: 1 },
   customerDataLabel: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 11, lineHeight: 15 },
-  customerDataValue: { color: '#2f2d2b', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 19 },
+  customerDataValue: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 19 },
   customerReviewData: { gap: 2, marginTop: 1, marginBottom: 2 },
-  customerReviewValue: { color: '#2f2d2b', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  customerReviewValue: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
   cardTitle: { fontSize: 15, lineHeight: 20, fontFamily: Fonts.bold, fontWeight: '700' },
   sectionTitle: { fontFamily: Fonts.bold, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   bodyText: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 20, fontWeight: '400' },
@@ -2380,10 +2392,10 @@ const styles = StyleSheet.create({
   orderSuccessCard: { alignItems: 'center', gap: Spacing.two, padding: Spacing.five, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
   orderSuccessIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e4f5e9' },
   orderSuccessCheck: { color: '#2f8f5b', fontFamily: Fonts.bold, fontSize: 32, lineHeight: 36, fontWeight: '700' },
-  orderSuccessTitle: { color: '#2f2d2b', fontFamily: Fonts.bold, fontSize: 20, lineHeight: 26, fontWeight: '700', textAlign: 'center' },
+  orderSuccessTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 20, lineHeight: 26, fontWeight: '700', textAlign: 'center' },
   orderSuccessDescription: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, textAlign: 'center' },
   orderSuccessLabel: { marginTop: Spacing.two, color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  orderSuccessId: { color: '#2f2d2b', fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
+  orderSuccessId: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
   smallButton: { minHeight: 46, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   buttonText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 13, fontWeight: '700' },
   selected: { borderColor: '#0a0a0a', borderWidth: 2 },
@@ -2410,8 +2422,8 @@ const styles = StyleSheet.create({
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#e3ded5' },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: '#2f8f5b' },
   giftCardSection: { gap: Spacing.two },
-  giftCardNotice: { minHeight: 54, justifyContent: 'center', paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#1b100c' },
-  giftCardNoticeText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 19, fontWeight: '700', textDecorationLine: 'underline' },
+  giftCardNotice: { minHeight: 40, justifyContent: 'center', paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#0a0a0a' },
+  giftCardNoticeText: { color: '#FFFFFF', fontSize: 11, lineHeight: 16, textDecorationLine: 'underline', textAlign: 'center' },
   giftCardLookup: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.two, borderRadius: 8, backgroundColor: '#f8f6f2' },
   availableGiftCardsCard: { gap: Spacing.two, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
   availableGiftCardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.two, borderTopWidth: 1, borderTopColor: '#ece8e2' },
@@ -2420,11 +2432,11 @@ const styles = StyleSheet.create({
   paymentDivider: { height: 1, backgroundColor: '#eeeae5' },
   giftCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, paddingTop: Spacing.one },
   giftCardDetails: { flex: 1, gap: 1 },
-  giftCardCode: { color: '#2f2d2b', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  giftCardCode: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
   giftCardAmount: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 18, fontWeight: '700' },
   giftCardRemove: { color: '#4a82e8', fontFamily: Fonts.bold, fontSize: 11, lineHeight: 15, fontWeight: '700' },
-  giftCardRemaining: { color: '#2f2d2b', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 20, fontWeight: '700' },
-  giftCardContinueButton: { minHeight: 48, marginTop: Spacing.one, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1b100c' },
+  giftCardRemaining: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 20, fontWeight: '700' },
+  giftCardContinueButton: { minHeight: 48, marginTop: Spacing.one, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   giftCardButtonDisabled: { opacity: 0.5 },
   pixInfo: { gap: Spacing.two, marginTop: Spacing.one, padding: Spacing.three, borderRadius: 8, backgroundColor: '#f5f5f5' },
   pixQrImage: { alignSelf: 'center', width: 240, height: 240, marginVertical: Spacing.two },
@@ -2494,8 +2506,8 @@ const styles = StyleSheet.create({
   giftCardReviewColumn: { gap: 1, flexShrink: 1 },
   giftCardReviewColumnRight: { alignItems: 'flex-end' },
   giftCardReviewLabel: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 11, lineHeight: 15 },
-  giftCardReviewCode: { color: '#2f2d2b', fontFamily: Fonts.mono, fontSize: 13, lineHeight: 18 },
-  giftCardReviewValue: { color: '#2f2d2b', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  giftCardReviewCode: { color: '#0a0a0a', fontFamily: Fonts.mono, fontSize: 13, lineHeight: 18 },
+  giftCardReviewValue: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   installmentSummary: { width: 'auto', alignSelf: 'center', alignItems: 'center', gap: 2, padding: Spacing.two, borderRadius: 8, backgroundColor: '#FFFFFF' },
   installmentSummaryLabel: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16 },
   installmentSummaryValue: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, lineHeight: 19 },
@@ -2513,12 +2525,21 @@ const styles = StyleSheet.create({
   modalCard: { width: '100%', maxWidth: 340, gap: Spacing.two, padding: Spacing.four, borderRadius: 6, backgroundColor: '#FFFFFF' },
   modalTitle: { textAlign: 'center', lineHeight: 26, fontSize: 18, marginBottom: Spacing.two, fontFamily: Fonts.bold, fontWeight: '700' },
   modalDeleteButton: { minHeight: 48, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
-  modalCancelButton: { minHeight: 48, borderRadius: 4, borderWidth: 1, borderColor: '#4c433c', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  giftCardIdentityModalCard: { width: '100%', maxWidth: 360, gap: Spacing.two, padding: Spacing.four, borderRadius: 8, backgroundColor: '#FFFFFF' },
+  modalCancelButton: { minHeight: 48, borderRadius: 4, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  giftCardIdentityKeyboard: { width: '100%', maxWidth: 420, maxHeight: '90%' },
+  giftCardIdentityOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.three, paddingVertical: Spacing.five, backgroundColor: 'rgba(0, 0, 0, 0.62)' },
+  giftCardIdentityModalCard: { width: '100%', maxHeight: '100%', padding: 15, borderRadius: 8, backgroundColor: '#FFFFFF' },
+  giftCardIdentityScroll: { width: '100%', flexGrow: 0, flexShrink: 1 },
+  giftCardIdentityModalContent: { gap: Spacing.two, paddingBottom: Spacing.one },
   giftCardIdentityHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
-  giftCardIdentityTitle: { flex: 1, fontFamily: Fonts.bold, fontSize: 17, lineHeight: 23, fontWeight: '700' },
-  giftCardIdentityClose: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  giftCardIdentityCloseText: { color: '#2f2d2b', fontSize: 25, lineHeight: 27 },
-  giftCardIdentityPrimary: { minHeight: 48, flex: 1, paddingHorizontal: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1b100c' },
-  giftCardIdentityActionRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'stretch' },
+  giftCardIdentityTitle: { flex: 1, minWidth: 0, fontFamily: Fonts.bold, fontSize: 16, lineHeight: 23, fontWeight: '700' },
+  giftCardIdentityClose: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  giftCardIdentityCloseText: { color: '#0a0a0a', fontSize: 20, lineHeight: 20 },
+  giftCardIdentityField: { flex: 0, flexGrow: 0, flexShrink: 0, width: '100%' },
+  giftCardIdentityInput: { width: '100%' },
+  giftCardIdentityPrimary: { minHeight: 48, alignSelf: 'stretch', paddingHorizontal: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
+  giftCardIdentityPrimaryInRow: { flex: 1, minWidth: 0 },
+  giftCardIdentityCancelButton: { minWidth: 96, paddingHorizontal: Spacing.three },
+  giftCardIdentityActionRow: { width: '100%', flexDirection: 'row', gap: Spacing.two, alignItems: 'stretch' },
+  giftCardIdentityLinkButton: { alignSelf: 'center', paddingHorizontal: Spacing.one },
 });
