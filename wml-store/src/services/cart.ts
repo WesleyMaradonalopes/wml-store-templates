@@ -1032,6 +1032,7 @@ export async function addGiftCardToCart(
   existingGiftCards: Array<Pick<GiftCard, 'redemptionCode' | 'id' | 'provider' | 'isSpecialCard'>> = [],
   payments: PaymentDataPayment[] = [],
   profileEmail = '',
+  giftCardDetails?: Pick<GiftCard, 'id' | 'provider' | 'isSpecialCard'>,
 ): Promise<OrderForm> {
   const giftCards = [
     ...existingGiftCards
@@ -1039,7 +1040,15 @@ export async function addGiftCardToCart(
       .map((giftCard) => giftCardAttachment(giftCard, true)),
     // O checkout Eitri não força provider no código recém-digitado; a própria
     // VTEX resolve VtexGiftCard e devolve id/provider após validar o vale.
-    giftCardAttachment({ redemptionCode: redemptionCode.trim() }, true),
+    // Quando o cartão veio da consulta autenticada, reaproveitamos também o
+    // id/provider retornados pela Giftcard API. Isso evita perder a identidade
+    // de cartões restritos ao perfil ao aplicá-los automaticamente.
+    giftCardAttachment({
+      redemptionCode: redemptionCode.trim(),
+      id: giftCardDetails?.id || undefined,
+      provider: giftCardDetails?.provider || undefined,
+      isSpecialCard: giftCardDetails?.isSpecialCard,
+    }, true),
   ];
   const response = await paymentDataFetch(orderFormId, {
     method: 'POST',
@@ -1058,7 +1067,11 @@ export async function addGiftCardToCart(
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   const normalizedOrderForm = normalizeOrderForm(orderForm);
   const normalizedCode = normalizeGiftCardCode(redemptionCode);
-  const applied = normalizedOrderForm.paymentData?.giftCards?.some((giftCard) => giftCard.inUse && normalizeGiftCardCode(giftCard.redemptionCode) === normalizedCode);
+  const requestedGiftCardId = String(giftCardDetails?.id || '').trim();
+  const applied = normalizedOrderForm.paymentData?.giftCards?.some((giftCard) => giftCard.inUse && (
+    normalizeGiftCardCode(giftCard.redemptionCode) === normalizedCode
+    || Boolean(requestedGiftCardId && String(giftCard.id || '').trim() === requestedGiftCardId)
+  ));
   if (!applied) {
     const message = giftCardResponseMessage(orderForm);
     const returnedGiftCards = normalizedOrderForm.paymentData?.giftCards ?? [];

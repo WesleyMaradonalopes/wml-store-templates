@@ -110,7 +110,7 @@ export type CheckoutOrderResult = {
 export type PlaceOrderInput = {
   orderFormId: string;
   paymentSystem: string;
-  paymentKind: 'card' | 'pix';
+  paymentKind: 'card' | 'pix' | 'giftcard';
   document: string;
   address: PaymentAddress;
   card?: CardPaymentData;

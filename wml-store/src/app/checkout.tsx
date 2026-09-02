@@ -176,6 +176,10 @@ function giftCardAppliedValue(giftCard: GiftCard) {
   return giftCard.value > 0 ? giftCard.value : giftCard.balance;
 }
 
+function giftCardDisplayCode(giftCard: GiftCard) {
+  return (giftCard.redemptionCode?.trim() || giftCard.caption?.trim() || giftCard.id?.trim() || 'Vale-presente').toUpperCase();
+}
+
 function giftCardsTotal(giftCards: GiftCard[]) {
   return giftCards.reduce((total, giftCard) => total + giftCardAppliedValue(giftCard), 0);
 }
@@ -1099,7 +1103,16 @@ export default function CheckoutScreen() {
 
   async function finishOrder() {
     if (!orderForm || !selectedPayment || saving) return;
-    const paymentKind: 'pix' | 'card' = selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : 'card';
+    const selectedPaymentMethod = orderForm.paymentData?.paymentSystems.find((method) => method.id === selectedPayment);
+    const selectedPaymentIsGiftCard = Boolean(selectedPaymentMethod && isGiftCardPayment(selectedPaymentMethod))
+      || selectedPaymentLabel.toLowerCase().includes('vale');
+    const paymentKind: 'pix' | 'card' | 'giftcard' = selectedPaymentIsGiftCard
+      ? 'giftcard'
+      : selectedPaymentLabel.toLowerCase().includes('pix') ? 'pix' : 'card';
+    if (paymentKind === 'giftcard' && !giftCardsCoverOrder(activeGiftCards(orderForm), orderForm.value)) {
+      setMessage(`Pagamento restante de ${money(Math.max(0, orderForm.value - giftCardsTotal(activeGiftCards(orderForm))))}. Por favor, combine com outra forma de pagamento`);
+      return;
+    }
     setSaving(true);
     setMessage('');
     try {
@@ -1113,19 +1126,23 @@ export default function CheckoutScreen() {
         setOrderForm(paymentOrderForm);
       }
 
-      // A VTEX só define a chave reCAPTCHA aplicável depois que o meio de
-      // pagamento foi selecionado. Atualizamos o attachment imediatamente
-      // antes de gerar um token novo para não usar uma chave antiga.
-      paymentOrderForm = await selectPaymentMethod({
-        orderFormId: paymentOrderForm.orderFormId,
-        paymentSystem: selectedPayment,
-        value: paymentOrderForm.value,
-        installments: paymentKind === 'card' ? selectedInstallment?.count ?? 1 : 1,
-        installmentsInterestRate: paymentKind === 'card' ? selectedInstallment?.interestRate ?? 0 : 0,
-        giftCards: activeGiftCards(paymentOrderForm),
-        profileEmail: email,
-      });
-      setOrderForm(paymentOrderForm);
+      if (paymentKind !== 'giftcard') {
+        // A VTEX só define a chave reCAPTCHA aplicável depois que o meio de
+        // pagamento foi selecionado. Atualizamos o attachment imediatamente
+        // antes de gerar um token novo para não usar uma chave antiga. Para
+        // vale integral, os gift cards já estão aplicados no carrinho e não
+        // devem ser removidos/reaplicados nesta etapa.
+        paymentOrderForm = await selectPaymentMethod({
+          orderFormId: paymentOrderForm.orderFormId,
+          paymentSystem: selectedPayment,
+          value: paymentOrderForm.value,
+          installments: paymentKind === 'card' ? selectedInstallment?.count ?? 1 : 1,
+          installmentsInterestRate: paymentKind === 'card' ? selectedInstallment?.interestRate ?? 0 : 0,
+          giftCards: activeGiftCards(paymentOrderForm),
+          profileEmail: email,
+        });
+        setOrderForm(paymentOrderForm);
+      }
       let activeRecaptchaSiteKey = getRecaptchaSiteKey(paymentOrderForm) || recaptchaSiteKey;
       if (activeRecaptchaSiteKey) setRecaptchaSiteKey(activeRecaptchaSiteKey);
 
@@ -1292,12 +1309,27 @@ export default function CheckoutScreen() {
         if (identifiedOrderForm) {
           currentOrderForm = identifiedOrderForm;
           setOrderForm(identifiedOrderForm);
-          if (identifiedOrderForm.userProfileId) {
+          const identifiedDocument = digits(identifiedOrderForm.clientProfileData?.document ?? '');
+          const identifiedDocumentMatches = Boolean(
+            desiredDocument
+            && identifiedDocument
+            && desiredDocument === identifiedDocument,
+          );
+          if (identifiedOrderForm.userProfileId && identifiedDocumentMatches) {
             console.info('[GIFT CARD] customer identified before apply', {
               orderFormId: identifiedOrderForm.orderFormId,
               userProfileIdPresent: true,
+              documentMatches: true,
             });
             return identifiedOrderForm;
+          }
+          if (identifiedOrderForm.userProfileId) {
+            console.info('[GIFT CARD] customer document needs synchronization before apply', {
+              orderFormId: identifiedOrderForm.orderFormId,
+              userProfileIdPresent: true,
+              profileDocumentPresent: Boolean(identifiedDocument),
+              documentMatches: identifiedDocumentMatches,
+            });
           }
         }
       } catch (error) {
@@ -1325,7 +1357,7 @@ export default function CheckoutScreen() {
     return updatedOrderForm;
   }
 
-  async function applyGiftCardCode(redemptionCode: string, sourceOrderForm = orderForm) {
+  async function applyGiftCardCode(redemptionCode: string, sourceOrderForm = orderForm, giftCardDetails?: GiftCard) {
     const normalizedCode = redemptionCode.trim();
     if (!sourceOrderForm || !normalizedCode) return false;
     setSaving(true);
@@ -1342,7 +1374,7 @@ export default function CheckoutScreen() {
         const giftCardApplied = activeGiftCards(targetOrderForm);
         // Nesta tela ainda não existe uma segunda forma selecionada. Reenviar
         // payments antigos faz a VTEX rejeitar o vale como pagamento indisponível.
-        return addGiftCardToCart(targetOrderForm.orderFormId, normalizedCode, giftCardApplied, [], email);
+        return addGiftCardToCart(targetOrderForm.orderFormId, normalizedCode, giftCardApplied, [], email, giftCardDetails);
       };
       let updatedOrderForm: OrderForm;
       try {
@@ -1379,22 +1411,26 @@ export default function CheckoutScreen() {
     await applyGiftCardCode(redemptionCode);
   }
 
-  async function applyAvailableGiftCard(giftCard: GiftCard, sourceOrderForm = orderForm) {
+  async function applyAvailableGiftCard(giftCard: GiftCard, sourceOrderForm = orderForm): Promise<boolean> {
     const redemptionCode = giftCard.redemptionCode.trim();
     if (!redemptionCode) {
       setVoucherMessage('Este crédito não está disponível para aplicação agora.');
       setVoucherMessageType('error');
-      return;
+      return false;
     }
     setApplyingAvailableGiftCard(giftCard.id || redemptionCode);
-    const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm);
-    if (applied) {
-      setAvailableGiftCards((current) => current.filter((item) => (
-        (giftCard.id && item.id !== giftCard.id)
-        || (!giftCard.id && item.redemptionCode !== giftCard.redemptionCode)
-      )));
+    try {
+      const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm, giftCard);
+      if (applied) {
+        setAvailableGiftCards((current) => current.filter((item) => (
+          (giftCard.id && item.id !== giftCard.id)
+          || (!giftCard.id && item.redemptionCode !== giftCard.redemptionCode)
+        )));
+      }
+      return applied;
+    } finally {
+      setApplyingAvailableGiftCard(null);
     }
-    setApplyingAvailableGiftCard(null);
   }
 
   async function completeGiftCardIdentity(authenticatedEmail: string) {
@@ -1406,17 +1442,26 @@ export default function CheckoutScreen() {
     try {
       let authenticatedOrderForm = orderForm;
       try {
-        const identifiedOrderForm = await identifyExistingCustomerByEmail(orderForm.orderFormId, normalizedEmail);
-        if (identifiedOrderForm) {
-          authenticatedOrderForm = identifiedOrderForm;
-          setOrderForm(identifiedOrderForm);
-        }
-      } catch {
-        // A autenticação já confirmou a identidade; se a reidentificação do
-        // orderForm falhar momentaneamente, a consulta protegida ainda pode
+        // Sincroniza o CPF do checkout antes da consulta protegida. A
+        // autenticação confirma o e-mail, mas os cartões criados pela API
+        // continuam vinculados ao CPF informado no orderForm.
+        authenticatedOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
+      } catch (error) {
+        // A autenticação já confirmou a identidade; se a sincronização do
+        // perfil falhar momentaneamente, a consulta protegida ainda pode
         // usar o perfil que já está no carrinho.
+        console.warn('[GIFT CARD] profile synchronization after authentication failed', {
+          orderFormId: orderForm.orderFormId,
+          message: error instanceof Error ? error.message : String(error || ''),
+        });
       }
       const cards = await getCustomerGiftCards(authenticatedOrderForm.orderFormId, normalizedEmail);
+      console.info('[GIFT CARD] authenticated cards loaded', {
+        orderFormId: authenticatedOrderForm.orderFormId,
+        count: cards.length,
+        activeCount: activeGiftCards(authenticatedOrderForm).length,
+        profileDocumentPresent: Boolean(digits(authenticatedOrderForm.clientProfileData?.document ?? '')),
+      });
       giftCardAvailabilityKeyRef.current = `${authenticatedOrderForm.orderFormId}|${normalizedEmail}|verified`;
       giftCardVerifiedEmailRef.current = normalizedEmail;
       setGiftCardIdentityVerified(true);
@@ -1437,7 +1482,15 @@ export default function CheckoutScreen() {
         // cubra todo o pedido; caso contrário, usamos o primeiro e deixamos
         // as demais opções disponíveis para uma nova aplicação.
         const cardToApply = unappliedCards.find((card) => giftCardAppliedValue(card) >= authenticatedOrderForm.value) || unappliedCards[0];
-        await applyAvailableGiftCard(cardToApply, authenticatedOrderForm);
+        const applied = await applyAvailableGiftCard(cardToApply, authenticatedOrderForm);
+        console.info('[GIFT CARD] authenticated card auto-apply', {
+          orderFormId: authenticatedOrderForm.orderFormId,
+          applied,
+          cardIdPresent: Boolean(cardToApply.id),
+        });
+        if (!applied) {
+          throw new Error('Não foi possível aplicar automaticamente o vale-presente. Tente novamente.');
+        }
       }
     } finally {
       setSaving(false);
@@ -1452,18 +1505,24 @@ export default function CheckoutScreen() {
       setMessage(`Pagamento restante de ${money(Math.max(0, orderForm.value - giftCardsTotal(currentGiftCards)))}. Por favor, combine com outra forma de pagamento`);
       return;
     }
-    setSelectedPayment(null);
-    setSelectedPaymentLabel('Vale presente');
+    const giftCardMethod = orderForm.paymentData?.paymentSystems.find(isGiftCardPayment);
+    if (!giftCardMethod?.id) {
+      setMessage('Vale-presente não está disponível para finalizar este carrinho.');
+      return;
+    }
+    setSelectedPayment(giftCardMethod.id);
+    setSelectedPaymentLabel(giftCardMethod.name || 'Vale presente');
     setSelectedInstallment(null);
     setMessage('');
     setStep('review');
   }
 
   async function removeVoucher(giftCard: GiftCard) {
-    const redemptionCode = giftCard.redemptionCode;
-    if (!orderForm || !redemptionCode) return;
+    const redemptionCode = giftCard.redemptionCode.trim();
+    const removalKey = redemptionCode || giftCard.id || '';
+    if (!orderForm || !removalKey) return;
     setSaving(true);
-    setRemovingGiftCard(redemptionCode);
+    setRemovingGiftCard(removalKey);
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
@@ -1721,6 +1780,9 @@ export default function CheckoutScreen() {
   const activeCardBrand = cardNumber ? cardBrandFor(activeCardMethod, cardNumber) : 'generic';
   const reviewCardBrand = selectedCardBrand === 'generic' ? activeCardBrand : selectedCardBrand;
   const appliedGiftCards = activeGiftCards(orderForm);
+  const selectedPaymentMethod = selectedPayment ? payments.find((method) => method.id === selectedPayment) : undefined;
+  const selectedPaymentIsGiftCard = Boolean(selectedPaymentMethod && isGiftCardPayment(selectedPaymentMethod))
+    || selectedPaymentLabel.toLowerCase().includes('vale');
   const title: Record<Step, string> = { cart: 'Carrinho', email: 'Dados pessoais', customer: 'Dados pessoais', address: 'Entrega', shipping: 'Entrega', payment: 'Pagamento', card: 'Cartão de crédito', installments: 'Parcelamento', review: 'Revise e confirme' };
   const customerErrors = getCustomerErrors();
   const addressErrors = getAddressErrors();
@@ -1805,7 +1867,7 @@ export default function CheckoutScreen() {
        <Card>
           <ReviewHeader icon="card" title="PAGAMENTO" />
           <View style={styles.paymentReviewCard}>
-            {selectedPayment && (selectedPaymentLabel.toLowerCase().includes('pix')
+            {selectedPayment && !selectedPaymentIsGiftCard && (selectedPaymentLabel.toLowerCase().includes('pix')
               ? <><PaymentBrandIcon brand="pix" width={78} height={39} /><ThemedText style={styles.bodyText}>Aprovação imediata</ThemedText></>
               : <><CreditCardVisual brand={reviewCardBrand} cardNumber={cardNumber} holderName={cardHolder} expiry={cardExpiry} cvv={cardCvv} masked compact /><View style={styles.installmentSummary}><ThemedText style={styles.installmentSummaryLabel}>Parcelamento</ThemedText><ThemedText style={styles.installmentSummaryValue}>{selectedInstallment ? selectedInstallment.count + 'x ' + money(selectedInstallment.value) : '1x ' + money(paymentAmountAfterGiftCards(orderForm))}</ThemedText></View></>)}
             {appliedGiftCards.length > 0 && <GiftCardPaymentReview giftCards={appliedGiftCards} />}
@@ -2145,11 +2207,11 @@ function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, savi
       </View>
       {appliedGiftCards.map((giftCard, index) => <View key={(giftCard.id || giftCard.redemptionCode) + '-' + index} style={styles.giftCardRow}>
         <View style={styles.giftCardDetails}>
-          <ThemedText style={styles.giftCardCode}>{giftCard.redemptionCode.toUpperCase()}</ThemedText>
+          <ThemedText style={styles.giftCardCode}>{giftCardDisplayCode(giftCard)}</ThemedText>
           <ThemedText style={styles.giftCardAmount}>{money(giftCardAppliedValue(giftCard))}</ThemedText>
         </View>
-        <Pressable disabled={saving || removingGiftCard === giftCard.redemptionCode} onPress={() => onRemove(giftCard)}>
-          <ThemedText style={styles.giftCardRemove}>{removingGiftCard === giftCard.redemptionCode ? 'Removendo...' : 'Remover'}</ThemedText>
+        <Pressable disabled={saving || removingGiftCard === (giftCard.redemptionCode || giftCard.id)} onPress={() => onRemove(giftCard)}>
+          <ThemedText style={styles.giftCardRemove}>{removingGiftCard === (giftCard.redemptionCode || giftCard.id) ? 'Removendo...' : 'Remover'}</ThemedText>
         </Pressable>
       </View>)}
       {appliedGiftCards.length > 0 && !canContinue && <ThemedText style={styles.giftCardRemaining}>Pagamento restante de {money(remainingValue)}. Por favor, combine com outra forma de pagamento</ThemedText>}
@@ -2315,7 +2377,7 @@ function GiftCardPaymentReview({ giftCards }: { giftCards: GiftCard[] }) {
     {giftCards.map((giftCard, index) => <View key={(giftCard.id || giftCard.redemptionCode) + '-review-' + index} style={styles.giftCardReviewRow}>
       <View style={styles.giftCardReviewColumn}>
         <ThemedText style={styles.giftCardReviewLabel}>Código</ThemedText>
-        <ThemedText style={styles.giftCardReviewCode}>{giftCard.redemptionCode.toUpperCase()}</ThemedText>
+        <ThemedText style={styles.giftCardReviewCode}>{giftCardDisplayCode(giftCard)}</ThemedText>
       </View>
       <View style={[styles.giftCardReviewColumn, styles.giftCardReviewColumnRight]}>
         <ThemedText style={styles.giftCardReviewLabel}>Valor</ThemedText>

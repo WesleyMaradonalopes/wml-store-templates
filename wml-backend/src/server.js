@@ -235,6 +235,23 @@ function paymentSystemKind(orderForm, paymentSystem, requestedKind) {
   return '';
 }
 
+function activeGiftCardsForOrder(orderForm) {
+  return (Array.isArray(orderForm?.paymentData?.giftCards) ? orderForm.paymentData.giftCards : [])
+    .filter((giftCard) => giftCard?.inUse === true && (giftCard?.redemptionCode || giftCard?.id));
+}
+
+function giftCardAppliedValueInCents(giftCard) {
+  const value = Number(giftCard?.value || 0);
+  if (Number.isFinite(value) && value > 0) return value;
+  const balance = Number(giftCard?.balance || 0);
+  return Number.isFinite(balance) && balance > 0 ? balance : 0;
+}
+
+function giftCardsCoverOrderInCents(orderForm, orderValue) {
+  return activeGiftCardsForOrder(orderForm)
+    .reduce((total, giftCard) => total + giftCardAppliedValueInCents(giftCard), 0) >= orderValue;
+}
+
 function buildPaymentFields({ kind, card, document, address, accountId = '', bin = '' }) {
   const fields = {
     accountId: String(card?.accountId || accountId || ''),
@@ -1311,7 +1328,9 @@ app.post('/checkout/order', async (request, response) => {
       return response.status(400).json({ ok: false, message: 'Não foi possível identificar a forma de pagamento.' });
     }
     if (kind === 'giftcard') {
-      return response.status(400).json({ ok: false, message: 'O vale-presente deve ser aplicado no carrinho antes de finalizar o pedido.' });
+      if (!giftCardsCoverOrderInCents(orderForm, orderValue)) {
+        return response.status(400).json({ ok: false, message: 'O vale-presente aplicado não cobre o valor total do pedido.' });
+      }
     }
     const paymentSystemName = String(paymentSystemEntry(orderForm, paymentSystem)?.name || '').trim();
     console.info(`[CHECKOUT] payment selected -> id=${paymentSystem} name=${paymentSystemName || 'unknown'} kind=${kind}`);
@@ -1407,6 +1426,10 @@ app.post('/checkout/order', async (request, response) => {
     const installmentsValue = Number(merchantSellerPayment?.installmentValue ?? payment?.installmentsValue ?? payment?.value ?? orderValue);
     const paymentValue = Number(merchantSellerPayment?.value ?? payment?.value ?? orderValue);
     const paymentReferenceValue = Number(merchantSellerPayment?.referenceValue ?? payment?.referenceValue ?? orderValue);
+    const appliedGiftCard = activeGiftCardsForOrder(orderForm).find((giftCard) => (
+      (payment?.giftCardId && String(giftCard.id || '') === String(payment.giftCardId))
+      || (payment?.giftCardRedemptionCode && String(giftCard.redemptionCode || '').toLowerCase() === String(payment.giftCardRedemptionCode).toLowerCase())
+    )) || activeGiftCardsForOrder(orderForm)[0];
     const paymentPayload = [{
       paymentSystem: normalizePaymentSystem(payment?.paymentSystem ?? paymentSystem),
       installments,
@@ -1430,6 +1453,11 @@ app.post('/checkout/order', async (request, response) => {
         isBillingAddressDifferent: false,
         chooseToUseNewCard: true,
         isRegexValid: true,
+      } : {}),
+      ...(kind === 'giftcard' ? {
+        giftCardRedemptionCode: String(payment?.giftCardRedemptionCode || appliedGiftCard?.redemptionCode || '').trim() || undefined,
+        giftCardProvider: String(payment?.giftCardProvider || appliedGiftCard?.provider || 'VtexGiftCard').trim() || undefined,
+        giftCardId: String(payment?.giftCardId || appliedGiftCard?.id || '').trim() || undefined,
       } : {}),
       transaction: {
         id: transactionId,
