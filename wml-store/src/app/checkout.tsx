@@ -1302,6 +1302,24 @@ export default function CheckoutScreen() {
       return currentOrderForm;
     }
 
+    // Depois que o perfil já foi identificado e o CPF foi sincronizado, não
+    // repetimos a busca por e-mail. A rota de identificação anexa somente o
+    // e-mail e pode devolver o mesmo perfil sem o CPF; reanexá-la imediatamente
+    // antes do paymentData faz a VTEX perder o contexto necessário para validar
+    // o vale-presente vinculado ao documento.
+    if (
+      currentOrderForm.userProfileId
+      && currentEmail.toLowerCase() === desiredEmail.toLowerCase()
+      && documentMatches
+    ) {
+      console.info('[GIFT CARD] customer profile already ready before apply', {
+        orderFormId: currentOrderForm.orderFormId,
+        userProfileIdPresent: true,
+        documentMatches: true,
+      });
+      return currentOrderForm;
+    }
+
     // Para clientes já reconhecidos, primeiro vincula o orderForm ao perfil
     // localizado pelo e-mail. Depois atualizamos o CPF explicitamente para
     // garantir que a validação do vale use o mesmo documento informado pelo
