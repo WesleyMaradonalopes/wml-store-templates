@@ -1510,7 +1510,22 @@ export default function CheckoutScreen() {
           cardIdPresent: Boolean(cardToApply.id),
         });
         if (!applied) {
-          throw new Error('Não foi possível aplicar automaticamente o vale-presente. Tente novamente.');
+          // A consulta protegida encontrou o cartão, mas a VTEX pode não
+          // refletir a primeira tentativa automática no paymentData. Nesse
+          // caso, fechamos o modal e deixamos exatamente o código encontrado
+          // no campo manual; o cliente só precisa tocar em "Adicionar".
+          const fallbackCode = cardToApply.redemptionCode.trim();
+          if (fallbackCode) {
+            setVoucher(fallbackCode);
+            setVoucherMessage('Vale-presente encontrado. Clique em Adicionar para aplicar.');
+            setVoucherMessageType('success');
+            console.info('[GIFT CARD] auto-apply fallback ready', {
+              orderFormId: authenticatedOrderForm.orderFormId,
+              codePresent: true,
+            });
+            return;
+          }
+          throw new Error('Não foi possível identificar o código do vale-presente.');
         }
       }
     } finally {
