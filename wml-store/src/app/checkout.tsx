@@ -1325,15 +1325,15 @@ export default function CheckoutScreen() {
     return updatedOrderForm;
   }
 
-  async function applyGiftCardCode(redemptionCode: string) {
+  async function applyGiftCardCode(redemptionCode: string, sourceOrderForm = orderForm) {
     const normalizedCode = redemptionCode.trim();
-    if (!orderForm || !normalizedCode) return false;
+    if (!sourceOrderForm || !normalizedCode) return false;
     setSaving(true);
     setVoucherLoading(true);
     setVoucherMessage('');
     setVoucherMessageType(null);
     try {
-      let giftCardOrderForm = await ensureCustomerProfileForGiftCard(orderForm);
+      let giftCardOrderForm = await ensureCustomerProfileForGiftCard(sourceOrderForm);
       console.info('[GIFT CARD] applying to orderForm', {
         orderFormId: giftCardOrderForm.orderFormId,
         userProfileIdPresent: Boolean(giftCardOrderForm.userProfileId),
@@ -1379,7 +1379,7 @@ export default function CheckoutScreen() {
     await applyGiftCardCode(redemptionCode);
   }
 
-  async function applyAvailableGiftCard(giftCard: GiftCard) {
+  async function applyAvailableGiftCard(giftCard: GiftCard, sourceOrderForm = orderForm) {
     const redemptionCode = giftCard.redemptionCode.trim();
     if (!redemptionCode) {
       setVoucherMessage('Este crédito não está disponível para aplicação agora.');
@@ -1387,7 +1387,7 @@ export default function CheckoutScreen() {
       return;
     }
     setApplyingAvailableGiftCard(giftCard.id || redemptionCode);
-    const applied = await applyGiftCardCode(redemptionCode);
+    const applied = await applyGiftCardCode(redemptionCode, sourceOrderForm);
     if (applied) {
       setAvailableGiftCards((current) => current.filter((item) => (
         (giftCard.id && item.id !== giftCard.id)
@@ -1424,6 +1424,21 @@ export default function CheckoutScreen() {
       setGiftCardAvailability(cards.length > 0 ? 'available' : 'none');
       setVoucherMessage('');
       setVoucherMessageType(null);
+      const appliedCardKeys = new Set(activeGiftCards(authenticatedOrderForm).map((card) => (
+        card.id || card.redemptionCode.trim().toLowerCase()
+      )));
+      const unappliedCards = cards.filter((card) => !appliedCardKeys.has(
+        card.id || card.redemptionCode.trim().toLowerCase(),
+      ));
+      if (unappliedCards.length > 0) {
+        // A identidade foi confirmada para este e-mail. Aplicamos o crédito
+        // automaticamente para que o cliente não precise copiar o código
+        // exibido no modal. Quando houver mais de um, priorizamos um que já
+        // cubra todo o pedido; caso contrário, usamos o primeiro e deixamos
+        // as demais opções disponíveis para uma nova aplicação.
+        const cardToApply = unappliedCards.find((card) => giftCardAppliedValue(card) >= authenticatedOrderForm.value) || unappliedCards[0];
+        await applyAvailableGiftCard(cardToApply, authenticatedOrderForm);
+      }
     } finally {
       setSaving(false);
     }

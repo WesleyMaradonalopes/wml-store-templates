@@ -1108,8 +1108,36 @@ app.post('/checkout/order-form/:orderFormId/gift-cards', async (request, respons
   }
 
   try {
-    const orderForm = await loadGiftCardOrderForm(orderFormId, userToken);
-    const cards = await giftCardsForOrderForm(orderForm, email);
+    let orderForm;
+    let cards = [];
+    let shopperContextError;
+    try {
+      orderForm = await loadGiftCardOrderForm(orderFormId, userToken);
+      cards = await giftCardsForOrderForm(orderForm, email);
+    } catch (error) {
+      shopperContextError = error;
+    }
+
+    // A sessão autenticada pode consultar o carrinho sem o clientProfileData
+    // completo (em especial o CPF), enquanto o contexto protegido do app
+    // ainda consegue enxergar o mesmo perfil e seus vales. A disponibilidade
+    // já usa esse contexto; repetir a leitura somente quando a primeira não
+    // trouxe cartões mantém os códigos protegidos sem bloquear clientes que
+    // acabaram de confirmar a identidade.
+    if (cards.length === 0) {
+      try {
+        const appOrderForm = await loadGiftCardOrderForm(orderFormId);
+        const appCards = await giftCardsForOrderForm(appOrderForm, email);
+        if (appCards.length > 0 || !orderForm) {
+          orderForm = appOrderForm;
+          cards = appCards;
+        }
+      } catch (error) {
+        if (!shopperContextError) shopperContextError = error;
+      }
+    }
+
+    if (!orderForm || (cards.length === 0 && shopperContextError)) throw shopperContextError;
     console.info(`[CHECKOUT] gift-card details -> orderForm=${orderFormId} email=${email} count=${cards.length}`);
     return response.json({ ok: true, giftCards: cards });
   } catch (error) {
