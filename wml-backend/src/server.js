@@ -634,20 +634,26 @@ async function giftCardsForOrderForm(orderForm, email, {
   // A busca autenticada precisa carregar também os cookies da sessão VTEX ID.
   // Sem esse contexto, a Giftcard API pode devolver um crédito de profileId
   // antigo em vez do vale restrito ao CPF que está no orderForm.
-  const requestHeaders = userToken
-    ? sessionHeaders(normalizedEmail, userToken)
-    : vtexHeaders();
+  const headerVariants = [
+    ...(userToken ? [sessionHeaders(normalizedEmail, userToken)] : []),
+    vtexHeaders(),
+  ];
   const cart = giftCardSearchCart(orderForm);
-  const searchResults = await Promise.all(candidates.map(async (candidate) => {
-    try {
-      return {
-        ...candidate,
-        result: await searchGiftCardsForClient(cart, candidate.client, requestHeaders),
-      };
-    } catch (error) {
-      return { ...candidate, error };
-    }
-  }));
+  const searchResults = [];
+  for (const requestHeaders of headerVariants) {
+    const variantResults = await Promise.all(candidates.map(async (candidate) => {
+      try {
+        return {
+          ...candidate,
+          requestHeaders,
+          result: await searchGiftCardsForClient(cart, candidate.client, requestHeaders),
+        };
+      } catch (error) {
+        return { ...candidate, requestHeaders, error };
+      }
+    }));
+    searchResults.push(...variantResults);
+  }
   const successfulSearches = searchResults.filter((entry) => entry.result?.ok);
   if (successfulSearches.length === 0) {
     const failed = searchResults.find((entry) => entry.result || entry.error);
@@ -676,11 +682,25 @@ async function giftCardsForOrderForm(orderForm, email, {
 
   const cards = await Promise.all(summaries.slice(0, 50).map(async ({ summary, client }) => {
     const id = String(summary?.id || '').trim();
-    const detailResult = await fetch(
-      `${vtexBaseUrl}/api/giftcards/${encodeURIComponent(id)}`,
-      { headers: requestHeaders },
-    ).catch(() => null);
-    const detail = detailResult?.ok ? await readResponseBody(detailResult) : null;
+    let detail = null;
+    for (const requestHeaders of headerVariants) {
+      const detailResult = await fetch(
+        `${vtexBaseUrl}/api/giftcards/${encodeURIComponent(id)}`,
+        { headers: requestHeaders },
+      ).catch(() => null);
+      if (detailResult?.ok) {
+        const candidateDetail = await readResponseBody(detailResult);
+        // Algumas sessões de shopper retornam o código mascarado. Continue
+        // com a autenticação da aplicação para obter o código completo; sem
+        // ele não é seguro nem possível aplicá-lo no checkout.
+        if (!detail) detail = candidateDetail;
+        const candidateCode = String(candidateDetail?.redemptionCode || '').trim();
+        if (candidateCode && !candidateCode.includes('*')) {
+          detail = candidateDetail;
+          break;
+        }
+      }
+    }
     const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
     if (!giftCardIsUsable(card)) return null;
 
@@ -701,13 +721,17 @@ async function giftCardsForOrderForm(orderForm, email, {
       .filter((candidateClient, index, values) => values.findIndex((value) => (
         String(value.id).trim().toLowerCase() === String(candidateClient.id).trim().toLowerCase()
       )) === index);
-    const validations = await Promise.all(validationClients.map(async (validationClient) => {
-      try {
-        return await searchGiftCardsForClient(validationCart, validationClient, requestHeaders);
-      } catch {
-        return null;
-      }
-    }));
+    const validations = [];
+    for (const requestHeaders of headerVariants) {
+      const variantValidations = await Promise.all(validationClients.map(async (validationClient) => {
+        try {
+          return await searchGiftCardsForClient(validationCart, validationClient, requestHeaders);
+        } catch {
+          return null;
+        }
+      }));
+      validations.push(...variantValidations);
+    }
     const confirmed = validations.some((validation) => (
       validation?.ok && giftCardLookupContainsCard(publicCard, validation.items)
     ));
@@ -1161,9 +1185,12 @@ async function loadGiftCardOrderForm(orderFormId, userToken = '') {
       cookie: checkoutOwnershipCookieForOrderForm(orderFormId),
       // Availability is read-only. When there is no shopper session, the
       // backend app credentials are the same protected context used by the
-      // existing profile lookup.
-      fallbackToAppAuth: !userToken,
-      fallbackWithoutUserToken: !userToken,
+      // existing profile lookup. If a shopper token has expired, the app
+      // context still lets us perform the protected, e-mail-scoped lookup;
+      // the details endpoint validates the returned codes before exposing
+      // them to the app.
+      fallbackToAppAuth: true,
+      fallbackWithoutUserToken: Boolean(userToken),
     },
   );
   rememberCheckoutOwnershipCookie(orderFormId, result);
@@ -1247,7 +1274,11 @@ app.post('/checkout/order-form/:orderFormId/gift-cards', async (request, respons
       }
     }
 
-    if (!orderForm || (cards.length === 0 && shopperContextError)) throw shopperContextError;
+    // A valid orderForm with zero usable cards is a normal result (for
+    // example, when every listed card is expired or rejected by the targeted
+    // validation). Do not surface the failed shopper-only attempt as an HTTP
+    // 401 after the app-auth fallback has already loaded the same cart.
+    if (!orderForm) throw shopperContextError || new Error('Não foi possível consultar o carrinho.');
     console.info(`[CHECKOUT] gift-card details -> orderForm=${orderFormId} email=${email} count=${cards.length}`);
     return response.json({ ok: true, giftCards: cards });
   } catch (error) {
