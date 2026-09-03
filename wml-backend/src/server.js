@@ -4,6 +4,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isGiftCardPaymentData, shopperTokenForPaymentData } from './checkout-context.js';
+import { giftCardClientCandidates, giftCardLookupContainsCard } from './gift-card-context.js';
 import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
 
 const app = express();
@@ -594,56 +595,137 @@ function publicGiftCard(card) {
   };
 }
 
-async function giftCardsForOrderForm(orderForm, email) {
+async function searchGiftCardsForClient(cart, client, headers) {
+  const response = await fetch(`${vtexBaseUrl}/api/giftcards/_search`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+      'REST-Range': 'resources=0-49',
+    },
+    body: JSON.stringify({ cart, client }),
+  });
+  const body = await readResponseBody(response);
+  return {
+    ok: response.ok,
+    status: response.status,
+    body,
+    items: response.ok ? giftCardSearchItems(body).slice(0, 50) : [],
+  };
+}
+
+async function giftCardsForOrderForm(orderForm, email, {
+  userToken = '',
+  verifyRedemptionCodes = false,
+} = {}) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const profileEmail = String(orderForm?.clientProfileData?.email || '').trim().toLowerCase();
   if (!normalizedEmail || !profileEmail || profileEmail !== normalizedEmail) {
     throw new Error('O e-mail do carrinho não corresponde ao perfil informado.');
   }
-  const profileId = String(orderForm?.userProfileId || '').trim() || normalizedEmail;
-  const client = {
-    id: profileId,
+  const customerProfile = await resolveCustomerProfile(normalizedEmail).catch(() => null);
+  const candidates = giftCardClientCandidates({
+    orderForm,
     email: normalizedEmail,
-    document: digits(orderForm?.clientProfileData?.document || ''),
-  };
-  if (!client.document) {
-    // The Giftcard API requires the document field even when the profile is
-    // identified by e-mail. An empty value is accepted by the endpoint and
-    // keeps the lookup read-only for profiles whose CPF is not in the cart.
-    client.document = '';
-  }
-
-  const searchResult = await fetch(`${vtexBaseUrl}/api/giftcards/_search`, {
-    method: 'POST',
-    headers: {
-      ...vtexHeaders(),
-      'Content-Type': 'application/json',
-      'REST-Range': 'resources=0-49',
-    },
-    body: JSON.stringify({ cart: giftCardSearchCart(orderForm), client }),
+    profile: customerProfile,
   });
-  const searchBody = await readResponseBody(searchResult);
-  if (!searchResult.ok) {
-    throw new Error(vtexErrorMessage(searchBody, `A VTEX não conseguiu consultar os créditos (HTTP ${searchResult.status}).`));
+  if (candidates.length === 0) return [];
+
+  // A busca autenticada precisa carregar também os cookies da sessão VTEX ID.
+  // Sem esse contexto, a Giftcard API pode devolver um crédito de profileId
+  // antigo em vez do vale restrito ao CPF que está no orderForm.
+  const requestHeaders = userToken
+    ? sessionHeaders(normalizedEmail, userToken)
+    : vtexHeaders();
+  const cart = giftCardSearchCart(orderForm);
+  const searchResults = await Promise.all(candidates.map(async (candidate) => {
+    try {
+      return {
+        ...candidate,
+        result: await searchGiftCardsForClient(cart, candidate.client, requestHeaders),
+      };
+    } catch (error) {
+      return { ...candidate, error };
+    }
+  }));
+  const successfulSearches = searchResults.filter((entry) => entry.result?.ok);
+  if (successfulSearches.length === 0) {
+    const failed = searchResults.find((entry) => entry.result || entry.error);
+    if (failed?.result) {
+      throw new Error(vtexErrorMessage(
+        failed.result.body,
+        `A VTEX não conseguiu consultar os créditos (HTTP ${failed.result.status}).`,
+      ));
+    }
+    throw failed?.error || new Error('A VTEX não conseguiu consultar os créditos.');
   }
 
-  const summaries = giftCardSearchItems(searchBody).slice(0, 50);
-  const cards = await Promise.all(summaries.map(async (summary) => {
-    const id = String(summary?.id || '').trim();
-    if (!id) return null;
-    const detailResult = await fetch(`${vtexBaseUrl}/api/giftcards/${encodeURIComponent(id)}`, { headers: vtexHeaders() }).catch(() => null);
-    if (!detailResult?.ok) return giftCardIsUsable(summary) ? summary : null;
-    const detail = await readResponseBody(detailResult);
-    const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
-    return giftCardIsUsable(card) ? card : null;
-  }));
+  // Um mesmo cartão pode aparecer por CPF, userId e e-mail. Preservamos a
+  // primeira ocorrência, pois os candidatos já estão ordenados por precisão.
+  const summaries = [];
+  const seenCardIds = new Set();
+  for (const entry of successfulSearches) {
+    for (const summary of entry.result.items) {
+      const id = String(summary?.id || '').trim();
+      const normalizedId = id.toLowerCase();
+      if (!id || seenCardIds.has(normalizedId)) continue;
+      seenCardIds.add(normalizedId);
+      summaries.push({ summary, client: entry.client });
+    }
+  }
 
-  return cards.filter(Boolean).map(publicGiftCard).filter((card) => (
-    card.id
-    && card.redemptionCode
-    && !card.redemptionCode.includes('*')
-    && card.balance > 0
-  ));
+  const cards = await Promise.all(summaries.slice(0, 50).map(async ({ summary, client }) => {
+    const id = String(summary?.id || '').trim();
+    const detailResult = await fetch(
+      `${vtexBaseUrl}/api/giftcards/${encodeURIComponent(id)}`,
+      { headers: requestHeaders },
+    ).catch(() => null);
+    const detail = detailResult?.ok ? await readResponseBody(detailResult) : null;
+    const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
+    if (!giftCardIsUsable(card)) return null;
+
+    const publicCard = publicGiftCard(card);
+    if (
+      !publicCard.id
+      || !publicCard.redemptionCode
+      || publicCard.redemptionCode.includes('*')
+      || publicCard.balance <= 0
+    ) return null;
+    if (!verifyRedemptionCodes) return publicCard;
+
+    // Confirma o código no mesmo carrinho antes de expô-lo ao app. Isso
+    // elimina resultados obsoletos que ainda aparecem na listagem, mas que o
+    // Checkout rejeita como "forma de pagamento não disponível".
+    const validationCart = { ...cart, redemptionCode: publicCard.redemptionCode };
+    const validationClients = [client, ...candidates.map((candidate) => candidate.client)]
+      .filter((candidateClient, index, values) => values.findIndex((value) => (
+        String(value.id).trim().toLowerCase() === String(candidateClient.id).trim().toLowerCase()
+      )) === index);
+    const validations = await Promise.all(validationClients.map(async (validationClient) => {
+      try {
+        return await searchGiftCardsForClient(validationCart, validationClient, requestHeaders);
+      } catch {
+        return null;
+      }
+    }));
+    const confirmed = validations.some((validation) => (
+      validation?.ok && giftCardLookupContainsCard(publicCard, validation.items)
+    ));
+    return confirmed ? publicCard : null;
+  }));
+  const availableCards = cards.filter(Boolean);
+  const matchedSources = successfulSearches
+    .filter((entry) => entry.result.items.length > 0)
+    .map((entry) => entry.source);
+  console.info('[CHECKOUT] gift-card search context', {
+    authenticated: Boolean(userToken),
+    candidateCount: candidates.length,
+    matchedSources,
+    listedCount: summaries.length,
+    returnedCount: availableCards.length,
+    codesVerified: verifyRedemptionCodes,
+  });
+  return availableCards;
 }
 
 async function resolveCustomerProfile(email) {
@@ -1095,13 +1177,18 @@ async function loadGiftCardOrderForm(orderFormId, userToken = '') {
 app.post('/checkout/order-form/:orderFormId/gift-cards/availability', async (request, response) => {
   const orderFormId = String(request.params.orderFormId || '').trim();
   const email = String(request.body?.email || '').trim().toLowerCase();
+  const requestUserToken = String(request.headers.vtexidclientautcookie || '').trim();
+  const userToken = customerEmailForToken(requestUserToken) === email ? requestUserToken : '';
   if (!isSafeCheckoutId(orderFormId) || !email || !email.includes('@')) {
     return response.status(400).json({ ok: false, message: 'Carrinho ou e-mail inválido.' });
   }
 
   try {
-    const orderForm = await loadGiftCardOrderForm(orderFormId);
-    const cards = await giftCardsForOrderForm(orderForm, email);
+    const orderForm = await loadGiftCardOrderForm(orderFormId, userToken);
+    const cards = await giftCardsForOrderForm(orderForm, email, {
+      userToken,
+      verifyRedemptionCodes: Boolean(userToken),
+    });
     console.info(`[CHECKOUT] gift-card availability -> orderForm=${orderFormId} email=${email} available=${cards.length > 0}`);
     // Do not return card ids, codes, balances, or profile data before the
     // shopper confirms the identity with VTEX ID.
@@ -1130,7 +1217,10 @@ app.post('/checkout/order-form/:orderFormId/gift-cards', async (request, respons
     let shopperContextError;
     try {
       orderForm = await loadGiftCardOrderForm(orderFormId, userToken);
-      cards = await giftCardsForOrderForm(orderForm, email);
+      cards = await giftCardsForOrderForm(orderForm, email, {
+        userToken,
+        verifyRedemptionCodes: true,
+      });
     } catch (error) {
       shopperContextError = error;
     }
@@ -1144,7 +1234,10 @@ app.post('/checkout/order-form/:orderFormId/gift-cards', async (request, respons
     if (cards.length === 0) {
       try {
         const appOrderForm = await loadGiftCardOrderForm(orderFormId);
-        const appCards = await giftCardsForOrderForm(appOrderForm, email);
+        const appCards = await giftCardsForOrderForm(appOrderForm, email, {
+          userToken,
+          verifyRedemptionCodes: true,
+        });
         if (appCards.length > 0 || !orderForm) {
           orderForm = appOrderForm;
           cards = appCards;

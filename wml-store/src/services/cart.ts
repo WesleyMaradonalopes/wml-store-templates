@@ -1127,11 +1127,12 @@ export async function identifyExistingCustomerByEmail(
 }
 
 export async function checkGiftCardAvailability(orderFormId: string, email: string): Promise<boolean> {
+  const authHeaders = await userTokenHeaders();
   const response = await fetch(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/gift-cards/availability`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     },
   ).catch(() => null);

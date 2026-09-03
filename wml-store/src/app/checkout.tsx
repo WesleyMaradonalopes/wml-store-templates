@@ -181,6 +181,15 @@ function giftCardDisplayCode(giftCard: GiftCard) {
   return (giftCard.redemptionCode?.trim() || giftCard.caption?.trim() || giftCard.id?.trim() || 'Vale-presente').toUpperCase();
 }
 
+function giftCardCreditLabel(giftCard: GiftCard) {
+  const label = (giftCard.caption?.trim() || giftCard.name?.trim() || 'Vale-presente')
+    .replace(/(?:\s*[-–—|/]\s*)?\bERP\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*[-–—|/]\s*$/, '')
+    .trim();
+  return label || 'Vale-presente';
+}
+
 function giftCardsTotal(giftCards: GiftCard[]) {
   return giftCards.reduce((total, giftCard) => total + giftCardAppliedValue(giftCard), 0);
 }
@@ -2287,7 +2296,7 @@ function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, savi
         const applying = applyingAvailableGiftCard === key;
         return <View key={key} style={styles.availableGiftCardRow}>
           <View style={styles.giftCardDetails}>
-            <ThemedText style={styles.giftCardCode}>{giftCard.caption || giftCard.name || 'Vale-presente'}</ThemedText>
+            <ThemedText style={styles.giftCardCode}>{giftCardCreditLabel(giftCard)}</ThemedText>
             <ThemedText style={styles.giftCardAmount}>{money(giftCardAppliedValue(giftCard))}</ThemedText>
           </View>
           <Pressable disabled={saving || voucherLoading || Boolean(applyingAvailableGiftCard)} onPress={() => onApplyAvailableGiftCard(giftCard)} style={[styles.smallButton, (saving || voucherLoading || Boolean(applyingAvailableGiftCard)) && styles.giftCardButtonDisabled]}>
