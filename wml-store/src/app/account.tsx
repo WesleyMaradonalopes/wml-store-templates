@@ -77,7 +77,6 @@ function mergeOrderFormProfile(current: CustomerProfile, incoming: OrderFormProf
   };
 }
 
-const userEmail = 'wesley.lopes@grupohope.com.br';
 const googleClientIdPlaceholder = 'not-configured.apps.googleusercontent.com';
 const googleRedirectUri = makeRedirectUri({ scheme: 'lojahr', path: 'oauthredirect' });
 
@@ -88,7 +87,7 @@ export default function AccountScreen() {
   const { view: requestedView } = useLocalSearchParams<{ view?: string }>();
   const [view, setView] = useState<AccountView>(requestedView === 'access' ? 'access' : 'home');
   const [loggedIn, setLoggedIn] = useState(false);
-  const [email, setEmail] = useState(userEmail);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');

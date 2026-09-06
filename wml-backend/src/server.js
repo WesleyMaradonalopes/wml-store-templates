@@ -780,6 +780,8 @@ async function giftCardsForOrderForm(orderForm, email, {
   console.info('[CHECKOUT] gift-card search context', {
     authenticated: Boolean(userToken),
     candidateCount: candidates.length,
+    cartItemCount: cart.items.length,
+    cartGrandTotal: cart.grandTotal,
     matchedSources,
     rawListedCount: rawSummaries.length,
     filteredOutCount: rawSummaries.length - summaries.length,

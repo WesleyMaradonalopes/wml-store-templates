@@ -10,18 +10,31 @@ import {
   uniqueGiftCardSearchEntries,
 } from '../src/gift-card-context.js';
 
+// Synthetic documents keep the ownership tests representative without
+// embedding a real customer's CPF in the repository.
+const PRIMARY_DOCUMENT = '1'.repeat(11);
+const OTHER_DOCUMENT = '2'.repeat(11);
+
+function formatDocument(document) {
+  return `${document.slice(0, 3)}.${document.slice(3, 6)}.${document.slice(6, 9)}-${document.slice(9)}`;
+}
+
+function maskedDocument(document) {
+  return `***.***.${document.slice(6, 9)}-${document.slice(9)}`;
+}
+
 test('uses only ownership identifiers documented by the Giftcard API', () => {
   const candidates = giftCardClientCandidates({
     email: ' Customer@Example.com ',
     orderForm: {
       userProfileId: 'profile-from-order-form',
-      clientProfileData: { email: 'customer@example.com', document: '123.456.789-00' },
+      clientProfileData: { email: 'customer@example.com', document: formatDocument(PRIMARY_DOCUMENT) },
     },
     profile: {
       id: 'master-data-document-id',
       userId: 'master-data-user-id',
       email: 'customer@example.com',
-      document: '123.456.789-00',
+      document: formatDocument(PRIMARY_DOCUMENT),
     },
   });
 
@@ -32,9 +45,9 @@ test('uses only ownership identifiers documented by the Giftcard API', () => {
     'master-data-id',
   ]);
   assert.deepEqual(candidates[0].client, {
-    id: '12345678900',
+    id: PRIMARY_DOCUMENT,
     email: 'customer@example.com',
-    document: '12345678900',
+    document: PRIMARY_DOCUMENT,
   });
 });
 
@@ -43,7 +56,7 @@ test('deduplicates equivalent profile identities', () => {
     email: 'customer@example.com',
     orderForm: {
       userProfileId: 'SAME-ID',
-      clientProfileData: { email: 'customer@example.com', document: '12345678900' },
+      clientProfileData: { email: 'customer@example.com', document: PRIMARY_DOCUMENT },
     },
     profile: {
       email: 'customer@example.com',
@@ -63,28 +76,28 @@ test('prefers the document from the profile resolved by the same email', () => {
   const candidates = giftCardClientCandidates({
     email: 'customer@example.com',
     orderForm: {
-      clientProfileData: { email: 'customer@example.com', document: '430.850.768-59' },
+      clientProfileData: { email: 'customer@example.com', document: formatDocument(OTHER_DOCUMENT) },
     },
     profile: {
       email: 'customer@example.com',
-      document: '396.619.588-74',
+      document: formatDocument(PRIMARY_DOCUMENT),
       userId: 'customer-user-id',
     },
   });
 
-  assert.equal(candidates[0].client.document, '39661958874');
-  assert.equal(candidates.some(({ client }) => client.id === '43085076859'), false);
+  assert.equal(candidates[0].client.document, PRIMARY_DOCUMENT);
+  assert.equal(candidates.some(({ client }) => client.id === OTHER_DOCUMENT), false);
 });
 
 test('does not use a profile or partial CPF from another email', () => {
   const candidates = giftCardClientCandidates({
     email: 'customer@example.com',
     orderForm: {
-      clientProfileData: { email: 'customer@example.com', document: '***.***.588-74' },
+      clientProfileData: { email: 'customer@example.com', document: maskedDocument(OTHER_DOCUMENT) },
     },
     profile: {
       email: 'other@example.com',
-      document: '430.850.768-59',
+      document: formatDocument(OTHER_DOCUMENT),
       userId: 'other-user-id',
     },
   });
@@ -97,13 +110,13 @@ test('does not reuse an order form profile from another customer', () => {
     email: 'customer@example.com',
     orderForm: {
       userProfileId: 'other-profile-id',
-      clientProfileData: { email: 'customer@example.com', document: '12345678900' },
+      clientProfileData: { email: 'customer@example.com', document: PRIMARY_DOCUMENT },
     },
     profile: {
       id: 'customer-document-id',
       userId: 'customer-profile-id',
       email: 'customer@example.com',
-      document: '12345678900',
+      document: PRIMARY_DOCUMENT,
     },
   });
 
@@ -127,9 +140,9 @@ test('orders usable cards by newest emission date', () => {
 
 test('deduplicates cards returned for a confirmed client identity', () => {
   const cpfClient = {
-    id: '39661958874',
+    id: PRIMARY_DOCUMENT,
     email: 'customer@example.com',
-    document: '39661958874',
+    document: PRIMARY_DOCUMENT,
   };
   const searches = [
     {
@@ -162,11 +175,11 @@ test('deduplicates cards returned for a confirmed client identity', () => {
 });
 
 test('requires a card owner to match the confirmed customer', () => {
-  const candidates = [{ client: { id: '39661958874', email: 'customer@example.com', document: '39661958874' } }];
+  const candidates = [{ client: { id: PRIMARY_DOCUMENT, email: 'customer@example.com', document: PRIMARY_DOCUMENT } }];
 
-  assert.equal(giftCardOwnerIdentifier({ id: '39661958874_7364' }), '39661958874');
-  assert.equal(giftCardBelongsToClient({ id: '39661958874_7364' }, candidates), true);
-  assert.equal(giftCardBelongsToClient({ id: '43085076859_1234' }, candidates), false);
+  assert.equal(giftCardOwnerIdentifier({ id: `${PRIMARY_DOCUMENT}_7364` }), PRIMARY_DOCUMENT);
+  assert.equal(giftCardBelongsToClient({ id: `${PRIMARY_DOCUMENT}_7364` }, candidates), true);
+  assert.equal(giftCardBelongsToClient({ id: `${OTHER_DOCUMENT}_1234` }, candidates), false);
   assert.equal(giftCardBelongsToClient({ id: '_6896' }, candidates), false);
   assert.equal(giftCardBelongsToClient({ id: 'opaque-id', profileId: 'customer@example.com' }, candidates), true);
 });
