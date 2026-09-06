@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { isGiftCardPaymentData, shopperTokenForPaymentData } from './checkout-context.js';
 import {
   compareGiftCardsNewestFirst,
+  giftCardBelongsToClient,
   giftCardClientCandidates,
   giftCardLookupContainsCard,
   uniqueGiftCardSearchEntries,
@@ -57,11 +58,16 @@ function checkoutHeaders(userToken = '', contentType = false, cookie = '') {
   const headers = { ...vtexHeaders() };
   if (contentType) headers['Content-Type'] = 'application/json';
   const cookies = [];
-  if (userToken) {
+  const sessionCookie = sessionCookieForToken(userToken);
+  // A successful VTEX ID login returns the usable credential as a cookie.
+  // The JWT in the response body is not interchangeable with the
+  // VtexIdclientAutCookie request header on Checkout/GiftCard endpoints.
+  // When the complete cookie is stored, forwarding the body token as a
+  // header makes VTEX reject an otherwise valid shopper session.
+  if (userToken && !sessionCookie) {
     headers.VtexIdclientAutCookie = userToken;
     cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
-  const sessionCookie = sessionCookieForToken(userToken);
   // Mantém os cookies de propriedade do orderForm, mas a identidade enviada
   // explicitamente pelo aplicativo sempre prevalece sobre cookies antigos.
   const cookieHeader = mergeCookieHeaders(sessionCookie, cookie, cookies.join('; '));
@@ -73,11 +79,11 @@ function publicCheckoutHeaders(userToken = '', contentType = false, cookie = '')
   const headers = { Accept: 'application/json' };
   if (contentType) headers['Content-Type'] = 'application/json';
   const cookies = [];
-  if (userToken) {
+  const sessionCookie = sessionCookieForToken(userToken);
+  if (userToken && !sessionCookie) {
     headers.VtexIdclientAutCookie = userToken;
     cookies.push(`VtexIdclientAutCookie_${account}=${userToken}`, `VtexIdclientAutCookie=${userToken}`);
   }
-  const sessionCookie = sessionCookieForToken(userToken);
   const cookieHeader = mergeCookieHeaders(sessionCookie, cookie, cookies.join('; '));
   if (cookieHeader) headers.Cookie = cookieHeader;
   return headers;
@@ -379,6 +385,18 @@ function tokenFromCookie(cookieHeader) {
   return match?.[1] || '';
 }
 
+function authTokenFromResponse(body, cookieHeader) {
+  // Prefer the credential actually issued as VtexIdclientAutCookie. The
+  // Authenticator response also contains a JWT-shaped `authCookie.Value`,
+  // but VTEX Checkout can reject that value when it is copied to the request
+  // header instead of replaying the Set-Cookie credential.
+  return tokenFromCookie(cookieHeader)
+    || String(body?.clientToken || '').trim()
+    || String(body?.authCookie?.Value || '').trim()
+    || String(body?.accountAuthCookie?.Value || '').trim()
+    || String(body?.token || '').trim();
+}
+
 function mergeCookieHeaders(...values) {
   const cookies = new Map();
   for (const value of values) {
@@ -417,10 +435,12 @@ function customerEmailForToken(token = '') {
 
 function sessionHeaders(email, token = '') {
   const stored = customerVtexSessions.get(email) || {};
+  const storedCookie = String(stored.cookieHeader || '').trim();
   const authToken = stored.authToken || token;
   const headers = { ...vtexHeaders() };
-  if (stored.cookieHeader) headers.Cookie = stored.cookieHeader;
-  if (authToken) {
+  if (storedCookie) {
+    headers.Cookie = storedCookie;
+  } else if (authToken) {
     headers.VtexIdclientAutCookie = authToken;
     if (!headers.Cookie) headers.Cookie = `VtexIdclientAutCookie_${account}=${authToken}; VtexIdclientAutCookie=${authToken}`;
   }
@@ -685,7 +705,9 @@ async function giftCardsForOrderForm(orderForm, email, {
   // titular. A associação vem da própria busca direcionada: cada resultado
   // abaixo foi devolvido pela VTEX para um client montado exclusivamente com
   // o CPF, userId ou e-mail confirmados no Master Data para este checkout.
-  const summaries = uniqueGiftCardSearchEntries(successfulSearches);
+  const rawSummaries = uniqueGiftCardSearchEntries(successfulSearches);
+  const summaries = rawSummaries
+    .filter(({ summary }) => giftCardBelongsToClient(summary, candidates));
 
   const cards = await Promise.all(summaries.slice(0, 50).map(async ({ summary, client }) => {
     const id = String(summary?.id || '').trim();
@@ -709,6 +731,7 @@ async function giftCardsForOrderForm(orderForm, email, {
       }
     }
     const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
+    if (!giftCardBelongsToClient(card, candidates)) return null;
     if (!giftCardIsUsable(card)) return null;
 
     const publicCard = publicGiftCard(card);
@@ -746,6 +769,8 @@ async function giftCardsForOrderForm(orderForm, email, {
     authenticated: Boolean(userToken),
     candidateCount: candidates.length,
     matchedSources,
+    rawListedCount: rawSummaries.length,
+    filteredOutCount: rawSummaries.length - summaries.length,
     listedCount: summaries.length,
     returnedCount: availableCards.length,
     codesVerified: verifyRedemptionCodes,
@@ -1939,7 +1964,7 @@ app.post('/auth/login', async (request, response) => {
     const result = await fetch(`${vtexBaseUrl}/api/vtexid/pub/authentication/classic/validate`, { method: 'POST', headers: { Cookie: `_vss=${startBody.authenticationToken}` }, body: form });
     const body = await result.json().catch(() => ({}));
     const cookieHeader = normalizeCookieHeader(extractSetCookie(result));
-    const authToken = body?.authCookie?.Value || body?.token || tokenFromCookie(cookieHeader);
+    const authToken = authTokenFromResponse(body, cookieHeader);
     if (!result.ok || (!authToken && !cookieHeader)) throw new Error(body?.message || 'E-mail ou senha inválidos.');
     customerVtexSessions.set(email, { authToken, cookieHeader, updatedAt: Date.now() });
     console.log(`[AUTH] ${email} -> password session cookie=${Boolean(cookieHeader)} token=${Boolean(authToken)}`);
@@ -1961,7 +1986,7 @@ app.post('/auth/access-key/validate', async (request, response) => {
     const result = await fetch(`${vtexBaseUrl}/api/vtexid/pub/authentication/accesskey/validate`, { method: 'POST', headers: { Cookie: `_vss=${authenticationToken}` }, body: form });
     const body = await result.json().catch(() => ({}));
     const cookieHeader = normalizeCookieHeader(extractSetCookie(result));
-    const authToken = body?.authCookie?.Value || body?.token || tokenFromCookie(cookieHeader);
+    const authToken = authTokenFromResponse(body, cookieHeader);
     if (!result.ok || (!authToken && !cookieHeader)) throw new Error('Código de acesso inválido.');
     customerVtexSessions.set(email, { authToken, cookieHeader, updatedAt: Date.now() });
     console.log(`[AUTH] ${email} -> access-key session cookie=${Boolean(cookieHeader)} token=${Boolean(authToken)}`);

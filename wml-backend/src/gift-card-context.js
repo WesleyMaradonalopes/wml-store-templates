@@ -32,13 +32,26 @@ export function giftCardClientCandidates({ orderForm, email, profile }) {
     ? validDocument(orderForm?.clientProfileData?.document)
     : '';
   const document = profileDocument || orderFormDocument;
+  const profileUserId = profileEmailMatches ? String(profile?.userId || '').trim() : '';
+  const orderFormProfileId = String(orderForm?.userProfileId || '').trim();
+  const orderFormProfileMatches = Boolean(
+    orderFormProfileId
+      && (!profileUserId || normalizeIdentifier(orderFormProfileId) === normalizeIdentifier(profileUserId)),
+  );
   const rawCandidates = [
     // Vales criados pelo Admin são vinculados ao Customer ID (CPF/CNPJ).
     ['document', document],
     // Conforme a Giftcard API, vales criados pela API usam profileId, que
     // pode ser o userId do Master Data ou o e-mail cadastrado.
-    ['master-data-user-id', profileEmailMatches ? profile?.userId : ''],
+    ['master-data-user-id', profileUserId],
+    // Alguns vales antigos foram criados usando o userProfileId retornado
+    // pelo Checkout. Só o aceitamos quando ele coincide com o userId do
+    // perfil localizado pelo mesmo e-mail (ou quando o perfil não informa
+    // userId), evitando reaproveitar um perfil antigo do orderForm.
+    ['order-form-profile-id', orderFormProfileMatches ? orderFormProfileId : ''],
     ['email', normalizedEmail],
+    // Integrações legadas podem ter usado o id do documento CL como profileId.
+    ['master-data-id', profileEmailMatches ? profile?.id : ''],
   ];
   const seen = new Set();
 
@@ -56,6 +69,36 @@ export function giftCardClientCandidates({ orderForm, email, profile }) {
       },
     }];
   });
+}
+
+export function giftCardOwnerIdentifier(card) {
+  const id = String(card?.id || '').trim();
+  const separator = id.lastIndexOf('_');
+  if (separator > 0 && separator < id.length - 1) return normalizeIdentifier(id.slice(0, separator));
+  return normalizeIdentifier(
+    card?.profileId
+      || card?.customerId
+      || card?.clientId
+      || card?.owner?.id
+      || card?.owner?.profileId,
+  );
+}
+
+export function giftCardBelongsToClient(card, candidates) {
+  const owner = giftCardOwnerIdentifier(card);
+  // A card without an owner identifier cannot be safely exposed as a CPF-
+  // linked credit. This prevents the broad legacy/ERP results with IDs such
+  // as `_6896` from being shown for an unrelated customer. Manual redemption
+  // remains available because it is validated by VTEX with the entered code.
+  if (!owner) return false;
+  const identities = (Array.isArray(candidates) ? candidates : [])
+    .flatMap(({ client }) => [client?.id, client?.email, validDocument(client?.document)])
+    .map(normalizeIdentifier)
+    .filter(Boolean);
+  if (identities.includes(owner)) return true;
+  // An owner that belongs to another CPF/profile/e-mail must never be exposed
+  // even if a broad legacy search returned it.
+  return false;
 }
 
 export function compareGiftCardsNewestFirst(left, right) {

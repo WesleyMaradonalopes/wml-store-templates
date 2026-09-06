@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import {
   compareGiftCardsNewestFirst,
+  giftCardBelongsToClient,
   giftCardClientCandidates,
+  giftCardOwnerIdentifier,
   giftCardLookupContainsCard,
   uniqueGiftCardSearchEntries,
 } from '../src/gift-card-context.js';
@@ -27,6 +29,7 @@ test('uses only ownership identifiers documented by the Giftcard API', () => {
     'document',
     'master-data-user-id',
     'email',
+    'master-data-id',
   ]);
   assert.deepEqual(candidates[0].client, {
     id: '12345678900',
@@ -89,6 +92,25 @@ test('does not use a profile or partial CPF from another email', () => {
   assert.deepEqual(candidates.map(({ source }) => source), ['email']);
 });
 
+test('does not reuse an order form profile from another customer', () => {
+  const candidates = giftCardClientCandidates({
+    email: 'customer@example.com',
+    orderForm: {
+      userProfileId: 'other-profile-id',
+      clientProfileData: { email: 'customer@example.com', document: '12345678900' },
+    },
+    profile: {
+      id: 'customer-document-id',
+      userId: 'customer-profile-id',
+      email: 'customer@example.com',
+      document: '12345678900',
+    },
+  });
+
+  assert.equal(candidates.some(({ source }) => source === 'order-form-profile-id'), false);
+  assert.equal(candidates.some(({ client }) => client.id === 'other-profile-id'), false);
+});
+
 test('orders usable cards by newest emission date', () => {
   const cards = [
     { id: 'opaque-id_1', emissionDate: '2024-09-05T10:00:00Z' },
@@ -103,7 +125,7 @@ test('orders usable cards by newest emission date', () => {
   ]);
 });
 
-test('keeps opaque card ids returned for a confirmed client identity', () => {
+test('deduplicates cards returned for a confirmed client identity', () => {
   const cpfClient = {
     id: '39661958874',
     email: 'customer@example.com',
@@ -137,6 +159,16 @@ test('keeps opaque card ids returned for a confirmed client identity', () => {
   ]);
   assert.equal(entries[0].client, cpfClient);
   assert.equal(entries[0].source, 'document');
+});
+
+test('requires a card owner to match the confirmed customer', () => {
+  const candidates = [{ client: { id: '39661958874', email: 'customer@example.com', document: '39661958874' } }];
+
+  assert.equal(giftCardOwnerIdentifier({ id: '39661958874_7364' }), '39661958874');
+  assert.equal(giftCardBelongsToClient({ id: '39661958874_7364' }, candidates), true);
+  assert.equal(giftCardBelongsToClient({ id: '43085076859_1234' }, candidates), false);
+  assert.equal(giftCardBelongsToClient({ id: '_6896' }, candidates), false);
+  assert.equal(giftCardBelongsToClient({ id: 'opaque-id', profileId: 'customer@example.com' }, candidates), true);
 });
 
 test('validates a targeted lookup by id or redemption code', () => {
