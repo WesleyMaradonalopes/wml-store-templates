@@ -391,6 +391,13 @@ export default function ProductScreen() {
               <View style={styles.productHeading}>
                 <View style={styles.headingText}>
                   <ThemedText style={styles.productName}>{product.name}</ThemedText>
+                  {(product.collection || product.productReference) && (
+                    <ThemedText style={styles.productMeta}>
+                      {product.collection ? `COLEÇÃO ${product.collection}` : ''}
+                      {product.collection && product.productReference ? ' | ' : ''}
+                      {product.productReference ? `${product.productReference}` : ''}
+                    </ThemedText>
+                  )}
                   {currentListPrice !== null && currentPrice !== null && currentListPrice > currentPrice && <ThemedText style={styles.listPrice}>De {money(currentListPrice)}</ThemedText>}
                   {currentPrice !== null && <ThemedText type="subtitle" style={styles.bestPrice}>{money(currentPrice)}</ThemedText>}
                 </View>
@@ -488,7 +495,6 @@ export default function ProductScreen() {
           <View style={styles.floatingBar}>
             <View style={styles.floatingInfo}>
               <ThemedText numberOfLines={1} style={styles.floatingName}>{product.name}</ThemedText>
-              {selectedOptions.Tamanho && <ThemedText themeColor="textSecondary" numberOfLines={1}>{selectedOptions.Tamanho}</ThemedText>}
               {currentPrice !== null && <ThemedText type="smallBold">{money(currentPrice)}</ThemedText>}
             </View>
             <Pressable disabled={adding} onPress={handleFloatingAdd} style={[styles.floatingButton, adding && styles.disabled]}>
@@ -943,6 +949,7 @@ const styles = StyleSheet.create({
   productHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
   headingText: { flex: 1, gap: 4 },
   productName: { fontSize: 16, lineHeight: 23 },
+  productMeta: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 10, lineHeight: 14, textTransform: 'uppercase' },
   favoriteButton: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   listPrice: { color: '#8c8781', fontSize: 16, textDecorationLine: 'line-through'  },
 	bestPrice: { color: '#0a0a0a', fontSize: 20},
