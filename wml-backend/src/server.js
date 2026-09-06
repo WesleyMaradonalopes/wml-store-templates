@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { isGiftCardPaymentData, shopperTokenForPaymentData } from './checkout-context.js';
 import {
   compareGiftCardsNewestFirst,
-  giftCardBelongsToClient,
   giftCardClientCandidates,
   giftCardLookupContainsCard,
+  uniqueGiftCardSearchEntries,
 } from './gift-card-context.js';
 import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
 
@@ -644,9 +644,14 @@ async function giftCardsForOrderForm(orderForm, email, {
   // A busca autenticada precisa carregar também os cookies da sessão VTEX ID.
   // Sem esse contexto, a Giftcard API pode devolver um crédito de profileId
   // antigo em vez do vale restrito ao CPF que está no orderForm.
+  const ownershipCookie = checkoutOwnershipCookieForOrderForm(orderForm?.orderFormId);
+  const withOwnershipCookie = (headers) => {
+    const cookieHeader = mergeCookieHeaders(headers.Cookie, ownershipCookie);
+    return cookieHeader ? { ...headers, Cookie: cookieHeader } : headers;
+  };
   const headerVariants = [
-    ...(userToken ? [sessionHeaders(normalizedEmail, userToken)] : []),
-    vtexHeaders(),
+    ...(userToken ? [withOwnershipCookie(sessionHeaders(normalizedEmail, userToken))] : []),
+    withOwnershipCookie(vtexHeaders()),
   ];
   const cart = giftCardSearchCart(orderForm);
   const searchResults = [];
@@ -676,22 +681,11 @@ async function giftCardsForOrderForm(orderForm, email, {
     throw failed?.error || new Error('A VTEX não conseguiu consultar os créditos.');
   }
 
-  // A VTEX pode devolver resultados amplos mesmo quando recebe um cliente no
-  // corpo da busca. O prefixo do id nativo é o profileId usado na criação do
-  // vale (CPF, userId ou e-mail). Só continuamos com cartões cujo prefixo
-  // corresponda a uma identidade confirmada deste cliente.
-  const summaries = [];
-  const seenCardIds = new Set();
-  for (const entry of successfulSearches) {
-    for (const summary of entry.result.items) {
-      if (!giftCardBelongsToClient(summary, candidates)) continue;
-      const id = String(summary?.id || '').trim();
-      const normalizedId = id.toLowerCase();
-      if (!id || seenCardIds.has(normalizedId)) continue;
-      seenCardIds.add(normalizedId);
-      summaries.push({ summary, client: entry.client, source: entry.source });
-    }
-  }
+  // O id do vale é opaco e não contém necessariamente o identificador do
+  // titular. A associação vem da própria busca direcionada: cada resultado
+  // abaixo foi devolvido pela VTEX para um client montado exclusivamente com
+  // o CPF, userId ou e-mail confirmados no Master Data para este checkout.
+  const summaries = uniqueGiftCardSearchEntries(successfulSearches);
 
   const cards = await Promise.all(summaries.slice(0, 50).map(async ({ summary, client }) => {
     const id = String(summary?.id || '').trim();
@@ -715,7 +709,6 @@ async function giftCardsForOrderForm(orderForm, email, {
       }
     }
     const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
-    if (!giftCardBelongsToClient(card, candidates)) return null;
     if (!giftCardIsUsable(card)) return null;
 
     const publicCard = publicGiftCard(card);
@@ -731,20 +724,16 @@ async function giftCardsForOrderForm(orderForm, email, {
     // elimina resultados obsoletos que ainda aparecem na listagem, mas que o
     // Checkout rejeita como "forma de pagamento não disponível".
     const validationCart = { ...cart, redemptionCode: publicCard.redemptionCode };
-    const validationClients = [client, ...candidates.map((candidate) => candidate.client)]
-      .filter((candidateClient, index, values) => values.findIndex((value) => (
-        String(value.id).trim().toLowerCase() === String(candidateClient.id).trim().toLowerCase()
-      )) === index);
     const validations = [];
     for (const requestHeaders of headerVariants) {
-      const variantValidations = await Promise.all(validationClients.map(async (validationClient) => {
-        try {
-          return await searchGiftCardsForClient(validationCart, validationClient, requestHeaders);
-        } catch {
-          return null;
-        }
-      }));
-      validations.push(...variantValidations);
+      try {
+        // Confirme o código usando exatamente a mesma identidade que trouxe
+        // o cartão. Assim, um vale encontrado por outro candidato nunca pode
+        // validar acidentalmente este resultado.
+        validations.push(await searchGiftCardsForClient(validationCart, client, requestHeaders));
+      } catch {
+        validations.push(null);
+      }
     }
     const confirmed = validations.some((validation) => (
       validation?.ok && giftCardLookupContainsCard(publicCard, validation.items)

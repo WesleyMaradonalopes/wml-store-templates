@@ -58,24 +58,6 @@ export function giftCardClientCandidates({ orderForm, email, profile }) {
   });
 }
 
-export function giftCardOwnerIdentifier(card) {
-  const id = String(card?.id || '').trim();
-  const separator = id.lastIndexOf('_');
-  if (separator <= 0 || separator === id.length - 1) return '';
-  return normalizeIdentifier(id.slice(0, separator));
-}
-
-export function giftCardBelongsToClient(card, candidates) {
-  const owner = giftCardOwnerIdentifier(card);
-  if (!owner) return false;
-  return (Array.isArray(candidates) ? candidates : []).some(({ client }) => {
-    const identities = [client?.id, client?.email, validDocument(client?.document)]
-      .map(normalizeIdentifier)
-      .filter(Boolean);
-    return identities.includes(owner);
-  });
-}
-
 export function compareGiftCardsNewestFirst(left, right) {
   const time = (card) => {
     const parsed = Date.parse(String(card?.emissionDate || ''));
@@ -87,6 +69,28 @@ export function compareGiftCardsNewestFirst(left, right) {
     return String(left?.id || '').localeCompare(String(right?.id || ''));
   }
   return rightTime - leftTime;
+}
+
+export function uniqueGiftCardSearchEntries(searches) {
+  const entries = [];
+  const seenCardIds = new Set();
+
+  for (const search of Array.isArray(searches) ? searches : []) {
+    const items = Array.isArray(search?.result?.items) ? search.result.items : [];
+    for (const summary of items) {
+      const id = String(summary?.id || '').trim();
+      const normalizedId = normalizeIdentifier(id);
+      if (!normalizedId || seenCardIds.has(normalizedId)) continue;
+      seenCardIds.add(normalizedId);
+      entries.push({
+        summary,
+        client: search.client,
+        source: search.source,
+      });
+    }
+  }
+
+  return entries;
 }
 
 export function giftCardLookupContainsCard(card, items) {
