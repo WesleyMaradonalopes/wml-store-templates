@@ -440,6 +440,7 @@ export default function CheckoutScreen() {
   const couponMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const giftCardAvailabilityKeyRef = useRef('');
   const giftCardVerifiedEmailRef = useRef('');
+  const giftCardDetailsRequestKeyRef = useRef('');
   const newsletterOptInTouched = useRef(false);
   const genders: { value: string; text: string; disabled?: boolean; selected?: boolean }[] = [
     { value: '', text: 'Opcional', disabled: true, selected: true },
@@ -502,21 +503,31 @@ export default function CheckoutScreen() {
     setGiftCardIdentityVerified(false);
     setGiftCardCreditsHidden(false);
     setAvailableGiftCards([]);
+    if (giftCardVoucherDetails) {
+      setVoucher('');
+      setVoucherMessage('');
+      setVoucherMessageType(null);
+    }
     setGiftCardVoucherDetails(null);
     setGiftCardAvailability('unknown');
     giftCardAvailabilityKeyRef.current = '';
+    giftCardDetailsRequestKeyRef.current = '';
   }
 
   async function loadGiftCardDetails(targetOrderForm = orderForm) {
     if (!targetOrderForm || !email.trim()) return [];
+    const requestedEmail = email.trim().toLowerCase();
+    const requestKey = `${targetOrderForm.orderFormId}|${requestedEmail}`;
+    giftCardDetailsRequestKeyRef.current = requestKey;
     setGiftCardDetailsLoading(true);
     try {
-      const cards = await getCustomerGiftCards(targetOrderForm.orderFormId, email);
+      const cards = await getCustomerGiftCards(targetOrderForm.orderFormId, requestedEmail);
+      if (giftCardDetailsRequestKeyRef.current !== requestKey) return [];
       setAvailableGiftCards(cards);
       setGiftCardAvailability(cards.length > 0 ? 'available' : 'none');
       return cards;
     } finally {
-      setGiftCardDetailsLoading(false);
+      if (giftCardDetailsRequestKeyRef.current === requestKey) setGiftCardDetailsLoading(false);
     }
   }
 
@@ -544,6 +555,7 @@ export default function CheckoutScreen() {
       setGiftCardVoucherDetails(null);
       giftCardAvailabilityKeyRef.current = '';
       giftCardVerifiedEmailRef.current = loggedEmail;
+      giftCardDetailsRequestKeyRef.current = '';
       setLoading(false);
       if (!loggedEmail) return;
       const { profile: customer, addresses } = await loadCustomerData(loggedEmail);
@@ -1528,6 +1540,9 @@ export default function CheckoutScreen() {
     }
     setSaving(true);
     try {
+      // Invalida uma consulta anterior para outro contexto antes de carregar
+      // os vales da identidade que acabou de ser confirmada.
+      giftCardDetailsRequestKeyRef.current = `${orderForm.orderFormId}|${normalizedEmail}|authenticated`;
       let authenticatedOrderForm = orderForm;
       try {
         // Sincroniza o CPF do checkout antes da consulta protegida. A
@@ -1561,6 +1576,13 @@ export default function CheckoutScreen() {
       setGiftCardAvailability(cards.length > 0 ? 'available' : 'none');
       setVoucherMessage('');
       setVoucherMessageType(null);
+      if (giftCardVoucherDetails) {
+        setVoucher('');
+        setGiftCardVoucherDetails(null);
+      }
+      if (cards.length === 0) {
+        throw new Error('Nenhum vale-presente ativo foi encontrado para este CPF e e-mail.');
+      }
       const appliedCardKeys = new Set(activeGiftCards(authenticatedOrderForm).map((card) => (
         card.id || card.redemptionCode.trim().toLowerCase()
       )));
@@ -1568,12 +1590,9 @@ export default function CheckoutScreen() {
         card.id || card.redemptionCode.trim().toLowerCase(),
       ));
       if (unappliedCards.length > 0) {
-        // A identidade foi confirmada para este e-mail. Aplicamos o crédito
-        // automaticamente para que o cliente não precise copiar o código
-        // exibido no modal. Quando houver mais de um, priorizamos um que já
-        // cubra todo o pedido; caso contrário, usamos o primeiro e exibimos
-        // o valor restante para que outra forma de pagamento seja escolhida.
-        const cardToApply = unappliedCards.find((card) => giftCardAppliedValue(card) >= authenticatedOrderForm.value) || unappliedCards[0];
+        // O backend já confirma o titular e ordena os vales ativos pela data
+        // de emissão. Portanto, o primeiro item é sempre o mais recente.
+        const cardToApply = unappliedCards[0];
         const applied = await applyAvailableGiftCard(cardToApply, authenticatedOrderForm);
         console.info('[GIFT CARD] authenticated card auto-apply', {
           orderFormId: authenticatedOrderForm.orderFormId,

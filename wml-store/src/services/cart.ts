@@ -79,6 +79,8 @@ export type GiftCard = {
   groupName?: string | null;
   inUse: boolean;
   isSpecialCard?: boolean;
+  emissionDate?: string | null;
+  expiringDate?: string | null;
 };
 
 export type OrderForm = {
@@ -1169,6 +1171,8 @@ export async function getCustomerGiftCards(orderFormId: string, email: string): 
     groupName: giftCard.groupName || null,
     inUse: giftCard.inUse === true,
     isSpecialCard: giftCard.isSpecialCard === true,
+    emissionDate: giftCard.emissionDate || null,
+    expiringDate: giftCard.expiringDate || null,
   })).filter((giftCard) => giftCard.redemptionCode || giftCard.id);
 }
 

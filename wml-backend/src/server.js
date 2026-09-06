@@ -4,7 +4,12 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isGiftCardPaymentData, shopperTokenForPaymentData } from './checkout-context.js';
-import { giftCardClientCandidates, giftCardLookupContainsCard } from './gift-card-context.js';
+import {
+  compareGiftCardsNewestFirst,
+  giftCardBelongsToClient,
+  giftCardClientCandidates,
+  giftCardLookupContainsCard,
+} from './gift-card-context.js';
 import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
 
 const app = express();
@@ -573,6 +578,10 @@ function giftCardSearchCart(orderForm) {
 function giftCardIsUsable(card) {
   const balance = Number(card?.balance || 0);
   if (!Number.isFinite(balance) || balance <= 0) return false;
+  const status = String(card?.status || card?.state || '').trim().toLowerCase();
+  if (['inactive', 'inativo', 'disabled', 'blocked', 'expired', 'cancelled', 'canceled'].includes(status)) {
+    return false;
+  }
   const expiration = String(card?.expiringDate || '').trim();
   if (!expiration) return true;
   const expirationTime = Date.parse(expiration);
@@ -591,6 +600,7 @@ function publicGiftCard(card) {
     groupName: String(card?.groupName || '').trim() || null,
     inUse: false,
     isSpecialCard: card?.isSpecialCard === true,
+    emissionDate: String(card?.emissionDate || '').trim() || null,
     expiringDate: String(card?.expiringDate || '').trim() || null,
   };
 }
@@ -666,17 +676,20 @@ async function giftCardsForOrderForm(orderForm, email, {
     throw failed?.error || new Error('A VTEX não conseguiu consultar os créditos.');
   }
 
-  // Um mesmo cartão pode aparecer por CPF, userId e e-mail. Preservamos a
-  // primeira ocorrência, pois os candidatos já estão ordenados por precisão.
+  // A VTEX pode devolver resultados amplos mesmo quando recebe um cliente no
+  // corpo da busca. O prefixo do id nativo é o profileId usado na criação do
+  // vale (CPF, userId ou e-mail). Só continuamos com cartões cujo prefixo
+  // corresponda a uma identidade confirmada deste cliente.
   const summaries = [];
   const seenCardIds = new Set();
   for (const entry of successfulSearches) {
     for (const summary of entry.result.items) {
+      if (!giftCardBelongsToClient(summary, candidates)) continue;
       const id = String(summary?.id || '').trim();
       const normalizedId = id.toLowerCase();
       if (!id || seenCardIds.has(normalizedId)) continue;
       seenCardIds.add(normalizedId);
-      summaries.push({ summary, client: entry.client });
+      summaries.push({ summary, client: entry.client, source: entry.source });
     }
   }
 
@@ -702,6 +715,7 @@ async function giftCardsForOrderForm(orderForm, email, {
       }
     }
     const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
+    if (!giftCardBelongsToClient(card, candidates)) return null;
     if (!giftCardIsUsable(card)) return null;
 
     const publicCard = publicGiftCard(card);
@@ -737,10 +751,8 @@ async function giftCardsForOrderForm(orderForm, email, {
     ));
     return confirmed ? publicCard : null;
   }));
-  const availableCards = cards.filter(Boolean);
-  const matchedSources = successfulSearches
-    .filter((entry) => entry.result.items.length > 0)
-    .map((entry) => entry.source);
+  const availableCards = cards.filter(Boolean).sort(compareGiftCardsNewestFirst);
+  const matchedSources = [...new Set(summaries.map((entry) => entry.source))];
   console.info('[CHECKOUT] gift-card search context', {
     authenticated: Boolean(userToken),
     candidateCount: candidates.length,
