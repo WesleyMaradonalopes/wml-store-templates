@@ -647,6 +647,12 @@ async function searchGiftCardsForClient(cart, client, headers) {
 async function giftCardsForOrderForm(orderForm, email, {
   userToken = '',
   verifyRedemptionCodes = false,
+  // The availability endpoint only needs a yes/no answer before identity is
+  // confirmed. Some VTEX Giftcard responses omit the owner prefix from the
+  // search item even though the search was made with the checkout customer's
+  // CPF/e-mail. Keep strict ownership checks for cards returned to the app,
+  // but allow this read-only probe to preserve the initial notice.
+  availabilityOnly = false,
 } = {}) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const profileEmail = String(orderForm?.clientProfileData?.email || '').trim().toLowerCase();
@@ -706,8 +712,14 @@ async function giftCardsForOrderForm(orderForm, email, {
   // abaixo foi devolvido pela VTEX para um client montado exclusivamente com
   // o CPF, userId ou e-mail confirmados no Master Data para este checkout.
   const rawSummaries = uniqueGiftCardSearchEntries(successfulSearches);
-  const summaries = rawSummaries
-    .filter(({ summary }) => giftCardBelongsToClient(summary, candidates));
+  const strongIdentitySummaries = rawSummaries.filter(({ source }) => (
+    source === 'document'
+      || source === 'master-data-user-id'
+      || source === 'order-form-profile-id'
+  ));
+  const summaries = availabilityOnly
+    ? (strongIdentitySummaries.length > 0 ? strongIdentitySummaries : rawSummaries)
+    : rawSummaries.filter(({ summary }) => giftCardBelongsToClient(summary, candidates));
 
   const cards = await Promise.all(summaries.slice(0, 50).map(async ({ summary, client }) => {
     const id = String(summary?.id || '').trim();
@@ -731,7 +743,7 @@ async function giftCardsForOrderForm(orderForm, email, {
       }
     }
     const card = { ...summary, ...(detail && typeof detail === 'object' ? detail : {}) };
-    if (!giftCardBelongsToClient(card, candidates)) return null;
+    if (!availabilityOnly && !giftCardBelongsToClient(card, candidates)) return null;
     if (!giftCardIsUsable(card)) return null;
 
     const publicCard = publicGiftCard(card);
@@ -774,6 +786,7 @@ async function giftCardsForOrderForm(orderForm, email, {
     listedCount: summaries.length,
     returnedCount: availableCards.length,
     codesVerified: verifyRedemptionCodes,
+    availabilityOnly,
   });
   return availableCards;
 }
@@ -1240,7 +1253,11 @@ app.post('/checkout/order-form/:orderFormId/gift-cards/availability', async (req
     const orderForm = await loadGiftCardOrderForm(orderFormId, userToken);
     const cards = await giftCardsForOrderForm(orderForm, email, {
       userToken,
-      verifyRedemptionCodes: Boolean(userToken),
+      // This endpoint returns only a boolean. Code validation belongs to the
+      // authenticated details endpoint and should not make the initial notice
+      // disappear when VTEX masks the search result for a shopper session.
+      verifyRedemptionCodes: false,
+      availabilityOnly: true,
     });
     console.info(`[CHECKOUT] gift-card availability -> orderForm=${orderFormId} email=${email} available=${cards.length > 0}`);
     // Do not return card ids, codes, balances, or profile data before the
