@@ -1907,6 +1907,7 @@ export default function CheckoutScreen() {
   const activeCardBrand = cardNumber ? cardBrandFor(activeCardMethod, cardNumber) : 'generic';
   const reviewCardBrand = selectedCardBrand === 'generic' ? activeCardBrand : selectedCardBrand;
   const appliedGiftCards = activeGiftCards(orderForm);
+  const giftCardRemainingAmount = paymentAmountAfterGiftCards(orderForm);
   const selectedPaymentMethod = selectedPayment ? payments.find((method) => method.id === selectedPayment) : undefined;
   const selectedPaymentIsGiftCard = Boolean(selectedPaymentMethod && isGiftCardPayment(selectedPaymentMethod))
     || selectedPaymentLabel.toLowerCase().includes('vale');
@@ -1996,7 +1997,7 @@ export default function CheckoutScreen() {
           <ReviewHeader icon="card" title="PAGAMENTO" />
           <View style={styles.paymentReviewCard}>
             {selectedPayment && !selectedPaymentIsGiftCard && (selectedPaymentLabel.toLowerCase().includes('pix')
-              ? <><PaymentBrandIcon brand="pix" width={78} height={39} /><ThemedText style={styles.bodyText}>Aprovação imediata</ThemedText></>
+              ? <><PaymentBrandIcon brand="pix" width={78} height={39} /><ThemedText style={styles.bodyText}>Aprovação imediata</ThemedText>{appliedGiftCards.length > 0 && giftCardRemainingAmount > 0 && <View style={styles.pixRemainingSummary}><ThemedText style={styles.pixRemainingLabel}>Pagamento restante</ThemedText><ThemedText style={styles.pixRemainingValue}>{money(giftCardRemainingAmount)}</ThemedText></View>}</>
               : <><CreditCardVisual brand={reviewCardBrand} cardNumber={cardNumber} holderName={cardHolder} expiry={cardExpiry} cvv={cardCvv} masked compact /><View style={styles.installmentSummary}><ThemedText style={styles.installmentSummaryLabel}>Parcelamento</ThemedText><ThemedText style={styles.installmentSummaryValue}>{selectedInstallment ? selectedInstallment.count + 'x ' + money(selectedInstallment.value) : '1x ' + money(paymentAmountAfterGiftCards(orderForm))}</ThemedText></View></>)}
             {appliedGiftCards.length > 0 && <GiftCardPaymentReview giftCards={appliedGiftCards} />}
           </View>
@@ -2713,6 +2714,9 @@ const styles = StyleSheet.create({
   reviewItemName: { flex: 1, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '400' },
   paymentReview: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
   paymentReviewCard: { width: '100%', gap: Spacing.two, alignItems: 'center' },
+  pixRemainingSummary: { alignItems: 'center', gap: 2, paddingTop: Spacing.one },
+  pixRemainingLabel: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16 },
+  pixRemainingValue: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   giftCardReview: { width: '100%', gap: Spacing.two, alignItems: 'stretch' },
   giftCardReviewTitle: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20 },
   giftCardReviewRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: 4, backgroundColor: '#f8f8f8' },
