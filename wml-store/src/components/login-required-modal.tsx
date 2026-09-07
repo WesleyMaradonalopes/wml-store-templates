@@ -19,6 +19,7 @@ export function LoginRequiredModal({ visible, onClose, onLogin }: LoginRequiredM
       statusBarTranslucent
       onRequestClose={onClose}>
       <View style={styles.backdrop}>
+        <Pressable accessibilityLabel="Fechar aviso de favoritos" onPress={onClose} style={StyleSheet.absoluteFill} />
         <View style={styles.card}>
           <View style={styles.header}>
             <ThemedText type="subtitle" style={styles.title}>Favoritos</ThemedText>

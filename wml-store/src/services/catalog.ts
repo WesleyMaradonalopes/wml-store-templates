@@ -1,5 +1,6 @@
 import { storeConfig } from '@/config/store';
 import { compareSizes, isSizeVariationName } from '@/constants/sizes';
+import { htmlToPlainText } from '@/utils/html';
 
 import { getJson } from './http';
 import { getStoredJson, setStoredJson } from './storage';
@@ -557,7 +558,7 @@ function normalizeProduct(product: ProductPayload): Product {
     name: product.productName ?? '',
     linkText: product.linkText ?? '',
     productReference: product.productReference ?? '',
-    description: product.description ?? '',
+    description: htmlToPlainText(product.description ?? ''),
     brand: product.brand ?? '',
     color,
     colorFilter: colorFilter || color,

@@ -27,6 +27,7 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
 import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductKitGroup, type ProductKitItem, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
+import { htmlToPlainText } from '@/utils/html';
 import { buildVariationGroups } from '@/utils/product-variations';
 
 function money(value: number | null) {
@@ -68,6 +69,9 @@ function estimateLabel(value: string) {
   return `até ${amount} ${amount === 1 ? 'dia' : 'dias'}`;
 }
 
+const DESCRIPTION_PREVIEW_LINES = 5;
+const DESCRIPTION_LINE_HEIGHT = 21;
+
 export default function ProductScreen() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -102,7 +106,10 @@ export default function ProductScreen() {
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingQuotes, setShippingQuotes] = useState<ShippingQuote[]>([]);
   const [shippingMessage, setShippingMessage] = useState('');
+  const [shippingOptionsOpen, setShippingOptionsOpen] = useState(false);
   const [descriptionOpen, setDescriptionOpen] = useState(true);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [descriptionLineCount, setDescriptionLineCount] = useState(0);
   const [compositionOpen, setCompositionOpen] = useState(false);
   const [careOpen, setCareOpen] = useState(false);
   const galleryListRef = useRef<FlatList<string>>(null);
@@ -116,6 +123,8 @@ export default function ProductScreen() {
         ? variant.available
         : variationNames.every((name) => selectedOptions[name] && variant.variations[name] === selectedOptions[name])
     ));
+  const shippingVariant = activeVariant ?? product?.variants.find((variant) => variant.available) ?? product?.variants[0];
+  const descriptionText = product ? htmlToPlainText(product.description) || 'Descrição não cadastrada.' : '';
   const galleryImages = Array.from(new Set([...(activeVariant?.images ?? []), ...(product?.images ?? [])].filter(Boolean)));
   const visibleColorProducts = colorProducts.slice(0, 5);
   const hiddenColorCount = Math.max(0, colorProducts.length - visibleColorProducts.length);
@@ -141,6 +150,9 @@ export default function ProductScreen() {
     setCartMessage(null);
     setShippingQuotes([]);
     setShippingMessage('');
+    setShippingOptionsOpen(false);
+    setDescriptionExpanded(false);
+    setDescriptionLineCount(0);
     getProduct(productId)
       .then((value) => {
         if (!active) return;
@@ -295,17 +307,20 @@ export default function ProductScreen() {
     setPostalCode(numbers.length > 5 ? `${numbers.slice(0, 5)}-${numbers.slice(5)}` : numbers);
     setShippingQuotes([]);
     setShippingMessage('');
+    setShippingOptionsOpen(false);
   }
 
   async function calculateShipping() {
     const cep = postalCode.replace(/\D/g, '');
     if (cep.length !== 8) return setShippingMessage('Informe um CEP válido.');
-    if (!activeVariant?.available) return setShippingMessage('Escolha um tamanho disponível primeiro.');
+    const shippingItem = shippingVariant ?? (product?.itemId ? { itemId: product.itemId, sellerId: product.sellerId, available: true } : null);
+    if (!shippingItem?.itemId) return setShippingMessage('Não foi possível identificar este produto.');
     setShippingLoading(true);
     setShippingMessage('');
     setShippingQuotes([]);
+    setShippingOptionsOpen(false);
     try {
-      const quotes = await simulateProductShipping({ itemId: activeVariant.itemId, sellerId: activeVariant.sellerId, postalCode: cep });
+      const quotes = await simulateProductShipping({ itemId: shippingItem.itemId, sellerId: shippingItem.sellerId, postalCode: cep });
       setShippingQuotes(quotes);
       if (quotes.length === 0) setShippingMessage('Não encontramos uma entrega disponível para este CEP.');
     } catch (shippingError) {
@@ -408,7 +423,7 @@ export default function ProductScreen() {
 
               {colorProducts.length > 0 && (
                 <View style={styles.selectorGroup}>
-                  <ThemedText type="smallBold">Cor: <ThemedText>{product.color || 'Selecione'}</ThemedText></ThemedText>
+                  <ThemedText style={styles.nameTitleColor} type="smallBold">Cor: <ThemedText style={styles.nameColor}>{product.color || 'Selecione'}</ThemedText></ThemedText>
                   <View style={styles.colorList}>
                     {visibleColorProducts.map((colorProduct) => {
                       const selected = colorProduct.id === product.id;
@@ -437,7 +452,7 @@ export default function ProductScreen() {
                 ) : <ActivityIndicator color="#0a0a0a" />
               ) : Object.entries(variantGroups).map(([name, values]) => (
                 <View key={name} style={styles.selectorGroup}>
-                  <ThemedText type="smallBold">{name}: <ThemedText>{selectedOptions[name] || 'Selecione'}</ThemedText></ThemedText>
+                  <ThemedText style={styles.selectorGroupVariant} type="smallBold">{name}: <ThemedText style={styles.selectorGroupVariant}>{selectedOptions[name]}</ThemedText></ThemedText>
                   <View style={styles.variantOptions}>
                     {values.map((value) => {
                       const available = optionAvailable(name, value);
@@ -462,14 +477,35 @@ export default function ProductScreen() {
                 <ThemedText style={styles.sectionTitle}>Calcule o frete e prazo de entrega</ThemedText>
                 <View style={styles.shippingRow}>
                   <TextInput value={postalCode} onChangeText={updatePostalCode} placeholder="Digite seu CEP" keyboardType="number-pad" maxLength={9} style={styles.shippingInput} />
-                  <Pressable disabled={shippingLoading} onPress={calculateShipping} style={styles.shippingButton}><ThemedText style={styles.shippingButtonText}>{shippingLoading ? 'Calculando...' : 'Calcular'}</ThemedText></Pressable>
+                  <Pressable disabled={shippingLoading} onPress={calculateShipping} style={styles.shippingButton}>{shippingLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.shippingButtonText}>Calcular</ThemedText>}</Pressable>
                 </View>
                 {!!shippingMessage && <ThemedText style={styles.messageText}>{shippingMessage}</ThemedText>}
-                {shippingQuotes.map((quote) => <View key={`${quote.deliveryChannel || 'delivery'}-${quote.name}`} style={styles.shippingQuote}><View><ThemedText type="smallBold">{quote.name}</ThemedText><ThemedText themeColor="textSecondary">{quote.isPickupInPoint ? 'Retire em ' : 'Receba em '}{estimateLabel(quote.shippingEstimate)}</ThemedText></View><ThemedText type="smallBold">{quote.price === 0 ? 'Grátis' : money(quote.price)}</ThemedText></View>)}
+                {shippingQuotes.length > 0 && <View style={styles.shippingOptions}>
+                  <Pressable accessibilityState={{ expanded: shippingOptionsOpen }} onPress={() => setShippingOptionsOpen((value) => !value)} style={styles.shippingOptionsHeader}>
+                    <View style={styles.shippingOptionsHeaderCopy}>
+                      <ThemedText type="smallBold">Opções de entrega</ThemedText>
+                      <ThemedText themeColor="textSecondary">{shippingQuotes.length} {shippingQuotes.length === 1 ? 'opção disponível' : 'opções disponíveis'}</ThemedText>
+                    </View>
+                    <DropdownChevron open={shippingOptionsOpen} />
+                  </Pressable>
+                  {shippingOptionsOpen && <View style={styles.shippingQuotesList}>{shippingQuotes.map((quote) => <View key={`${quote.deliveryChannel || 'delivery'}-${quote.name}`} style={styles.shippingQuote}><View style={styles.shippingQuoteDetails}><ThemedText type="smallBold">{quote.name}</ThemedText><ThemedText themeColor="textSecondary">{quote.isPickupInPoint ? 'Retire em ' : 'Receba em '}{estimateLabel(quote.shippingEstimate)}</ThemedText></View><ThemedText type="smallBold">{quote.price === 0 ? 'Grátis' : money(quote.price)}</ThemedText></View>)}</View>}
+                </View>}
               </View>
 
               <Accordion title="Descrição" open={descriptionOpen} onToggle={() => setDescriptionOpen((value) => !value)}>
-                <ThemedText style={styles.accordionText}>{product.description || 'Descrição não cadastrada.'}</ThemedText>
+                <View style={[styles.descriptionTextClip, !descriptionExpanded && styles.descriptionTextClipCollapsed]}>
+                  <ThemedText
+                    onTextLayout={(event) => {
+                      const nextLineCount = event.nativeEvent.lines.length;
+                      setDescriptionLineCount((current) => current === nextLineCount ? current : nextLineCount);
+                    }}
+                    style={styles.accordionText}>
+                    {descriptionText}
+                  </ThemedText>
+                </View>
+                {descriptionLineCount > DESCRIPTION_PREVIEW_LINES && <Pressable onPress={() => setDescriptionExpanded((value) => !value)} style={styles.readMoreButton}>
+                  <ThemedText style={styles.readMoreText}>{descriptionExpanded ? 'Ler menos' : 'Ler mais'}</ThemedText>
+                </Pressable>}
               </Accordion>
               <Accordion title="Composição" open={compositionOpen} onToggle={() => setCompositionOpen((value) => !value)}>
                 <ThemedText style={styles.accordionText}>{product.composition || 'Informações não cadastradas.'}</ThemedText>
@@ -954,15 +990,18 @@ const styles = StyleSheet.create({
   listPrice: { color: '#8c8781', fontSize: 16, textDecorationLine: 'line-through'  },
 	bestPrice: { color: '#0a0a0a', fontSize: 20},
   selectorGroup: { gap: Spacing.two },
+	selectorGroupVariant: { fontSize: 12 },
   colorList: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
-  colorOption: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: '#d7d2ca', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  selectedColorOption: { borderWidth: 2, borderColor: '#0a0a0a' },
-  colorCircle: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: '#d7d2ca' },
-  moreColorsButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 19, borderWidth: 1, borderColor: '#d7d2ca', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  moreColorsText: { fontSize: 12 },
+  colorOption: { width: 30, height: 30, borderRadius: 50, borderWidth: 1, borderColor: '#ddd', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  selectedColorOption: { borderWidth: 1, borderColor: '#0a0a0a' },
+  colorCircle: { width: 20, height: 20, borderRadius: 50, borderWidth: 1, borderColor: '#ddd' },
+  moreColorsButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 50, borderWidth: 1, borderColor: '#d7d2ca', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  moreColorsText: { fontSize: 12},
+	nameTitleColor: { fontSize: 12, fontFamily: Fonts.medium, fontWeight: '500' },
+	nameColor: { fontSize: 12, fontFamily: Fonts.bold, fontWeight: '600'  },
 	titleColorModal: { fontSize: 16 },
   variantOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  variantOption: { minWidth: 42, height: 42, paddingHorizontal: Spacing.three, borderRadius: 21, borderWidth: 1, borderColor: '#d7d3cc', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  variantOption: { minWidth: 35, height: 35, borderRadius: 50, borderWidth: 1, borderColor: '#d7d3cc', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   selectedVariant: { backgroundColor: '#0a0a0a', borderColor: '#0a0a0a' },
   selectedVariantText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableVariant: { opacity: 0.35, backgroundColor: '#eeeae4' },
@@ -981,12 +1020,21 @@ const styles = StyleSheet.create({
   shippingInput: { flex: 1, paddingHorizontal: Spacing.three, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
   shippingButton: { minWidth: 108, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#0a0a0a' },
   shippingButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  shippingOptions: { borderRadius: 10, borderWidth: 1, borderColor: '#e0dbd4', overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  shippingOptionsHeader: { minHeight: 58, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  shippingOptionsHeaderCopy: { flex: 1, gap: 2 },
+  shippingQuotesList: { gap: Spacing.two, padding: Spacing.two, borderTopWidth: 1, borderTopColor: '#e0dbd4', backgroundColor: '#f7f6f3' },
   shippingQuote: { padding: Spacing.three, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#eee' },
+  shippingQuoteDetails: { flex: 1, gap: 2 },
   accordion: { marginHorizontal: -Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
   accordionHeader: { minHeight: 52, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   accordionContent: { gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
   accordionTitle: { fontSize: 16, lineHeight: 23, fontWeight: '500' },
   accordionText: { color: '#625d57', lineHeight: 21, fontSize: 12 },
+  descriptionTextClip: { overflow: 'hidden' },
+  descriptionTextClipCollapsed: { maxHeight: DESCRIPTION_PREVIEW_LINES * DESCRIPTION_LINE_HEIGHT },
+  readMoreButton: { alignSelf: 'flex-start', paddingVertical: Spacing.one },
+  readMoreText: { color: '#0a0a0a', fontSize: 13, lineHeight: 18, fontFamily: Fonts.bold, textDecorationLine: 'underline' },
   dropdownChevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
   dropdownChevronOpen: { transform: [{ rotate: '-90deg' }] },
   floatingBar: { position: 'absolute', left: 10, right: 10, bottom: 20, minHeight: 50, borderRadius: 50, paddingHorizontal: 20, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#0a0a0a', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
