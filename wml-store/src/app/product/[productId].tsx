@@ -469,8 +469,8 @@ export default function ProductScreen() {
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
               <View style={styles.helperButtons}>
-                <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><ThemedText>♧</ThemedText><ThemedText type="smallBold">Provador Virtual</ThemedText></Pressable>
-                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon color="#0a0a0a" size={17} /><ThemedText type="smallBold">Tabela de medidas</ThemedText></Pressable>
+                <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><ThemedText>♧</ThemedText><ThemedText style={styles.provadorVirtual} type="smallBold">Provador Virtual</ThemedText></Pressable>
+                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon color="#0a0a0a" size={17} /><ThemedText style={styles.provadorVirtual} type="smallBold">Tabela de medidas</ThemedText></Pressable>
               </View>
 
               <View style={styles.shippingSection}>
@@ -968,6 +968,7 @@ const styles = StyleSheet.create({
   heroProductPrice: { color: '#FFFFFF', fontSize: 14 },
   heroBuyButton: { minWidth: 86, minHeight: 40, paddingHorizontal: Spacing.three, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   heroBuyButtonText: { color: '#0a0a0a' },
+	provadorVirtual: { fontSize: 12, fontFamily: Fonts.medium, fontWeight: '500' },
   viewer: { flex: 1, backgroundColor: '#fff' },
   viewerList: { flex: 1, backgroundColor: '#fff' },
   viewerListContent: { backgroundColor: '#fff' },
@@ -984,7 +985,7 @@ const styles = StyleSheet.create({
   details: { gap: Spacing.four, padding: Spacing.four, backgroundColor: '#FFFFFF' },
   productHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
   headingText: { flex: 1, gap: 4 },
-  productName: { fontSize: 16, lineHeight: 23 },
+  productName: { fontSize: 16, lineHeight: 23, fontFamily: Fonts.medium, fontWeight: '400' },
   productMeta: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 10, lineHeight: 14, textTransform: 'uppercase' },
   favoriteButton: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   listPrice: { color: '#8c8781', fontSize: 16, textDecorationLine: 'line-through'  },
@@ -1016,21 +1017,21 @@ const styles = StyleSheet.create({
   helperButton: { flex: 1, minHeight: 44, paddingHorizontal: Spacing.two, borderRadius: 8, borderWidth: 1, borderColor: '#bdb6ad', flexDirection: 'row', gap: Spacing.one, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   shippingSection: { gap: Spacing.three, paddingTop: Spacing.two },
   sectionTitle: { fontSize: 15, lineHeight: 23 },
-  shippingRow: { minHeight: 48, flexDirection: 'row' },
+  shippingRow: { minHeight: 32, flexDirection: 'row' },
   shippingInput: { flex: 1, paddingHorizontal: Spacing.three, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
   shippingButton: { minWidth: 108, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#0a0a0a' },
   shippingButtonText: { color: '#FFFFFF', fontWeight: '700' },
   shippingOptions: { borderRadius: 10, borderWidth: 1, borderColor: '#e0dbd4', overflow: 'hidden', backgroundColor: '#FFFFFF' },
-  shippingOptionsHeader: { minHeight: 58, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  shippingOptionsHeader: { minHeight: 32, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   shippingOptionsHeaderCopy: { flex: 1, gap: 2 },
   shippingQuotesList: { gap: Spacing.two, padding: Spacing.two, borderTopWidth: 1, borderTopColor: '#e0dbd4', backgroundColor: '#f7f6f3' },
-  shippingQuote: { padding: Spacing.three, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#eee' },
+  shippingQuote: { padding: Spacing.three, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#fff' },
   shippingQuoteDetails: { flex: 1, gap: 2 },
   accordion: { marginHorizontal: -Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
-  accordionHeader: { minHeight: 52, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  accordionHeader: { minHeight: 32, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   accordionContent: { gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
-  accordionTitle: { fontSize: 16, lineHeight: 23, fontWeight: '500' },
-  accordionText: { color: '#625d57', lineHeight: 21, fontSize: 12 },
+  accordionTitle: { fontSize: 16, lineHeight: 16, fontWeight: '500' },
+  accordionText: { color: '#625d57', lineHeight: 16, fontSize: 12 },
   descriptionTextClip: { overflow: 'hidden' },
   descriptionTextClipCollapsed: { maxHeight: DESCRIPTION_PREVIEW_LINES * DESCRIPTION_LINE_HEIGHT },
   readMoreButton: { alignSelf: 'flex-start', paddingVertical: Spacing.one },
