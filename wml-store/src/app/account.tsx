@@ -29,6 +29,7 @@ import HomeUtilityPrivacyIcon from '@/components/icons/HomeUtilityPrivacyIcon';
 import HomeUtilityReturnsIcon from '@/components/icons/HomeUtilityReturnsIcon';
 import HomeUtilityStoresIcon from '@/components/icons/HomeUtilityStoresIcon';
 import LockIcon from '@/components/icons/LockIcon';
+import LogoutIcon from '@/components/icons/LogoutIcon';
 import UserIcon from '@/components/icons/UserIcon';
 
 type AccountView = 'home' | 'access' | 'password' | 'email' | 'code' | 'register' | 'register-code' | 'register-password' | 'recovery-email' | 'recovery-password' | 'personal';
@@ -643,6 +644,11 @@ function PasswordSetupView({ mode, email, code, setCode, newPassword, setNewPass
     </View>
   </ThemedView>;
 }
+const logoutButtonStyles = StyleSheet.create({
+  content: { width: '100%', padding: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: Spacing.two },
+  label: { color: '#0a0a0a', fontWeight: '600' },
+});
+
 function LoggedAccountV2({ email, notifications, setNotifications, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void }) {
   const tiles: AccountTileData[] = [
     { label: 'Meus pedidos', icon: <Box01Icon color="#0a0a0a" size={18} />, onPress: onOrders },
@@ -654,7 +660,7 @@ function LoggedAccountV2({ email, notifications, setNotifications, onLogout, log
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#0a0a0a" size={18} /> },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#0a0a0a" size={18} /> },
   ];
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><View style={styles.divider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.logoutText}>Sair</ThemedText>}</Pressable><View style={styles.divider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
+  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><View style={styles.divider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <><LogoutIcon color="#0a0a0a" size={16} /><ThemedText style={logoutButtonStyles.label}>Sair</ThemedText></>}</View></Pressable><View style={styles.divider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
 }
 
 function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPrivacyPress }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void; onPrivacyPress: () => void }) {

@@ -27,12 +27,18 @@ function money(value: number) {
   return `R$ ${value.toFixed(2).replace('.', ',')}`;
 }
 
+function discountPercentage(product: Product) {
+  if (product.listPrice === null || product.price === null || product.listPrice <= product.price || product.listPrice <= 0) return 0;
+  return Math.round((1 - product.price / product.listPrice) * 100);
+}
+
 export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true }: Props) {
   const router = useRouter();
   const [localFavorite, setLocalFavorite] = useState(Boolean(controlledFavorite));
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const favorite = controlledFavorite ?? localFavorite;
+  const discount = discountPercentage(product);
 
   useEffect(() => {
     if (controlledFavorite !== undefined) {
@@ -84,6 +90,12 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
       <Pressable onPress={() => router.push(`/product/${product.id}`)} style={styles.productLink}>
         <View style={styles.imageArea}>
           {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.image} contentFit="cover" />}
+          {(product.isNewProduct || discount > 0) && (
+            <View pointerEvents="none" style={styles.badges}>
+              {product.isNewProduct && <View style={[styles.badge, styles.newBadge]}><ThemedText style={styles.badgeText}>Novo</ThemedText></View>}
+              {discount > 0 && <View style={[styles.badge, styles.discountBadge]}><ThemedText style={styles.badgeText}>{discount}%</ThemedText></View>}
+            </View>
+          )}
           <Pressable
             accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
             accessibilityState={{ selected: favorite }}
@@ -127,6 +139,11 @@ const styles = StyleSheet.create({
   productLink: { gap: 5 },
   imageArea: { position: 'relative', width: '100%' },
   image: { width: '100%', aspectRatio: 0.76, borderRadius: 12, backgroundColor: '#e8e8ea' },
+  badges: { position: 'absolute', left: 5, top: 5, zIndex: 10, alignItems: 'flex-start', gap: 4 },
+  badge: { minHeight: 20, paddingHorizontal: 5, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
+  newBadge: { backgroundColor: '#0a0a0a' },
+  discountBadge: { backgroundColor: '#cf242c' },
+  badgeText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
   favoriteButton: { position: 'absolute', right: 5, top: 5, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   name: { minHeight: 38, fontSize: 13, lineHeight: 18 },
   priceArea: { minHeight: 22, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },

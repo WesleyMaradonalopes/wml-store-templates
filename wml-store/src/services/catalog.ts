@@ -46,6 +46,7 @@ export type Product = {
   listPrice: number | null;
   collection: string;
   gender: string;
+  isNewProduct?: boolean;
   isKit: boolean;
   kitGroups: ProductKitGroup[];
   raw?: Record<string, unknown>;
@@ -121,6 +122,7 @@ type ProductPayload = {
     description?: string;
     brand?: string;
     linkText?: string;
+    releaseDate?: string | number;
     properties?: Array<{ name?: string; values?: string[] }>;
     specificationGroups?: unknown;
     allSpecificationsValues?: Record<string, unknown>;
@@ -486,6 +488,22 @@ function getSpecificationValue(product: ProductPayload, names: string[], fieldId
   return readSpecGroupValue(raw, targetNames) || readAllSpecificationsValue(raw, targetNames) || readRawObjectValue(raw, targetNames) || '';
 }
 
+const NEW_PRODUCT_WINDOW_MS = 10368000000;
+
+function isRecentProduct(product: ProductPayload) {
+  const releaseDate = product.releaseDate;
+  if (releaseDate === undefined || releaseDate === null || releaseDate === '') return false;
+
+  const numericReleaseDate = Number(releaseDate);
+  const releaseTime = Number.isFinite(numericReleaseDate) && numericReleaseDate > 0
+    ? numericReleaseDate
+    : Date.parse(String(releaseDate));
+  if (!Number.isFinite(releaseTime)) return false;
+
+  const age = Date.now() - releaseTime;
+  return age <= NEW_PRODUCT_WINDOW_MS;
+}
+
 function getSizeValue(variant: ProductVariant) {
   return Object.entries(variant.variations).find(([name]) => isSizeVariationName(name))?.[1] ?? '';
 }
@@ -572,6 +590,7 @@ function normalizeProduct(product: ProductPayload): Product {
     listPrice: defaultVariant?.listPrice ?? null,
     collection,
     gender,
+    isNewProduct: isRecentProduct(product),
     isKit,
     kitGroups: [],
     raw: rawProduct(product),
