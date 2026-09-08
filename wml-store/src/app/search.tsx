@@ -20,6 +20,30 @@ function paramText(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
 }
 
+function facetIdentity(facet: SelectedFacet) {
+  return `${facet.key.trim().toLowerCase()}:${facet.value.trim().toLowerCase()}`;
+}
+
+function mergeFacets(...groups: SelectedFacet[][]) {
+  return Array.from(new Map(groups.flat().map((facet) => [facetIdentity(facet), facet])).values());
+}
+
+function isCategoryFacet(facet: SelectedFacet) {
+  const key = facet.key.toLowerCase();
+  return key === 'c' || /^category-\d+$/.test(key);
+}
+
+function replaceResolvedCategoryValues(contextFacets: SelectedFacet[], resolvedFacets: SelectedFacet[]) {
+  const resolvedCategories = resolvedFacets.filter(isCategoryFacet);
+  let categoryIndex = 0;
+  return contextFacets.map((facet) => {
+    if (!isCategoryFacet(facet)) return facet;
+    const resolved = resolvedCategories[categoryIndex];
+    categoryIndex += 1;
+    return resolved ? { ...facet, value: resolved.value } : facet;
+  });
+}
+
 type ListingResolution = {
   query: string;
   facets: SelectedFacet[];
@@ -40,6 +64,9 @@ export default function SearchScreen() {
   const [searchOpen, setSearchOpen] = useState(!initialHasListingContext);
   const [products, setProducts] = useState<Product[]>([]);
   const [facets, setFacets] = useState<CatalogFacet[]>([]);
+  // Facets coming from the route identify the page's scope. They must survive
+  // clearing shopper-selected filters (for example, a category landing page).
+  const [contextFacets, setContextFacets] = useState<SelectedFacet[]>(initialFacets);
   const [selectedFacets, setSelectedFacets] = useState<SelectedFacet[]>([]);
   const [resultCount, setResultCount] = useState(0);
   const [loading, setLoading] = useState(Boolean(initialQuery || initialFacets.length));
@@ -52,6 +79,7 @@ export default function SearchScreen() {
   const [popularTerms, setPopularTerms] = useState<string[]>([]);
   const [listingResolution, setListingResolution] = useState<ListingResolution | null>(null);
   const [filtersVisible, setFiltersVisible] = useState(false);
+  const activeFacets = mergeFacets(contextFacets, selectedFacets);
   const facetSignature = JSON.stringify(selectedFacets);
 
   useEffect(() => {
@@ -61,7 +89,8 @@ export default function SearchScreen() {
     setTerm(nextQuery);
     setActiveQuery(nextQuery);
     setSearchOpen(!(nextQuery || nextFacets.length > 0 || nextTitle));
-    setSelectedFacets(nextFacets);
+    setContextFacets(nextFacets);
+    setSelectedFacets([]);
     setSort(paramText(sortParam) || 'score:desc');
     setListingTitle(nextTitle);
     setSuggestions([]);
@@ -96,16 +125,18 @@ export default function SearchScreen() {
     const value = term.trim();
     if (value === activeQuery) return;
     const timer = setTimeout(() => {
+      setContextFacets([]);
       setSelectedFacets([]);
       setSort('score:desc');
       setListingTitle('');
       setActiveQuery(value);
+      setListingResolution(null);
     }, 250);
     return () => clearTimeout(timer);
   }, [activeQuery, term]);
 
   useEffect(() => {
-    if (!activeQuery && selectedFacets.length === 0) {
+    if (!activeQuery && activeFacets.length === 0) {
       setProducts([]);
       setFacets([]);
       setResultCount(0);
@@ -118,7 +149,7 @@ export default function SearchScreen() {
     setMessage(null);
     setListingResolution(null);
     async function loadListing() {
-      let requestFacets = selectedFacets;
+      let requestFacets = activeFacets;
       let listing = await searchSmartProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort });
 
       if (listing.recordsFiltered === 0 && listing.products.length === 0) {
@@ -126,7 +157,10 @@ export default function SearchScreen() {
         if (JSON.stringify(resolvedFacets) !== JSON.stringify(requestFacets)) {
           requestFacets = resolvedFacets;
           listing = await searchSmartProductListing({ query: activeQuery, facets: requestFacets, count: 48, sort });
-          if (active) setSelectedFacets(resolvedFacets);
+          if (active) {
+            setContextFacets((current) => replaceResolvedCategoryValues(current, resolvedFacets));
+            setSelectedFacets(resolvedFacets);
+          }
         }
       }
 
@@ -148,7 +182,7 @@ export default function SearchScreen() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [activeQuery, facetSignature, sort]);
+  }, [activeQuery, contextFacets, facetSignature, sort]);
 
   function search() {
     const value = term.trim();
@@ -156,11 +190,13 @@ export default function SearchScreen() {
       clearSearch();
       return;
     }
+    setContextFacets([]);
     setSelectedFacets([]);
     setSort('score:desc');
     setListingTitle('');
     setActiveQuery(value);
     setSuggestions([]);
+    setListingResolution(null);
   }
 
   function clearSearch() {
@@ -176,20 +212,24 @@ export default function SearchScreen() {
 
   function openPopular(value: string) {
     setTerm(value);
+    setContextFacets([]);
     setSelectedFacets([]);
     setSort('score:desc');
     setListingTitle('');
     setActiveQuery(value);
     setSuggestions([]);
+    setListingResolution(null);
   }
 
   function selectSuggestion(value: string) {
     setTerm(value);
+    setContextFacets([]);
     setSelectedFacets([]);
     setSort('score:desc');
     setListingTitle('');
     setActiveQuery(value);
     setSuggestions([]);
+    setListingResolution(null);
   }
 
   async function loadMore() {
@@ -197,7 +237,7 @@ export default function SearchScreen() {
     setLoadingMore(true);
     try {
       const nextPage = Math.floor(products.length / 48) + 1;
-      const resolution = listingResolution ?? { query: activeQuery, facets: selectedFacets, source: 'intelligent' as const };
+      const resolution = listingResolution ?? { query: activeQuery, facets: mergeFacets(contextFacets, selectedFacets), source: 'intelligent' as const };
       const listing = resolution.source === 'catalog-fulltext'
         ? await searchCatalogProductListing({ query: resolution.query, facets: resolution.facets, count: 48, page: nextPage, sort })
         : await searchProductListing({ query: resolution.query, facets: resolution.facets, count: 48, page: nextPage, sort });
@@ -248,7 +288,7 @@ export default function SearchScreen() {
         )}
         <View style={styles.body}>
 
-        {!activeQuery && selectedFacets.length === 0 && popularTerms.length > 0 && (
+        {!activeQuery && activeFacets.length === 0 && popularTerms.length > 0 && (
           <ThemedView style={styles.trending}>
             <ThemedText type="smallBold">Em alta</ThemedText>
             <View style={styles.chips}>
@@ -257,7 +297,7 @@ export default function SearchScreen() {
           </ThemedView>
         )}
 
-        {(!!activeQuery || selectedFacets.length > 0) && (
+        {(!!activeQuery || activeFacets.length > 0) && (
           <View style={styles.listingHeader}>
             <View style={styles.listingHeading}>
               <ThemedText style={styles.listingTitle}>{listingTitle || activeQuery || 'Produtos'}</ThemedText>
@@ -269,7 +309,7 @@ export default function SearchScreen() {
 
         {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
         {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
-        {!loading && (activeQuery || selectedFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
+        {!loading && (activeQuery || activeFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
 
         <FlatList
           data={products}
@@ -298,17 +338,20 @@ export default function SearchScreen() {
           visible={filtersVisible}
           query={activeQuery}
           facets={facets}
-          baseFacets={(listingResolution?.source === 'facet' || listingResolution?.source === 'collection')
-            ? listingResolution.facets.filter((facet) => !selectedFacets.some((selected) => selected.key === facet.key && selected.value === facet.value))
-            : []}
+          baseFacets={mergeFacets(
+            contextFacets,
+            (listingResolution?.source === 'facet' || listingResolution?.source === 'collection')
+              ? listingResolution.facets.filter((facet) => !selectedFacets.some((selected) => facetIdentity(selected) === facetIdentity(facet)))
+              : [],
+          )}
           selectedFacets={selectedFacets}
           sort={sort}
           resultCount={resultCount}
           onClose={() => setFiltersVisible(false)}
           onApply={(nextFacets, nextSort) => {
             const scope = (listingResolution?.source === 'facet' || listingResolution?.source === 'collection') ? listingResolution.facets : [];
-            const merged = Array.from(new Map([...scope, ...nextFacets].map((facet) => [`${facet.key}:${facet.value}`, facet])).values());
-            setSelectedFacets(merged);
+            setContextFacets((current) => mergeFacets(current, scope));
+            setSelectedFacets(nextFacets);
             setSort(nextSort);
             setFiltersVisible(false);
           }}

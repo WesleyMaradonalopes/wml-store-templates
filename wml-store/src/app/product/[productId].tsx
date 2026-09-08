@@ -71,7 +71,7 @@ function estimateLabel(value: string) {
 }
 
 const DESCRIPTION_PREVIEW_LINES = 5;
-const DESCRIPTION_LINE_HEIGHT = 21;
+const DESCRIPTION_LINE_HEIGHT = 20;
 
 export default function ProductScreen() {
   const router = useRouter();
@@ -1052,7 +1052,7 @@ const styles = StyleSheet.create({
   shippingQuotesFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 20 },
   shippingQuote: { minHeight: 20, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
   shippingQuoteName: { flex: 0.9, minWidth: 0 },
-  shippingQuoteEstimate: { flex: 1.35, minWidth: 0, fontSize: 11, textAlign: 'center' },
+  shippingQuoteEstimate: { flex: 1.35, minWidth: 0, fontSize: 11, textAlign: 'left' },
   shippingQuotePrice: { minWidth: 58, textAlign: 'right' },
   shippingMoreButton: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.one },
   shippingMoreText: { fontSize: 12, textDecorationLine: 'underline' },
@@ -1063,9 +1063,9 @@ const styles = StyleSheet.create({
   accordionText: { color: '#625d57', lineHeight: 16, fontSize: 12 },
   descriptionTextClip: { position: 'relative', overflow: 'hidden' },
   descriptionTextClipCollapsed: { maxHeight: DESCRIPTION_PREVIEW_LINES * DESCRIPTION_LINE_HEIGHT },
-  descriptionTextFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 30 },
+  descriptionTextFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 20 },
   readMoreButton: { alignSelf: 'flex-start', paddingVertical: Spacing.one },
-  readMoreText: { color: '#0a0a0a', fontSize: 13, lineHeight: 18, fontFamily: Fonts.bold, textDecorationLine: 'underline' },
+  readMoreText: { color: '#0a0a0a', fontSize: 13, lineHeight: 13, fontFamily: Fonts.bold, textDecorationLine: 'underline' },
   dropdownChevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
   dropdownChevronOpen: { transform: [{ rotate: '-90deg' }] },
   floatingBar: { position: 'absolute', left: 10, right: 10, bottom: 20, minHeight: 50, borderRadius: 50, paddingHorizontal: 20, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, backgroundColor: '#fff', shadowColor: '#0a0a0a', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
