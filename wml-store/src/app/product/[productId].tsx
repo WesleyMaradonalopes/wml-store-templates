@@ -10,6 +10,7 @@ import { AddedToCartModal, type AddedProductInfo } from '@/components/added-to-c
 import { CartIconButton } from '@/components/cart-icon-button';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
+import CloseIcon from '@/components/icons/CloseIcon';
 import ExchangeIcon from '@/components/icons/ExchangeIcon';
 import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
@@ -476,19 +477,34 @@ export default function ProductScreen() {
               <View style={styles.shippingSection}>
                 <ThemedText style={styles.sectionTitle}>Calcule o frete e prazo de entrega</ThemedText>
                 <View style={styles.shippingRow}>
-                  <TextInput value={postalCode} onChangeText={updatePostalCode} placeholder="Digite seu CEP" keyboardType="number-pad" maxLength={9} style={styles.shippingInput} />
+                  <View style={styles.shippingInputWrap}>
+                    <TextInput value={postalCode} onChangeText={updatePostalCode} placeholder="Digite seu CEP" keyboardType="number-pad" maxLength={9} style={styles.shippingInput} />
+                    {!!postalCode && <Pressable accessibilityLabel="Limpar CEP" onPress={() => updatePostalCode('')} style={styles.shippingClearButton}>
+                      <CloseIcon color="#77716a" size={18} />
+                    </Pressable>}
+                  </View>
                   <Pressable disabled={shippingLoading} onPress={calculateShipping} style={styles.shippingButton}>{shippingLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.shippingButtonText}>Calcular</ThemedText>}</Pressable>
                 </View>
                 {!!shippingMessage && <ThemedText style={styles.messageText}>{shippingMessage}</ThemedText>}
                 {shippingQuotes.length > 0 && <View style={styles.shippingOptions}>
-                  <Pressable accessibilityState={{ expanded: shippingOptionsOpen }} onPress={() => setShippingOptionsOpen((value) => !value)} style={styles.shippingOptionsHeader}>
-                    <View style={styles.shippingOptionsHeaderCopy}>
-                      <ThemedText type="smallBold">Opções de entrega</ThemedText>
-                      <ThemedText themeColor="textSecondary">{shippingQuotes.length} {shippingQuotes.length === 1 ? 'opção disponível' : 'opções disponíveis'}</ThemedText>
-                    </View>
+                  <View style={[styles.shippingQuotesList, shippingQuotes.length > 1 && !shippingOptionsOpen && styles.shippingQuotesListCollapsed]}>
+                    {shippingQuotes.map((quote) => <View key={`${quote.deliveryChannel || 'delivery'}-${quote.name}`} style={styles.shippingQuote}>
+                      <ThemedText numberOfLines={1} type="smallBold" style={styles.shippingQuoteName}>{quote.name}</ThemedText>
+                      <ThemedText numberOfLines={1} themeColor="textSecondary" style={styles.shippingQuoteEstimate}>{quote.isPickupInPoint ? 'Retire em ' : 'Receba em '}{estimateLabel(quote.shippingEstimate)}</ThemedText>
+                      <ThemedText numberOfLines={1} type="smallBold" style={styles.shippingQuotePrice}>{quote.price === 0 ? 'Grátis' : money(quote.price)}</ThemedText>
+                    </View>)}
+                    {shippingQuotes.length > 1 && !shippingOptionsOpen && <LinearGradient
+                      pointerEvents="none"
+                      colors={['rgba(255, 255, 255, 0.98)', 'rgba(255, 255, 255, 0)']}
+                      start={{ x: 0.5, y: 1 }}
+                      end={{ x: 0.5, y: 0 }}
+                      style={styles.shippingQuotesFade}
+                    />}
+                  </View>
+                  {shippingQuotes.length > 1 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: shippingOptionsOpen }} onPress={() => setShippingOptionsOpen((value) => !value)} style={styles.shippingMoreButton}>
+                    <ThemedText type="smallBold" style={styles.shippingMoreText}>{shippingOptionsOpen ? 'Ver menos' : 'Ver mais'}</ThemedText>
                     <DropdownChevron open={shippingOptionsOpen} />
-                  </Pressable>
-                  {shippingOptionsOpen && <View style={styles.shippingQuotesList}>{shippingQuotes.map((quote) => <View key={`${quote.deliveryChannel || 'delivery'}-${quote.name}`} style={styles.shippingQuote}><View style={styles.shippingQuoteDetails}><ThemedText type="smallBold">{quote.name}</ThemedText><ThemedText themeColor="textSecondary">{quote.isPickupInPoint ? 'Retire em ' : 'Receba em '}{estimateLabel(quote.shippingEstimate)}</ThemedText></View><ThemedText type="smallBold">{quote.price === 0 ? 'Grátis' : money(quote.price)}</ThemedText></View>)}</View>}
+                  </Pressable>}
                 </View>}
               </View>
 
@@ -502,6 +518,13 @@ export default function ProductScreen() {
                     style={styles.accordionText}>
                     {descriptionText}
                   </ThemedText>
+                  {!descriptionExpanded && descriptionLineCount > DESCRIPTION_PREVIEW_LINES && <LinearGradient
+                    pointerEvents="none"
+                    colors={['rgba(255, 255, 255, 0.98)', 'rgba(255, 255, 255, 0)']}
+                    start={{ x: 0.5, y: 1 }}
+                    end={{ x: 0.5, y: 0 }}
+                    style={styles.descriptionTextFade}
+                  />}
                 </View>
                 {descriptionLineCount > DESCRIPTION_PREVIEW_LINES && <Pressable onPress={() => setDescriptionExpanded((value) => !value)} style={styles.readMoreButton}>
                   <ThemedText style={styles.readMoreText}>{descriptionExpanded ? 'Ler menos' : 'Ler mais'}</ThemedText>
@@ -1018,22 +1041,29 @@ const styles = StyleSheet.create({
   shippingSection: { gap: Spacing.three, paddingTop: Spacing.two },
   sectionTitle: { fontSize: 15, lineHeight: 23 },
   shippingRow: { minHeight: 32, flexDirection: 'row' },
-  shippingInput: { flex: 1, paddingHorizontal: Spacing.three, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
+  shippingInputWrap: { flex: 1, position: 'relative' },
+  shippingInput: { width: '100%', paddingHorizontal: Spacing.three, paddingRight: 42, borderWidth: 1, borderColor: '#cfc8bf', borderTopLeftRadius: 8, borderBottomLeftRadius: 8, backgroundColor: '#FFFFFF', fontFamily: Fonts.sans },
+  shippingClearButton: { position: 'absolute', top: 0, right: 2, bottom: 0, width: 34, alignItems: 'center', justifyContent: 'center' },
   shippingButton: { minWidth: 108, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 8, borderBottomRightRadius: 8, backgroundColor: '#0a0a0a' },
   shippingButtonText: { color: '#FFFFFF', fontWeight: '700' },
-  shippingOptions: { borderRadius: 10, borderWidth: 1, borderColor: '#e0dbd4', overflow: 'hidden', backgroundColor: '#FFFFFF' },
-  shippingOptionsHeader: { minHeight: 32, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
-  shippingOptionsHeaderCopy: { flex: 1, gap: 2 },
-  shippingQuotesList: { gap: Spacing.two, padding: Spacing.two, borderTopWidth: 1, borderTopColor: '#e0dbd4', backgroundColor: '#f7f6f3' },
-  shippingQuote: { padding: Spacing.three, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, backgroundColor: '#fff' },
-  shippingQuoteDetails: { flex: 1, gap: 2 },
+  shippingOptions: { overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  shippingQuotesList: { position: 'relative', gap: 0, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  shippingQuotesListCollapsed: { maxHeight: 70 },
+  shippingQuotesFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 20 },
+  shippingQuote: { minHeight: 20, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
+  shippingQuoteName: { flex: 0.9, minWidth: 0 },
+  shippingQuoteEstimate: { flex: 1.35, minWidth: 0, fontSize: 11, textAlign: 'center' },
+  shippingQuotePrice: { minWidth: 58, textAlign: 'right' },
+  shippingMoreButton: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.one },
+  shippingMoreText: { fontSize: 12, textDecorationLine: 'underline' },
   accordion: { marginHorizontal: -Spacing.four, borderTopWidth: 1, borderTopColor: '#e5e0d9' },
   accordionHeader: { minHeight: 32, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   accordionContent: { gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
-  accordionTitle: { fontSize: 16, lineHeight: 16, fontWeight: '500' },
+  accordionTitle: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   accordionText: { color: '#625d57', lineHeight: 16, fontSize: 12 },
-  descriptionTextClip: { overflow: 'hidden' },
+  descriptionTextClip: { position: 'relative', overflow: 'hidden' },
   descriptionTextClipCollapsed: { maxHeight: DESCRIPTION_PREVIEW_LINES * DESCRIPTION_LINE_HEIGHT },
+  descriptionTextFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 30 },
   readMoreButton: { alignSelf: 'flex-start', paddingVertical: Spacing.one },
   readMoreText: { color: '#0a0a0a', fontSize: 13, lineHeight: 18, fontFamily: Fonts.bold, textDecorationLine: 'underline' },
   dropdownChevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
