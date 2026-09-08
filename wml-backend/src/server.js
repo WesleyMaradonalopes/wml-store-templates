@@ -26,6 +26,7 @@ const allowedOrigins = String(process.env.ALLOWED_ORIGINS || '').split(',').map(
 const wishlistEntity = process.env.VTEX_WISHLIST_ENTITY || 'wishlist';
 const wishlistSchema = process.env.VTEX_WISHLIST_SCHEMA || 'wishlist';
 const wishlistEntities = [...new Set([wishlistEntity, 'wishlist', 'WL', 'wl', 'WI', 'wi'])];
+const wishlistGraphqlContextProvider = String(process.env.VTEX_WISHLIST_CONTEXT_PROVIDER || 'vtex.wish-list@1.x').trim();
 const customerVtexSessions = new Map();
 const checkoutOwnershipCookies = new Map();
 const wishlistIoStrategyByEmail = new Map();
@@ -894,6 +895,124 @@ async function searchCustomerAddressesByEmail(email) {
     const address = normalizeCustomerAddress(document);
     return [address.id || address.documentId, address];
   })).values()].filter((address) => address.id || address.street || address.postalCode);
+}
+
+function decodeJwtPayload(token) {
+  const normalizedToken = String(token || '').trim().replace(/^Bearer\s+/i, '');
+  const payload = normalizedToken.split('.')[1];
+  if (!payload) return null;
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    return JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function wishlistShopperId(email, token = '') {
+  const stored = customerVtexSessions.get(email) || {};
+  const candidates = [...new Set([
+    token,
+    stored.shopperToken,
+    stored.authToken,
+    tokenFromCookie(stored.cookieHeader),
+  ].map((value) => String(value || '').trim()).filter(Boolean))];
+
+  for (const candidate of candidates) {
+    const shopperId = String(decodeJwtPayload(candidate)?.sub || '').trim();
+    if (shopperId) return shopperId;
+  }
+
+  throw new Error('Não foi possível identificar a sessão do cliente para os favoritos. Faça login novamente.');
+}
+
+function wishlistGraphqlContext() {
+  if (!wishlistGraphqlContextProvider || !/^[\w.@-]+$/.test(wishlistGraphqlContextProvider)) return '';
+  return ` @context(provider: "${wishlistGraphqlContextProvider}")`;
+}
+
+async function requestWishlistGraphql(email, token, query, variables) {
+  const response = await fetch(`${vtexBaseUrl}/_v/private/graphql/v1?locale=pt-BR`, {
+    method: 'POST',
+    headers: {
+      ...sessionHeaders(email, token),
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const body = await readResponseBody(response);
+  if (!response.ok || (Array.isArray(body?.errors) && body.errors.length > 0)) {
+    throw new Error(vtexErrorMessage(body, `A VTEX não conseguiu atualizar os favoritos (HTTP ${response.status}).`));
+  }
+  if (!body?.data) throw new Error('A VTEX não retornou os dados dos favoritos.');
+  return body.data;
+}
+
+function wishlistGraphqlItems(data) {
+  const lists = Array.isArray(data?.viewLists) ? data.viewLists : [];
+  const list = lists.find((item) => String(item?.name || '').trim().toLowerCase() === 'wishlist') || lists[0];
+  const items = Array.isArray(list?.data) ? list.data : [];
+  return items.flatMap((item) => {
+    const productId = String(item?.productId || '').trim();
+    if (!productId) return [];
+    return [{
+      productId,
+      id: String(item?.id || '').trim(),
+      title: String(item?.title || '').trim(),
+      sku: String(item?.sku || '').trim(),
+    }];
+  });
+}
+
+async function getWishlistGraphql(email, token = '') {
+  const shopperId = wishlistShopperId(email, token);
+  const context = wishlistGraphqlContext();
+  const data = await requestWishlistGraphql(email, token, `
+    query ViewLists($shopperId: String!, $from: Int, $to: Int) {
+      viewLists(shopperId: $shopperId, from: $from, to: $to)${context} {
+        data { productId sku title id }
+        name public
+      }
+    }
+  `, { shopperId, from: 1, to: 50 });
+  const items = wishlistGraphqlItems(data);
+  return {
+    shopperId,
+    items,
+    wishlist: [...new Set(items.map((item) => item.productId))],
+    source: 'vtex-graphql',
+  };
+}
+
+async function addWishlistGraphql(email, token, productId, title, sku) {
+  const shopperId = wishlistShopperId(email, token);
+  const context = wishlistGraphqlContext();
+  await requestWishlistGraphql(email, token, `
+    mutation AddToList($shopperId: String!, $listItem: ListItemInputType!, $name: String!) {
+      addToList(shopperId: $shopperId, listItem: $listItem, name: $name)${context}
+    }
+  `, {
+    shopperId,
+    listItem: {
+      productId,
+      title: title || productId,
+      sku: sku || productId,
+    },
+    name: 'Wishlist',
+  });
+}
+
+async function removeWishlistGraphql(email, token, itemId) {
+  const shopperId = wishlistShopperId(email, token);
+  const context = wishlistGraphqlContext();
+  await requestWishlistGraphql(email, token, `
+    mutation RemoveFromList($shopperId: String!, $id: ID!, $name: String!) {
+      removeFromList(shopperId: $shopperId, id: $id, name: $name)${context}
+    }
+  `, { shopperId, id: itemId, name: 'Wishlist' });
 }
 
 function normalizeWishlistIds(value) {
@@ -1985,7 +2104,9 @@ app.post('/auth/login', async (request, response) => {
     const cookieHeader = normalizeCookieHeader(extractSetCookie(result));
     const authToken = authTokenFromResponse(body, cookieHeader);
     if (!result.ok || (!authToken && !cookieHeader)) throw new Error(body?.message || 'E-mail ou senha inválidos.');
-    customerVtexSessions.set(email, { authToken, cookieHeader, updatedAt: Date.now() });
+    const shopperToken = [body?.authCookie?.Value, body?.accountAuthCookie?.Value, authToken]
+      .find((candidate) => Boolean(decodeJwtPayload(candidate)?.sub)) || '';
+    customerVtexSessions.set(email, { authToken, shopperToken, cookieHeader, updatedAt: Date.now() });
     console.log(`[AUTH] ${email} -> password session cookie=${Boolean(cookieHeader)} token=${Boolean(authToken)}`);
     return response.json({ ok: true, authCookie: { Value: authToken } });
   } catch (error) {
@@ -2007,7 +2128,9 @@ app.post('/auth/access-key/validate', async (request, response) => {
     const cookieHeader = normalizeCookieHeader(extractSetCookie(result));
     const authToken = authTokenFromResponse(body, cookieHeader);
     if (!result.ok || (!authToken && !cookieHeader)) throw new Error('Código de acesso inválido.');
-    customerVtexSessions.set(email, { authToken, cookieHeader, updatedAt: Date.now() });
+    const shopperToken = [body?.authCookie?.Value, body?.accountAuthCookie?.Value, authToken]
+      .find((candidate) => Boolean(decodeJwtPayload(candidate)?.sub)) || '';
+    customerVtexSessions.set(email, { authToken, shopperToken, cookieHeader, updatedAt: Date.now() });
     console.log(`[AUTH] ${email} -> access-key session cookie=${Boolean(cookieHeader)} token=${Boolean(authToken)}`);
     return response.json({ ok: true, authCookie: { Value: authToken } });
   } catch (error) {
@@ -2047,10 +2170,10 @@ app.get('/customer/wishlist', async (request, response) => {
   if (!email) return response.status(400).json({ ok: false, message: 'Informe o e-mail do cliente.' });
   try {
     const token = String(request.headers.vtexidclientautcookie || '').trim();
-    const result = await getWishlistByEmail(email, token);
+    const result = await getWishlistGraphql(email, token);
     console.log(`[WISHLIST] ${email} -> token=${Boolean(token)}`);
-    console.log(`[WISHLIST] ${email} -> read source=${result.source || result.entity} count=${result.wishlist?.length || 0}`);
-    return response.json({ ok: true, ...result });
+    console.log(`[WISHLIST] ${email} -> read source=${result.source} count=${result.wishlist.length}`);
+    return response.json({ ok: true, wishlist: result.wishlist, source: result.source });
   }
   catch (error) { console.error(`[WISHLIST] ${email} -> read-error: ${error instanceof Error ? error.message : 'unknown'}`); return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao carregar favoritos.' }); }
 });
@@ -2061,15 +2184,26 @@ app.post('/customer/wishlist/toggle', async (request, response) => {
   if (!email || !productId) return response.status(400).json({ ok: false, message: 'E-mail e produto são obrigatórios.' });
   try {
     const token = String(request.headers.vtexidclientautcookie || '').trim();
-    const current = await getWishlistByEmail(email, token);
-    const favorite = !current.wishlist.includes(productId);
-    const wishlist = favorite ? [...current.wishlist, productId] : current.wishlist.filter((id) => id !== productId);
-    const usesVtexIo = String(current.source || '').includes('/api/io/');
-    const ioUpdated = usesVtexIo ? await mutateVtexIoWishlist(productId, favorite ? 'add' : 'remove', token, email) : false;
-    if (!ioUpdated) await saveWishlistByEmail(email, wishlist, token, current);
-    const source = ioUpdated ? 'vtex-io' : 'master-data';
-    console.log(`[WISHLIST] ${email} -> ${favorite ? 'added' : 'removed'} source=${source} count=${wishlist.length}`);
-    return response.json({ ok: true, favorite, wishlist, source });
+    const current = await getWishlistGraphql(email, token);
+    const currentItem = current.items.find((item) => item.productId === productId);
+    const favorite = !currentItem;
+
+    if (favorite) {
+      await addWishlistGraphql(
+        email,
+        token,
+        productId,
+        String(request.body?.title || request.body?.name || '').trim(),
+        String(request.body?.sku || '').trim(),
+      );
+    } else {
+      if (!currentItem.id) throw new Error('A VTEX não retornou o identificador do favorito para remoção.');
+      await removeWishlistGraphql(email, token, currentItem.id);
+    }
+
+    const updated = await getWishlistGraphql(email, token);
+    console.log(`[WISHLIST] ${email} -> ${favorite ? 'added' : 'removed'} source=${updated.source} count=${updated.wishlist.length}`);
+    return response.json({ ok: true, favorite, wishlist: updated.wishlist, source: updated.source });
   } catch (error) { console.error(`[WISHLIST] ${email} -> update-error: ${error instanceof Error ? error.message : 'unknown'}`); return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao salvar favorito.' }); }
 });
 

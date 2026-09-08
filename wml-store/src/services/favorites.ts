@@ -90,7 +90,7 @@ export async function toggleFavorite(product: Product, options: { hydrate?: bool
   const session = await getAccountSession();
   const token = await getVtexUserToken();
   if (!session?.email || !token) throw new Error('Entre na sua conta para salvar favoritos.');
-  const response = await fetch(`${storeConfig.backendUrl}/customer/wishlist/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json', VtexIdclientAutCookie: token }, body: JSON.stringify({ email: session.email, productId: product.id }) });
+  const response = await fetch(`${storeConfig.backendUrl}/customer/wishlist/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json', VtexIdclientAutCookie: token }, body: JSON.stringify({ email: session.email, productId: product.id, title: product.name, sku: product.itemId }) });
   const payload = await response.json().catch(() => ({})) as { favorite?: boolean; wishlist?: string[]; message?: string };
   if (!response.ok) throw new Error(payload.message || `Não foi possível atualizar os favoritos (HTTP ${response.status}).`);
   const cachedIds = await getCachedIds(session.email);
