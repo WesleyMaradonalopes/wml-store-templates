@@ -5,7 +5,8 @@ import { Alert, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-
 
 import { Spacing } from '@/constants/theme';
 import { type Product } from '@/services/catalog';
-import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
+import { getAccountSession } from '@/services/auth';
+import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, subscribeFavoriteChanges, toggleFavorite } from '@/services/favorites';
 
 import HeartIcon from './icons/HeartIcon';
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
@@ -49,6 +50,26 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
     isFavorite(product.id).then((value) => { if (active) setLocalFavorite(value); }).catch(() => undefined);
     return () => { active = false; };
   }, [controlledFavorite, product.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    const unsubscribe = subscribeFavoriteChanges((change) => {
+      getAccountSession()
+        .then((session) => {
+          if (!active || !session?.email || session.email.trim().toLowerCase() !== change.email) return;
+          const nextFavorite = change.wishlist.includes(product.id);
+          setLocalFavorite(nextFavorite);
+          if (controlledFavorite !== nextFavorite) onFavoriteChange?.(nextFavorite);
+        })
+        .catch(() => undefined);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [controlledFavorite, onFavoriteChange, product.id]);
 
   function updateFavorite(value: boolean, notify = true) {
     setLocalFavorite(value);

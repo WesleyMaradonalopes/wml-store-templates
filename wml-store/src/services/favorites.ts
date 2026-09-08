@@ -7,6 +7,31 @@ function cacheKey(email: string) {
   return `lojahr:favorites:${email.toLowerCase()}`;
 }
 
+export type FavoriteChange = {
+  email: string;
+  wishlist: string[];
+};
+
+type FavoriteChangeListener = (change: FavoriteChange) => void;
+
+const favoriteChangeListeners = new Set<FavoriteChangeListener>();
+
+export function subscribeFavoriteChanges(listener: FavoriteChangeListener) {
+  favoriteChangeListeners.add(listener);
+  return () => favoriteChangeListeners.delete(listener);
+}
+
+function notifyFavoriteChanges(email: string, wishlist: string[]) {
+  const change = { email: email.trim().toLowerCase(), wishlist: Array.from(new Set(wishlist)) };
+  favoriteChangeListeners.forEach((listener) => {
+    try {
+      listener(change);
+    } catch {
+      // Um card não deve interromper a atualização dos demais.
+    }
+  });
+}
+
 async function getCachedIds(email: string) {
   return (await getStoredJson<string[]>(cacheKey(email))) ?? [];
 }
@@ -29,8 +54,9 @@ async function loadFavorites(): Promise<Product[]> {
     const response = await fetch(`${storeConfig.backendUrl}/customer/wishlist?email=${encodeURIComponent(session.email)}`, { headers: { VtexIdclientAutCookie: token } });
     if (response.ok) {
       const payload = await response.json() as { wishlist?: string[] };
-      const serverIds = payload.wishlist ?? [];
+      const serverIds = Array.from(new Set((payload.wishlist ?? []).map((id) => String(id).trim()).filter(Boolean)));
       await saveCachedIds(session.email, serverIds);
+      notifyFavoriteChanges(session.email, serverIds);
       return productsFromIds(serverIds);
     }
   } catch {
@@ -94,8 +120,9 @@ export async function toggleFavorite(product: Product, options: { hydrate?: bool
   const payload = await response.json().catch(() => ({})) as { favorite?: boolean; wishlist?: string[]; message?: string };
   if (!response.ok) throw new Error(payload.message || `Não foi possível atualizar os favoritos (HTTP ${response.status}).`);
   const cachedIds = await getCachedIds(session.email);
-  const ids = payload.wishlist ?? (payload.favorite ? [...cachedIds, product.id] : cachedIds.filter((id) => id !== product.id));
+  const ids = Array.from(new Set(payload.wishlist ?? (payload.favorite ? [...cachedIds, product.id] : cachedIds.filter((id) => id !== product.id))));
   await saveCachedIds(session.email, ids);
+  notifyFavoriteChanges(session.email, ids);
   return {
     favorite: Boolean(payload.favorite),
     favorites: options.hydrate === false ? [] : await productsFromIds(ids),
