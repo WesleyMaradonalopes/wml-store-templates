@@ -1,11 +1,10 @@
 import { Montserrat_300Light, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, useFonts } from '@expo-google-fonts/montserrat';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import { Linking, Platform, useColorScheme } from 'react-native';
 import { TabBarContext } from '@/context/tab-bar-context';
 import { getAccountSession, getVtexUserToken } from '@/services/auth';
-import { configureNotificationPresentation, initializeNotifications } from '@/services/notifications';
+import { addNotificationResponseListener, configureNotificationPresentation, getLastNotificationResponse, initializeNotifications, type NotificationResponse } from '@/services/notifications';
 import GlobalTabBar from '@/components/global-tab-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -71,7 +70,7 @@ function getNotificationTarget(data: Record<string, unknown>) {
 function NotificationBootstrap() {
   const router = useRouter();
   const handledResponseIds = useRef(new Set<string>());
-  const handleResponse = useCallback((response: Notifications.NotificationResponse) => {
+  const handleResponse = useCallback((response: NotificationResponse) => {
     const notificationId = response.notification.request.identifier;
     if (handledResponseIds.current.has(notificationId)) return;
     handledResponseIds.current.add(notificationId);
@@ -95,8 +94,8 @@ function NotificationBootstrap() {
       console.warn('[notifications] Falha ao inicializar notificações.', error);
     });
 
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
-    void Notifications.getLastNotificationResponseAsync()
+    const responseSubscription = addNotificationResponseListener(handleResponse);
+    void getLastNotificationResponse()
       .then((response) => {
         if (response) handleResponse(response);
       })
@@ -104,7 +103,7 @@ function NotificationBootstrap() {
         console.warn('[notifications] Falha ao ler a última notificação.', error);
       });
 
-    return () => responseSubscription.remove();
+    return () => responseSubscription?.remove();
   }, [handleResponse]);
 
   return null;

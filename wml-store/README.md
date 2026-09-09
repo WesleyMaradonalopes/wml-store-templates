@@ -112,8 +112,10 @@ fluxo legado da Eitri, mas sem alterar o repositório legado.
    npm run android:native
    ```
 
-   Teste em um aparelho Android ou emulador com Google Play Services. No
-   Android 13 ou superior, aceite a permissão quando ela aparecer.
+   Não use o Expo Go para validar o push: ele pode não conter o módulo nativo
+   `ExpoPushTokenManager`. Teste em um aparelho Android ou emulador com Google
+   Play Services usando o development build gerado acima. No Android 13 ou
+   superior, aceite a permissão quando ela aparecer.
 
 ### Envio de uma campanha
 

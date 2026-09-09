@@ -15,7 +15,7 @@ import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
-import { disableNotifications, enableNotifications, initializeNotifications, NotificationPermissionError } from '@/services/notifications';
+import { disableNotifications, enableNotifications, initializeNotifications, NotificationModuleUnavailableError, NotificationPermissionError } from '@/services/notifications';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode, phoneToApi } from '@/utils/customer-formatters';
 
 import AppleLogoIcon from '@/components/icons/AppleLogoIcon';
@@ -202,7 +202,9 @@ export default function AccountScreen() {
       setNotifications(previousValue);
       setNotificationsMessage(error instanceof NotificationPermissionError
         ? 'Permissão de notificações negada. Ative-a nas configurações do dispositivo para receber avisos.'
-        : 'Não foi possível atualizar a permissão de notificações. Tente novamente.');
+        : error instanceof NotificationModuleUnavailableError
+          ? 'Para ativar notificações, instale o development build do app; o Expo Go não inclui este módulo nativo.'
+          : 'Não foi possível atualizar a permissão de notificações. Tente novamente.');
     } finally {
       setNotificationsLoading(false);
     }

@@ -1,4 +1,4 @@
-import * as Notifications from 'expo-notifications';
+import type * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { getStoredJson, setStoredJson } from './storage';
@@ -14,6 +14,16 @@ let channelRequest: Promise<void> | null = null;
 let notificationOperation: Promise<unknown> = Promise.resolve();
 let initializationPromise: Promise<NotificationState> | null = null;
 let nativeRegistrationReady = false;
+let notificationsModule: NotificationsModule | null | undefined;
+let moduleWarningShown = false;
+
+type NotificationsModule = typeof import('expo-notifications');
+
+export type NotificationResponse = Notifications.NotificationResponse;
+
+type NotificationResponseSubscription = {
+  remove: () => void;
+};
 
 export type NotificationState = {
   enabled: boolean;
@@ -29,6 +39,36 @@ export class NotificationPermissionError extends Error {
   }
 }
 
+export class NotificationModuleUnavailableError extends Error {
+  constructor() {
+    super('As notificações exigem um development build com o módulo nativo instalado.');
+    this.name = 'NotificationModuleUnavailableError';
+  }
+}
+
+/**
+ * Expo Go and an old native binary can contain the JavaScript package without
+ * containing its native module. Keep the import lazy so the rest of the app
+ * can still open in those runtimes; push registration remains available in a
+ * development/release build generated after installing this dependency.
+ */
+function getNotificationsModule(): NotificationsModule | null {
+  if (!nativePlatform) return null;
+  if (notificationsModule !== undefined) return notificationsModule;
+
+  try {
+    notificationsModule = require('expo-notifications') as NotificationsModule;
+  } catch (error) {
+    notificationsModule = null;
+    if (!moduleWarningShown) {
+      moduleWarningShown = true;
+      console.warn('[notifications] O runtime atual não possui o módulo nativo. Use um development build.', error);
+    }
+  }
+
+  return notificationsModule;
+}
+
 /**
  * Makes remote notifications visible while the app is in the foreground.
  * This is a process-wide Expo Notifications setting, so it is configured once
@@ -37,7 +77,10 @@ export class NotificationPermissionError extends Error {
 export function configureNotificationPresentation() {
   if (!nativePlatform || presentationConfigured) return;
 
-  Notifications.setNotificationHandler({
+  const notifications = getNotificationsModule();
+  if (!notifications) return;
+
+  notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldPlaySound: true,
       shouldSetBadge: false,
@@ -63,10 +106,13 @@ async function writeNotificationsPreference(enabled: boolean) {
 
 async function ensureAndroidNotificationChannel() {
   if (Platform.OS !== 'android') return;
+  const notifications = getNotificationsModule();
+  if (!notifications) return;
+
   if (!channelRequest) {
-    channelRequest = Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, {
+    channelRequest = notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, {
       name: 'Promoções e avisos',
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#0a0a0a',
       sound: 'default',
@@ -76,7 +122,9 @@ async function ensureAndroidNotificationChannel() {
 }
 
 async function readNativePermission() {
-  return Notifications.getPermissionsAsync();
+  const notifications = getNotificationsModule();
+  if (!notifications) return { granted: false, status: 'unavailable' };
+  return notifications.getPermissionsAsync();
 }
 
 async function readState(): Promise<NotificationState> {
@@ -112,9 +160,12 @@ export function getNotificationState() {
 }
 
 async function registerNativePush() {
+  const notifications = getNotificationsModule();
+  if (!notifications) throw new NotificationModuleUnavailableError();
+
   await ensureAndroidNotificationChannel();
 
-  const token = await Notifications.getDevicePushTokenAsync();
+  const token = await notifications.getDevicePushTokenAsync();
   if (!token.data) {
     throw new Error('O serviço de notificações não retornou um token para este dispositivo.');
   }
@@ -123,7 +174,7 @@ async function registerNativePush() {
   // Firebase campaign to this topic is what makes the account switch an
   // actual opt-in/opt-out instead of a visual-only preference.
   if (Platform.OS === 'android') {
-    await Notifications.subscribeToTopicAsync(NOTIFICATION_TOPIC);
+    await notifications.subscribeToTopicAsync(NOTIFICATION_TOPIC);
   }
 
   nativeRegistrationReady = true;
@@ -136,12 +187,15 @@ function runNotificationOperation<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 async function enableNotificationsInternal() {
+  const notifications = getNotificationsModule();
+  if (!notifications) throw new NotificationModuleUnavailableError();
+
   configureNotificationPresentation();
   await ensureAndroidNotificationChannel();
 
   let permission = await readNativePermission();
   if (!permission.granted) {
-    permission = await Notifications.requestPermissionsAsync();
+    permission = await notifications.requestPermissionsAsync();
   }
 
   if (!permission.granted) {
@@ -164,13 +218,16 @@ export function enableNotifications() {
 async function disableNotificationsInternal() {
   configureNotificationPresentation();
   nativeRegistrationReady = false;
+  const notifications = getNotificationsModule();
 
   // Unsubscribe before deleting the native registration. Both calls are
   // best-effort because an older installation may not have a token/topic yet.
-  if (Platform.OS === 'android') {
-    await Notifications.unsubscribeFromTopicAsync(NOTIFICATION_TOPIC).catch(() => undefined);
+  if (notifications && Platform.OS === 'android') {
+    await notifications.unsubscribeFromTopicAsync(NOTIFICATION_TOPIC).catch(() => undefined);
   }
-  await Notifications.unregisterForNotificationsAsync().catch(() => undefined);
+  if (notifications) {
+    await notifications.unregisterForNotificationsAsync().catch(() => undefined);
+  }
   await writeNotificationsPreference(false);
   return readState();
 }
@@ -198,7 +255,8 @@ export function initializeNotifications() {
     let permission = await readNativePermission();
 
     if (!permission.granted && preference !== false && permission.status === 'undetermined') {
-      permission = await Notifications.requestPermissionsAsync();
+      const notifications = getNotificationsModule();
+      if (notifications) permission = await notifications.requestPermissionsAsync();
     }
 
     if (permission.granted && preference !== false) {
@@ -222,4 +280,16 @@ export function initializeNotifications() {
     if (initializationPromise === promise) initializationPromise = null;
   });
   return promise;
+}
+
+export function addNotificationResponseListener(
+  listener: (response: NotificationResponse) => void,
+): NotificationResponseSubscription | null {
+  const notifications = getNotificationsModule();
+  return notifications?.addNotificationResponseReceivedListener(listener) ?? null;
+}
+
+export function getLastNotificationResponse(): Promise<NotificationResponse | null> {
+  const notifications = getNotificationsModule();
+  return notifications?.getLastNotificationResponseAsync() ?? Promise.resolve(null);
 }
