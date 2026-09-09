@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "639876978523",
+    "project_id": "app-test-one-663ca",
+    "storage_bucket": "app-test-one-663ca.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:639876978523:android:3f4bff4cc201bad19b6c7e",
+        "android_client_info": {
+          "package_name": "br.com.lojahr.store"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBFeb31CdhJSwuXt7l7sz3m13YRhNnRFY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:639876978523:android:811cbe9890fe3cea9b6c7e",
+        "android_client_info": {
+          "package_name": "com.wesleylopes.apptestone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBFeb31CdhJSwuXt7l7sz3m13YRhNnRFY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
