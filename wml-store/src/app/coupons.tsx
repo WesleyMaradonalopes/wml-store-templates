@@ -246,7 +246,7 @@ export default function CouponsScreen() {
         {toast && (
           <View pointerEvents="none" style={styles.toastContainer}>
             <View style={styles.toast}>
-              <ThemedText style={styles.toastIcon}>✓</ThemedText>
+              <CopyIcon color="#ffffff" size={24} />
               <ThemedText style={styles.toastText}>{toast}</ThemedText>
             </View>
           </View>
@@ -256,11 +256,11 @@ export default function CouponsScreen() {
   );
 }
 
-function CopyIcon() {
+function CopyIcon({ color = '#0a0a0a', size = 20 }: { color?: string; size?: number }) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Rect x={8} y={8} width={11} height={11} rx={2} stroke="#0a0a0a" strokeWidth={1.5} />
-      <Path d="M16 8V6.5A1.5 1.5 0 0 0 14.5 5h-8A1.5 1.5 0 0 0 5 6.5v8A1.5 1.5 0 0 0 6.5 16H8" stroke="#0a0a0a" strokeWidth={1.5} strokeLinecap="round" />
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={8} y={8} width={11} height={11} rx={2} stroke={color} strokeWidth={1.5} />
+      <Path d="M16 8V6.5A1.5 1.5 0 0 0 14.5 5h-8A1.5 1.5 0 0 0 5 6.5v8A1.5 1.5 0 0 0 6.5 16H8" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
     </Svg>
   );
 }
@@ -299,7 +299,6 @@ const styles = StyleSheet.create({
   backToTopButton: { alignSelf: 'center', minHeight: 40, paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, borderWidth: 1, borderColor: '#e6e1dc', backgroundColor: '#ffffff' },
   backToTopText: { fontFamily: Fonts.medium, fontSize: 13, lineHeight: 18, color: '#0a0a0a' },
   toastContainer: { position: 'absolute', left: 0, right: 0, top: '42%', alignItems: 'center' },
-  toast: { width: 190, alignItems: 'center', paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, borderRadius: 12, backgroundColor: 'rgba(15, 8, 5, 0.9)' },
-  toastIcon: { color: '#ffffff', fontFamily: Fonts.bold, fontSize: 24, lineHeight: 28 },
+  toast: { width: 150, alignItems: 'center', paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, borderRadius: 12, backgroundColor: 'rgba(15, 8, 5, 0.7)' },
   toastText: { color: '#ece8e4', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16, textAlign: 'center' },
 });

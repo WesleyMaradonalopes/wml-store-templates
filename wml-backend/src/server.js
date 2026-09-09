@@ -2225,45 +2225,151 @@ function customerAuthHeaders(request) {
   return token ? { VtexIdclientAutCookie: token } : {};
 }
 
+function customerAuthToken(request) {
+  return String(request.headers['vtexidclientautcookie'] || '').trim();
+}
+
+function normalizeCustomerEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function orderListFromBody(body) {
+  if (Array.isArray(body)) return body;
+  if (!body || typeof body !== 'object') return [];
+  for (const key of ['list', 'orders', 'data']) {
+    if (Array.isArray(body[key])) return body[key];
+  }
+  return [];
+}
+
+function orderFromBody(body) {
+  if (body && typeof body === 'object' && body.order && typeof body.order === 'object') return body.order;
+  return body;
+}
+
+function numericOrderValue(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeOrderRecord(order) {
+  if (!order || typeof order !== 'object') return order;
+  const normalized = { ...order };
+  const orderId = String(order.orderId || order.orderGroup || '').trim();
+  const value = numericOrderValue(order.value);
+  const totalValue = numericOrderValue(order.totalValue);
+
+  if (!normalized.orderId && orderId) normalized.orderId = orderId;
+  if (value === null && totalValue !== null) normalized.value = totalValue;
+  if (totalValue === null && value !== null) normalized.totalValue = value;
+  if (numericOrderValue(normalized.totalItems) === null && Array.isArray(normalized.items)) {
+    normalized.totalItems = normalized.items.reduce((total, item) => total + Number(item?.quantity || 0), 0);
+  }
+  return normalized;
+}
+
+function normalizeOrderList(orders) {
+  const seen = new Set();
+  return (Array.isArray(orders) ? orders : [])
+    .map(normalizeOrderRecord)
+    .filter((order) => {
+      const orderId = String(order?.orderId || '').trim();
+      if (!orderId || seen.has(orderId)) return false;
+      seen.add(orderId);
+      return true;
+    });
+}
+
+async function tokenBelongsToCustomerEmail(token, email) {
+  const normalizedEmail = normalizeCustomerEmail(email);
+  const storedEmail = customerEmailForToken(token);
+  if (storedEmail) return storedEmail === normalizedEmail;
+
+  const claims = decodeJwtPayload(token) || {};
+  const claimEmails = [claims.email, claims.emailAddress, claims.preferred_username, claims.preferredUsername]
+    .map(normalizeCustomerEmail)
+    .filter((value) => value.includes('@'));
+  if (claimEmails.length > 0) return claimEmails.includes(normalizedEmail);
+
+  const claimIds = [claims.sub, claims.userId, claims.userProfileId, claims.profileId]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  if (claimIds.length === 0) return false;
+
+  const profile = await searchCustomerByEmail(normalizedEmail).catch(() => null);
+  return claimIds.some((id) => id === String(profile?.id || '').trim() || id === String(profile?.userId || '').trim());
+}
+
+async function privateOrderFallbackEmail(request) {
+  const token = customerAuthToken(request);
+  const requestedEmail = normalizeCustomerEmail(request.query.email);
+  const mappedEmail = normalizeCustomerEmail(customerEmailForToken(token));
+  const email = requestedEmail || mappedEmail;
+  if (!token || !email || !(await tokenBelongsToCustomerEmail(token, email))) return '';
+  return email;
+}
+
+async function orderBelongsToEmail(order, email) {
+  const normalizedEmail = normalizeCustomerEmail(email);
+  const profileData = order?.clientProfileData && typeof order.clientProfileData === 'object' ? order.clientProfileData : {};
+  const orderEmails = [profileData.email, profileData.userEmail, order?.customerEmail]
+    .map(normalizeCustomerEmail)
+    .filter((value) => value.includes('@'));
+  if (orderEmails.includes(normalizedEmail)) return true;
+
+  const orderProfileId = String(profileData.userProfileId || order?.userProfileId || '').trim();
+  if (!orderProfileId) return false;
+  const profile = await searchCustomerByEmail(normalizedEmail).catch(() => null);
+  return orderProfileId === String(profile?.id || '').trim() || orderProfileId === String(profile?.userId || '').trim();
+}
+
 async function enrichOrderList(orders) {
-  const list = Array.isArray(orders) ? orders : [];
-  return Promise.all(list.map(async (summary) => {
+  const list = normalizeOrderList(orders);
+  const enriched = await Promise.all(list.map(async (summary) => {
     const id = summary?.orderId || summary?.orderGroup;
     if (!id || Array.isArray(summary.items) && summary.items.length) return summary;
     const detail = await fetch(`${vtexBaseUrl}/api/oms/pvt/orders/${encodeURIComponent(id)}`, { headers: vtexHeaders() }).then(async (result) => result.ok ? result.json() : null).catch(() => null);
-    return detail ? { ...summary, ...detail } : summary;
+    return detail ? normalizeOrderRecord({ ...summary, ...detail }) : summary;
   }));
+  return normalizeOrderList(enriched);
 }
 
 app.get('/customer/orders', async (request, response) => {
   try {
+    const page = Math.min(Math.max(Number.parseInt(String(request.query.page || '1'), 10) || 1, 1), 100);
+    const perPage = Math.min(Math.max(Number.parseInt(String(request.query.per_page || '50'), 10) || 50, 1), 50);
     const url = new URL(`${vtexBaseUrl}/api/oms/user/orders`);
-    url.searchParams.set('page', String(request.query.page || '1'));
-    url.searchParams.set('per_page', String(request.query.per_page || '50'));
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per_page', String(perPage));
     const result = await fetch(url, { headers: { ...vtexHeaders(), ...customerAuthHeaders(request) } });
     const body = await result.json().catch(() => ({}));
-    console.log(`[ORDERS] list -> HTTP ${result.status}`);
-    if (result.ok) {
-      const orders = await enrichOrderList(Array.isArray(body) ? body : body.list || body.orders || []);
+    const publicOrders = orderListFromBody(body);
+    console.log(`[ORDERS] list -> HTTP ${result.status} page=${page} count=${publicOrders.length}`);
+    if (result.ok && publicOrders.length > 0) {
+      const orders = await enrichOrderList(publicOrders);
       return response.json({ ok: true, orders });
     }
 
-    // Fallback server-side: some accounts do not expose /oms/user/orders to
-    // the storefront token. The private OMS request remains protected here.
-    const email = String(request.query.email || '').trim().toLowerCase();
+    // Some valid shopper sessions return 200 with an empty list when the user
+    // endpoint is unavailable for the storefront. Only use the private OMS
+    // fallback when the backend can prove that the token belongs to this email.
+    const email = await privateOrderFallbackEmail(request);
     if (email) {
       const privateUrl = new URL(`${vtexBaseUrl}/api/oms/pvt/orders`);
       privateUrl.searchParams.set('q', email);
-      privateUrl.searchParams.set('page', '1');
-      privateUrl.searchParams.set('per_page', '50');
+      privateUrl.searchParams.set('page', String(page));
+      privateUrl.searchParams.set('per_page', String(perPage));
       const privateResult = await fetch(privateUrl, { headers: vtexHeaders() });
       const privateBody = await privateResult.json().catch(() => ({}));
-      console.log(`[ORDERS] private fallback -> HTTP ${privateResult.status}`);
+      const privateOrders = orderListFromBody(privateBody);
+      console.log(`[ORDERS] private fallback -> HTTP ${privateResult.status} page=${page} count=${privateOrders.length}`);
       if (privateResult.ok) {
-        const orders = await enrichOrderList(Array.isArray(privateBody) ? privateBody : privateBody.list || privateBody.orders || []);
+        const orders = await enrichOrderList(privateOrders);
         return response.json({ ok: true, orders });
       }
     }
+    if (result.ok) return response.json({ ok: true, orders: await enrichOrderList(publicOrders) });
     throw new Error(`VTEX Orders retornou HTTP ${result.status}.`);
   } catch (error) {
     return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao carregar pedidos.' });
@@ -2272,16 +2378,24 @@ app.get('/customer/orders', async (request, response) => {
 
 app.get('/customer/orders/:orderId', async (request, response) => {
   try {
-    const orderId = encodeURIComponent(request.params.orderId);
+    const rawOrderId = String(request.params.orderId || '').trim();
+    if (!rawOrderId || rawOrderId.length > 100 || !/^[A-Za-z0-9_-]+$/.test(rawOrderId)) {
+      return response.status(400).json({ ok: false, message: 'Pedido inválido.' });
+    }
+    const orderId = encodeURIComponent(rawOrderId);
     const result = await fetch(`${vtexBaseUrl}/api/oms/user/orders/${orderId}`, { headers: { ...vtexHeaders(), ...customerAuthHeaders(request) } });
     const body = await result.json().catch(() => ({}));
     console.log(`[ORDERS] detail ${request.params.orderId} -> HTTP ${result.status}`);
-    if (result.ok) return response.json({ ok: true, order: body });
+    if (result.ok) return response.json({ ok: true, order: normalizeOrderRecord(orderFromBody(body)) });
 
+    const email = await privateOrderFallbackEmail(request);
+    if (!email) throw new Error(`VTEX Orders retornou HTTP ${result.status}.`);
     const privateResult = await fetch(`${vtexBaseUrl}/api/oms/pvt/orders/${orderId}`, { headers: vtexHeaders() });
     const privateBody = await privateResult.json().catch(() => ({}));
     console.log(`[ORDERS] detail private fallback ${request.params.orderId} -> HTTP ${privateResult.status}`);
-    if (privateResult.ok) return response.json({ ok: true, order: privateBody });
+    const privateOrder = normalizeOrderRecord(orderFromBody(privateBody));
+    if (privateResult.ok && await orderBelongsToEmail(privateOrder, email)) return response.json({ ok: true, order: privateOrder });
+    if (privateResult.ok) return response.status(404).json({ ok: false, message: 'Pedido não encontrado.' });
     throw new Error(`VTEX Orders retornou HTTP ${result.status} / fallback ${privateResult.status}.`);
   } catch (error) {
     return response.status(502).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao carregar detalhes do pedido.' });

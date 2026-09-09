@@ -22,19 +22,38 @@ export type CustomerOrderItem = {
 export type CustomerOrder = {
   orderId: string;
   creationDate?: string;
-  status?: string;
-  value?: number;
+  status?: string | null;
+  statusDescription?: string | null;
+  value?: number | null;
+  totalValue?: number | null;
+  totalItems?: number | null;
   items?: CustomerOrderItem[];
   shippingData?: unknown;
   clientProfileData?: unknown;
   paymentData?: unknown;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
-export function orderStatusLabel(status?: string) {
-  const normalized = String(status || '').trim().toLowerCase();
+function normalizeStatus(value?: string | null) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+export function isCanceledOrder(status?: string | null, statusDescription?: string | null) {
+  return [status, statusDescription].some((value) => {
+    const normalized = normalizeStatus(value);
+    return normalized.includes('cancel') || normalized.includes('cancelad');
+  });
+}
+
+export function orderStatusLabel(status?: string | null, statusDescription?: string | null) {
+  const normalized = normalizeStatus(status);
   const labels: Record<string, string> = {
     invoiced: 'Faturado',
+    invoice: 'Faturado',
     processing: 'Processando',
     handling: 'Em preparação',
     'ready-for-handling': 'Em preparação',
@@ -45,7 +64,7 @@ export function orderStatusLabel(status?: string) {
     'payment-pending': 'Aguardando pagamento',
     'waiting-for-seller-confirmation': 'Aguardando confirmação',
   };
-  return labels[normalized] || status || 'Processando';
+  return labels[normalized] || String(statusDescription || '').trim() || String(status || '').trim() || 'Processando';
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -55,15 +74,30 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 export async function getCustomerOrders(): Promise<CustomerOrder[]> {
   const session = await getAccountSession();
-  const query = session?.email ? `?email=${encodeURIComponent(session.email)}` : '';
-  const response = await fetch(`${storeConfig.backendUrl}/customer/orders${query}`, { headers: await authHeaders() });
-  if (!response.ok) throw new Error(`Não foi possível carregar os pedidos: ${response.status}`);
-  const payload = await response.json() as { orders?: CustomerOrder[] };
-  return payload.orders ?? [];
+  const headers = await authHeaders();
+  const pageSize = 50;
+  const allOrders: CustomerOrder[] = [];
+
+  for (let page = 1; page <= 20; page += 1) {
+    const query = new URLSearchParams({ page: String(page), per_page: String(pageSize) });
+    if (session?.email) query.set('email', session.email.trim().toLowerCase());
+    const response = await fetch(`${storeConfig.backendUrl}/customer/orders?${query.toString()}`, { headers });
+    if (!response.ok) throw new Error(`Não foi possível carregar os pedidos: ${response.status}`);
+    const payload = await response.json() as { orders?: CustomerOrder[] };
+    const orders = Array.isArray(payload.orders) ? payload.orders : [];
+    allOrders.push(...orders);
+    if (orders.length < pageSize) break;
+  }
+
+  return [...new Map(allOrders
+    .filter((order) => Boolean(order?.orderId))
+    .map((order) => [order.orderId, order])).values()];
 }
 
 export async function getCustomerOrder(orderId: string): Promise<CustomerOrder> {
-  const response = await fetch(`${storeConfig.backendUrl}/customer/orders/${encodeURIComponent(orderId)}`, { headers: await authHeaders() });
+  const session = await getAccountSession();
+  const query = session?.email ? `?email=${encodeURIComponent(session.email.trim().toLowerCase())}` : '';
+  const response = await fetch(`${storeConfig.backendUrl}/customer/orders/${encodeURIComponent(orderId)}${query}`, { headers: await authHeaders() });
   if (!response.ok) throw new Error(`Não foi possível carregar o pedido: ${response.status}`);
   const payload = await response.json() as { order?: CustomerOrder };
   if (!payload.order) throw new Error('Pedido não encontrado.');
