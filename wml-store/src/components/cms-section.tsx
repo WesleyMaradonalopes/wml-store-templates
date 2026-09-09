@@ -1,14 +1,16 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 import { CmsSection } from '@/services/cms';
 import { buildCmsActionRoute, readCmsAction, type CmsAction } from '@/services/cms-actions';
+import { cmsInternalRoute, openCmsExternalLink } from '@/services/cms-links';
 import { isFavorite } from '@/services/favorites';
 
+import { CmsRichText } from './cms-rich-text';
 import ArrowLeftIAIcon from './icons/ArrowLeftIAicon';
 import ArrowRightAIcon from './icons/ArrowRightAicon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
@@ -61,27 +63,11 @@ function openCmsAction(router: ReturnType<typeof useRouter>, value: unknown, fal
   }
 
   if (effectiveAction.type === 'link') {
-    if (/^https?:\/\//i.test(target)) Linking.openURL(target);
+    const internalRoute = cmsInternalRoute(target);
+    if (internalRoute) router.push(internalRoute as never);
+    else if (/^(?:https?:\/\/|\/\/|mailto:|tel:|sms:)/i.test(target)) void openCmsExternalLink(target);
     else router.push((target.startsWith('/') ? target : `/${target}`) as never);
   }
-}
-
-function richTextBlocks(value: unknown): string[] {
-  let candidate = value;
-  if (typeof value === 'string') {
-    try {
-      candidate = JSON.parse(value) as unknown;
-    } catch {
-      return value.trim() ? [value] : [];
-    }
-  }
-
-  if (!candidate || typeof candidate !== 'object') return [];
-  const blocks = (candidate as { blocks?: unknown }).blocks;
-  if (!Array.isArray(blocks)) return [];
-  return blocks
-    .map((block) => block && typeof block === 'object' ? text((block as { text?: unknown }).text).trim() : '')
-    .filter(Boolean);
 }
 
 type ProductShelfProps = {
@@ -287,7 +273,11 @@ function ContentCard({ title, description, imageUrl, action }: { title?: string;
     if (action.type === 'product') router.push(`/product/${action.value}`);
     else if (action.type === 'page') router.push(`/page/${action.value}`);
     else if (action.type === 'search') router.push(`/search?q=${encodeURIComponent(action.value)}` as never);
-    else if (action.type === 'link') Linking.openURL(action.value);
+    else if (action.type === 'link') {
+      const internalRoute = cmsInternalRoute(action.value);
+      if (internalRoute) router.push(internalRoute as never);
+      else void openCmsExternalLink(action.value);
+    }
   }
   return <Pressable onPress={open}><ThemedView style={styles.contentCard}>{!!imageUrl && <Image source={{ uri: imageUrl }} style={styles.contentCardImage} contentFit="cover" />}<ThemedText type="smallBold">{title || 'Conteúdo'}</ThemedText>{!!description && <ThemedText themeColor="textSecondary" numberOfLines={3}>{description}</ThemedText>}</ThemedView></Pressable>;
 }
@@ -556,12 +546,9 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
   }, [bannerImages.length, heroIndex, isHeroBanner]);
 
   if (section.name === 'RichText') {
-    const title = text(data.title).trim();
-    const blocks = richTextBlocks(data.content);
     return (
       <ThemedView style={styles.section}>
-        {!!title && <ThemedText type="subtitle">{title}</ThemedText>}
-        {blocks.map((block, index) => <ThemedText key={`${block}-${index}`}>{block}</ThemedText>)}
+        <CmsRichText data={data} />
       </ThemedView>
     );
   }
@@ -632,7 +619,8 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
   if (section.name === 'WordPressCardList') {
     const posts = Array.isArray(data.posts) ? data.posts : Array.isArray(data.content) ? data.content : [];
-    return <ThemedView style={styles.section}><View style={styles.sectionHeader}><ThemedText type="subtitle">{text(data.title) || 'Confira nosso blog'}</ThemedText>{!!text(data.postUrl) && <Pressable onPress={() => Linking.openURL(text(data.postUrl))}><ThemedText style={styles.seeAll}>Ver tudo</ThemedText></Pressable>}</View><View style={styles.contentRow}>{posts.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title) || text(value.name)} description={text(value.description) || text(value.excerpt)} imageUrl={text(value.imageUrl) || text(value.thumbnail)} action={{ type: 'link', value: text(value.link) }} />; })}</View>{posts.length === 0 && <ThemedText themeColor="textSecondary">Os conteúdos do blog aparecerão aqui.</ThemedText>}</ThemedView>;
+    const postUrl = text(data.postUrl);
+    return <ThemedView style={styles.section}><View style={styles.sectionHeader}><ThemedText type="subtitle">{text(data.title) || 'Confira nosso blog'}</ThemedText>{!!postUrl && <Pressable onPress={() => { const internalRoute = cmsInternalRoute(postUrl); if (internalRoute) router.push(internalRoute as never); else void openCmsExternalLink(postUrl); }}><ThemedText style={styles.seeAll}>Ver tudo</ThemedText></Pressable>}</View><View style={styles.contentRow}>{posts.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title) || text(value.name)} description={text(value.description) || text(value.excerpt)} imageUrl={text(value.imageUrl) || text(value.thumbnail)} action={{ type: 'link', value: text(value.link) }} />; })}</View>{posts.length === 0 && <ThemedText themeColor="textSecondary">Os conteúdos do blog aparecerão aqui.</ThemedText>}</ThemedView>;
   }
 
   if (section.name === 'CategoryListSwipe') {

@@ -2659,7 +2659,7 @@ const styles = StyleSheet.create({
   pixScreen: { flex: 1, position: 'relative' },
   pixContent: { gap: Spacing.three, paddingHorizontal: Spacing.one, paddingTop: Spacing.three, paddingBottom: Spacing.six },
   pixBrandHeader: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.one },
-  pixBrandTitle: { color: '#1e120d', fontFamily: Fonts.bold, fontSize: 15, lineHeight: 20 },
+  pixBrandTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 15, lineHeight: 20 },
   pixInfoCard: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#f0ece8' },
   pixInfoIcon: { color: '#8b746b', fontSize: 22, lineHeight: 24 },
   pixInfoText: { flex: 1, color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20 },
