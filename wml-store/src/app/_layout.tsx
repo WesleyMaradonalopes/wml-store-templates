@@ -1,11 +1,13 @@
 import { Montserrat_300Light, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, useFonts } from '@expo-google-fonts/montserrat';
 import * as SplashScreen from 'expo-splash-screen';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import { Platform, useColorScheme } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
+import { Linking, Platform, useColorScheme } from 'react-native';
 import { TabBarContext } from '@/context/tab-bar-context';
 import { getAccountSession, getVtexUserToken } from '@/services/auth';
+import { configureNotificationPresentation, initializeNotifications } from '@/services/notifications';
 import GlobalTabBar from '@/components/global-tab-bar';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +36,7 @@ export default function TabLayout() {
   return (
     <TabBarContext.Provider value={{ hidden, setHidden, showOnCheckout, setShowOnCheckout }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <NotificationBootstrap />
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="search" options={{ headerShown: false }} />
@@ -53,4 +56,56 @@ export default function TabLayout() {
       </ThemeProvider>
     </TabBarContext.Provider>
   );
+}
+
+function getNotificationTarget(data: Record<string, unknown>) {
+  for (const key of ['url', 'link', 'deepLink', 'route', 'path']) {
+    const value = data[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+
+  const slug = data.slug;
+  return typeof slug === 'string' && slug.trim() ? `/page/${encodeURIComponent(slug.trim())}` : '';
+}
+
+function NotificationBootstrap() {
+  const router = useRouter();
+  const handledResponseIds = useRef(new Set<string>());
+  const handleResponse = useCallback((response: Notifications.NotificationResponse) => {
+    const notificationId = response.notification.request.identifier;
+    if (handledResponseIds.current.has(notificationId)) return;
+    handledResponseIds.current.add(notificationId);
+
+    const data = response.notification.request.content.data || {};
+    const target = getNotificationTarget(data);
+    if (!target) return;
+
+    if (/^(https?:|lojahr:)/i.test(target)) {
+      void Linking.openURL(target);
+      return;
+    }
+
+    const route = target.startsWith('/') ? target : `/${target}`;
+    router.push(route as never);
+  }, [router]);
+
+  useEffect(() => {
+    configureNotificationPresentation();
+    void initializeNotifications().catch((error) => {
+      console.warn('[notifications] Falha ao inicializar notificações.', error);
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) handleResponse(response);
+      })
+      .catch((error) => {
+        console.warn('[notifications] Falha ao ler a última notificação.', error);
+      });
+
+    return () => responseSubscription.remove();
+  }, [handleResponse]);
+
+  return null;
 }

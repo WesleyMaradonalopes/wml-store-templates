@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "br.com.lojahr.store",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -27,6 +28,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#0a0a0a",
+          "defaultChannel": "marketing"
+        }
+      ],
       [
         "expo-splash-screen",
         {

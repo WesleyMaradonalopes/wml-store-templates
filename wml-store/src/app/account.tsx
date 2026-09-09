@@ -15,6 +15,7 @@ import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
+import { disableNotifications, enableNotifications, initializeNotifications, NotificationPermissionError } from '@/services/notifications';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode, phoneToApi } from '@/utils/customer-formatters';
 
 import AppleLogoIcon from '@/components/icons/AppleLogoIcon';
@@ -93,7 +94,9 @@ export default function AccountScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [accepted, setAccepted] = useState(false);
-  const [notifications, setNotifications] = useState(true);
+  const [notifications, setNotifications] = useState(false);
+  const [notificationsMessage, setNotificationsMessage] = useState<string | null>(null);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [authToken, setAuthToken] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [codeSentAt, setCodeSentAt] = useState<number | null>(null);
@@ -149,6 +152,17 @@ export default function AccountScreen() {
 
   useEffect(() => {
     let active = true;
+    initializeNotifications().then((state) => {
+      if (!active) return;
+      setNotifications(state.enabled);
+    }).catch((error) => {
+      if (active) setNotificationsMessage(error instanceof Error ? error.message : 'Não foi possível carregar a configuração de notificações.');
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     getAccountSession().then((session) => {
       if (!active || !session?.email?.trim()) return;
       const sessionEmail = session.email.trim().toLowerCase();
@@ -173,6 +187,26 @@ export default function AccountScreen() {
     }).catch(() => undefined);
     return () => { active = false; };
   }, [loggedIn]);
+
+  async function changeNotifications(value: boolean) {
+    if (notificationsLoading) return;
+
+    const previousValue = notifications;
+    setNotifications(value);
+    setNotificationsMessage(null);
+    setNotificationsLoading(true);
+    try {
+      const state = value ? await enableNotifications() : await disableNotifications();
+      setNotifications(state.enabled);
+    } catch (error) {
+      setNotifications(previousValue);
+      setNotificationsMessage(error instanceof NotificationPermissionError
+        ? 'Permissão de notificações negada. Ative-a nas configurações do dispositivo para receber avisos.'
+        : 'Não foi possível atualizar a permissão de notificações. Tente novamente.');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }
 
   async function login() {
     if (!email.trim() || !password.trim()) {
@@ -401,7 +435,7 @@ export default function AccountScreen() {
 
   if (view === 'home') {
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader back={false} showSearch={false} showCart={false} logoWidth={88} logoHeight={24} logoOffsetY={0} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-      {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} /> : <GuestAccount onEnter={() => setView('access')} onRegister={() => setView('register')} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} />}
+      {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} /> : <GuestAccount notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onEnter={() => setView('access')} onRegister={() => setView('register')} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} />}
     </ScrollView></SafeAreaView></ThemedView>;
   }
 
@@ -432,8 +466,8 @@ export default function AccountScreen() {
   </ScrollView></SafeAreaView></ThemedView>;
 }
 
-function GuestAccount({ onEnter, onRegister, onCoupons, onReturns, onPrivacy }: { onEnter: () => void; onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void }) {
-  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} onCoupons={onCoupons} onReturns={onReturns} onPrivacy={onPrivacy} /><Preference /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
+function GuestAccount({ onEnter, onRegister, onCoupons, onReturns, onPrivacy, notifications, onNotificationsChange, notificationsLoading, notificationsMessage }: { onEnter: () => void; onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null }) {
+  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} onCoupons={onCoupons} onReturns={onReturns} onPrivacy={onPrivacy} /><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
 }
 
 type AccountTileData = { label: string; icon: ReactNode; onPress?: () => void };
@@ -449,7 +483,7 @@ function AccountTile({ label, icon, onPress }: AccountTileData) {
 }
 
 function LoggedAccount({ email, notifications, setNotifications, onLogout, onPersonal, onOrders, onFavorites }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; onPersonal: () => void; onOrders: () => void; onFavorites: () => void }) {
-  return <LoggedAccountV2 email={email} notifications={notifications} setNotifications={setNotifications} onLogout={onLogout} logoutLoading={false} onPersonal={onPersonal} onOrders={onOrders} onFavorites={onFavorites} onPasswordReset={() => undefined} />;
+  return <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={setNotifications} notificationsLoading={false} notificationsMessage={null} onLogout={onLogout} logoutLoading={false} onPersonal={onPersonal} onOrders={onOrders} onFavorites={onFavorites} onPasswordReset={() => undefined} />;
 }
 
 function UtilityGrid({ onRegister, onCoupons, onReturns, onPrivacy }: { onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void }) {
@@ -461,20 +495,24 @@ function UtilityGrid({ onRegister, onCoupons, onReturns, onPrivacy }: { onRegist
   ];
   return <View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View>;
 }
-function Preference({ value = true, onChange }: { value?: boolean; onChange?: (value: boolean) => void }) {
-  return <View style={styles.preference}>
-    <View style={styles.preferenceLabel}>
-      <HomeNotificationsIcon color="#0a0a0a" size={18} />
-      <ThemedText style={styles.preferenceText}>Notificações</ThemedText>
+function Preference({ value = false, onChange, disabled = false, message }: { value?: boolean; onChange?: (value: boolean) => void; disabled?: boolean; message?: string | null }) {
+  return <View style={styles.preferenceBlock}>
+    <View style={styles.preference}>
+      <View style={styles.preferenceLabel}>
+        <HomeNotificationsIcon color="#0a0a0a" size={18} />
+        <ThemedText style={styles.preferenceText}>Notificações</ThemedText>
+      </View>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: value, disabled }}
+        disabled={disabled}
+        onPress={() => onChange?.(!value)}
+        style={[styles.notificationSwitch, value ? styles.notificationSwitchOn : styles.notificationSwitchOff, disabled && styles.disabled]}
+      >
+        <View style={styles.notificationThumb} />
+      </Pressable>
     </View>
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      onPress={() => onChange?.(!value)}
-      style={[styles.notificationSwitch, value ? styles.notificationSwitchOn : styles.notificationSwitchOff]}
-    >
-      <View style={styles.notificationThumb} />
-    </Pressable>
+    {!!message && <ThemedText style={styles.notificationMessage}>{message}</ThemedText>}
   </View>;
 }
 function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, message, onRegister }: { onPassword: () => void; onEmail: () => void; onGoogle: () => void; onApple: () => void; googleLoading: boolean; message: string | null; onRegister: () => void }) {
@@ -662,7 +700,7 @@ const logoutButtonStyles = StyleSheet.create({
   label: { color: '#0a0a0a', fontWeight: '600' },
 });
 
-function LoggedAccountV2({ email, notifications, setNotifications, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset, onCoupons, onReturns, onPrivacy }: { email: string; notifications: boolean; setNotifications: (value: boolean) => void; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void; onCoupons?: () => void; onReturns?: () => void; onPrivacy?: () => void }) {
+function LoggedAccountV2({ email, notifications, onNotificationsChange, notificationsLoading, notificationsMessage, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset, onCoupons, onReturns, onPrivacy }: { email: string; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void; onCoupons?: () => void; onReturns?: () => void; onPrivacy?: () => void }) {
   const tiles: AccountTileData[] = [
     { label: 'Meus pedidos', icon: <Box01Icon color="#0a0a0a" size={18} />, onPress: onOrders },
     { label: 'Dados pessoais', icon: <UserIcon color="#0a0a0a" size={18} />, onPress: onPersonal },
@@ -673,7 +711,7 @@ function LoggedAccountV2({ email, notifications, setNotifications, onLogout, log
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#0a0a0a" size={18} /> },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#0a0a0a" size={18} />, onPress: onPrivacy },
   ];
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={setNotifications} /><View style={styles.divider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <><LogoutIcon color="#0a0a0a" size={16} /><ThemedText style={logoutButtonStyles.label}>Sair</ThemedText></>}</View></Pressable><View style={styles.divider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
+  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><View style={styles.divider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <><LogoutIcon color="#0a0a0a" size={16} /><ThemedText style={logoutButtonStyles.label}>Sair</ThemedText></>}</View></Pressable><View style={styles.divider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by lojahr</ThemedText></>;
 }
 
 function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPrivacyPress }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void; onPrivacyPress: () => void }) {
@@ -803,7 +841,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingTop: 20, paddingBottom: 20 }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#0a0a0a' }, primaryText: { color: '#ffffff', fontWeight: '700' }, primaryDadosText: { textDecorationLine: 'underline', color: '#0a0a0a' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#0a0a0a', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 0, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, notificationSwitch: { width: 30, height: 16, padding: 3, borderRadius: 14, justifyContent: 'center' }, notificationSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' }, notificationSwitchOff: { backgroundColor: '#dedbd5', alignItems: 'flex-start' }, notificationThumb: { width: 12, height: 12, borderRadius: 11, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, cardTitle: { fontSize: 20 }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] }, genderDropdownIconOpen: { transform: [{ rotate: '-90deg' }] }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, forgotButton: { alignSelf: 'flex-start' }, linkText: { color: '#625d57', textDecorationLine: 'underline' }, linkTextAlert: { color: '#df5f5f', fontSize: 11 }, authFooter: { flexDirection: 'row', gap: Spacing.two }, authFooterButton: { flex: 1, minHeight: 48, justifyContent: 'center' }, passwordRules: { gap: Spacing.one, paddingVertical: Spacing.one }, passwordRule: { fontSize: 12, lineHeight: 17 }, passwordRuleValid: { color: '#2f8f5b' }, passwordRuleInvalid: { color: '#df5f5f' }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }, checkboxMark: { color: '#ffffff', fontSize: 13, lineHeight: 16, fontWeight: '700' }, resendButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#e7e3da' }, resendText: { color: '#5d5955', fontWeight: '700' }, checked: { backgroundColor: '#0a0a0a' }, disabled: { opacity: 0.5 },
+  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingTop: 20, paddingBottom: 20 }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#0a0a0a' }, primaryText: { color: '#ffffff', fontWeight: '700' }, primaryDadosText: { textDecorationLine: 'underline', color: '#0a0a0a' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#0a0a0a', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preferenceBlock: { gap: 4 }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 0, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, notificationSwitch: { width: 30, height: 16, padding: 3, borderRadius: 14, justifyContent: 'center' }, notificationSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' }, notificationSwitchOff: { backgroundColor: '#dedbd5', alignItems: 'flex-start' }, notificationThumb: { width: 12, height: 12, borderRadius: 11, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, cardTitle: { fontSize: 20 }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] }, genderDropdownIconOpen: { transform: [{ rotate: '-90deg' }] }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, forgotButton: { alignSelf: 'flex-start' }, linkText: { color: '#625d57', textDecorationLine: 'underline' }, linkTextAlert: { color: '#df5f5f', fontSize: 11 }, authFooter: { flexDirection: 'row', gap: Spacing.two }, authFooterButton: { flex: 1, minHeight: 48, justifyContent: 'center' }, passwordRules: { gap: Spacing.one, paddingVertical: Spacing.one }, passwordRule: { fontSize: 12, lineHeight: 17 }, passwordRuleValid: { color: '#2f8f5b' }, passwordRuleInvalid: { color: '#df5f5f' }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }, checkboxMark: { color: '#ffffff', fontSize: 13, lineHeight: 16, fontWeight: '700' }, resendButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#e7e3da' }, resendText: { color: '#5d5955', fontWeight: '700' }, checked: { backgroundColor: '#0a0a0a' }, disabled: { opacity: 0.5 }, notificationMessage: { color: '#9f1111', fontSize: 11, lineHeight: 16 },
   authTitle: { fontFamily: Fonts.bold, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   privacyLink: { color: '#4f4b47', textDecorationLine: 'underline' },
   accountTile: { minHeight: 96, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'stretch' },

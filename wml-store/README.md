@@ -87,6 +87,58 @@ Os `clientId`/site keys são públicos e podem ficar em `EXPO_PUBLIC_*`. O
 `clientSecret`, a Google API key e outras credenciais permanecem somente na
 configuração da VTEX/backend e nunca devem ser colocados em `EXPO_PUBLIC_*`.
 
+## Notificações push via Firebase
+
+O app novo usa `expo-notifications` com FCM no Android. O switch **Notificações**
+da conta controla o tópico `lojahr_promotions`: ao ativar, o app solicita a
+permissão do sistema, registra o dispositivo e inscreve-o no tópico; ao
+desativar, remove a inscrição e o registro nativo. Isso reproduz a intenção do
+fluxo legado da Eitri, mas sem alterar o repositório legado.
+
+### Configuração no Firebase
+
+1. No Firebase Console, abra o projeto que será usado pelo app novo (ou crie
+   um projeto) e vá em **Configurações do projeto > Seus apps > Adicionar app >
+   Android**.
+2. Informe exatamente o pacote `br.com.lojahr.store`. A configuração do app
+   antigo não deve ser reutilizada se ela tiver outro pacote.
+3. Baixe o arquivo `google-services.json` e coloque-o em
+   `wml-store/google-services.json`. O arquivo ainda não é incluído neste
+   repositório porque precisa vir do projeto Firebase escolhido.
+4. Gere um novo development build depois de adicionar esse arquivo e a
+   dependência nativa:
+
+   ```bash
+   npm run android:native
+   ```
+
+   Teste em um aparelho Android ou emulador com Google Play Services. No
+   Android 13 ou superior, aceite a permissão quando ela aparecer.
+
+### Envio de uma campanha
+
+No Firebase Console, abra **Messaging**, crie uma campanha de notificações e
+direcione-a ao tópico `lojahr_promotions`. Para abrir uma tela do app ao tocar
+na notificação, adicione um campo de dados personalizado `route`, por exemplo:
+
+```text
+route = /coupons
+```
+
+Também são aceitos `url`, `link`, `deepLink`, `path` e `slug`; uma URL abre no
+navegador e uma rota abre no Expo Router. Enviar para “todos os usuários do
+app” não respeita o switch individual, portanto as campanhas promocionais
+devem usar o tópico.
+
+Esta primeira integração de tópico está pronta para Android. Para campanhas
+Firebase também no iOS, ainda é necessário configurar APNs e uma estratégia de
+entrega iOS (FCM nativo ou Expo Push Service); a API de inscrição em tópico
+usada aqui é específica do Android.
+
+O `google-services.json` contém identificadores públicos do app, mas chaves
+privadas, service accounts e credenciais administrativas nunca devem ser
+colocadas no aplicativo mobile.
+
 ## Join the community
 
 Join our community of developers creating universal apps.
