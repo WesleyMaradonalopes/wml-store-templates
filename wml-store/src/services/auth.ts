@@ -9,32 +9,49 @@ const AUTH_TOKEN_KEY = 'lojahr_vtex_user_token';
 
 let accountSessionCache: AccountSession | null | undefined;
 let accountSessionRequest: Promise<AccountSession | null> | null = null;
+let accountSessionRevision = 0;
 let vtexTokenCache: string | null | undefined;
 let vtexTokenRequest: Promise<string | null> | null = null;
+let vtexTokenRevision = 0;
 
 export function getAccountSession() {
   if (accountSessionCache !== undefined) return Promise.resolve(accountSessionCache);
   if (!accountSessionRequest) {
-    accountSessionRequest = getStoredJson<AccountSession>(SESSION_KEY)
+    const revision = accountSessionRevision;
+    const request = getStoredJson<AccountSession>(SESSION_KEY)
       .then((session) => {
+        if (revision !== accountSessionRevision) return null;
         accountSessionCache = session;
         return session;
-      })
-      .finally(() => { accountSessionRequest = null; });
+      });
+    accountSessionRequest = request;
+    const releaseRequest = () => {
+      if (accountSessionRequest === request) accountSessionRequest = null;
+    };
+    void request.then(releaseRequest, releaseRequest);
   }
   return accountSessionRequest;
 }
 
 export function saveAccountSession(email: string) {
-  const session = { email, loggedAt: new Date().toISOString() };
+  const session = { email: email.trim().toLowerCase(), loggedAt: new Date().toISOString() };
+  accountSessionRevision += 1;
   accountSessionCache = session;
+  accountSessionRequest = null;
   return setStoredJson<AccountSession>(SESSION_KEY, session);
 }
 
 export function clearAccountSession() {
+  accountSessionRevision += 1;
+  vtexTokenRevision += 1;
   accountSessionCache = null;
+  accountSessionRequest = null;
   vtexTokenCache = null;
-  return Promise.all([removeStoredValue(SESSION_KEY), SecureStore.deleteItemAsync(AUTH_TOKEN_KEY)]).then(() => undefined);
+  vtexTokenRequest = null;
+  return Promise.all([
+    removeStoredValue(SESSION_KEY),
+    SecureStore.deleteItemAsync(AUTH_TOKEN_KEY).catch(() => undefined),
+  ]).then(() => undefined);
 }
 
 export function getCachedAccountSession() {
@@ -46,7 +63,9 @@ export function getCachedVtexUserToken() {
 }
 
 async function saveVtexUserToken(token: string) {
+  vtexTokenRevision += 1;
   vtexTokenCache = token;
+  vtexTokenRequest = null;
   await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 }
 
@@ -290,12 +309,18 @@ export async function loginVtexPassword(email: string, password: string) {
 export function getVtexUserToken() {
   if (vtexTokenCache !== undefined) return Promise.resolve(vtexTokenCache);
   if (!vtexTokenRequest) {
-    vtexTokenRequest = SecureStore.getItemAsync(AUTH_TOKEN_KEY)
+    const revision = vtexTokenRevision;
+    const request = SecureStore.getItemAsync(AUTH_TOKEN_KEY)
       .then((token) => {
+        if (revision !== vtexTokenRevision) return null;
         vtexTokenCache = token;
         return token;
-      })
-      .finally(() => { vtexTokenRequest = null; });
+      });
+    vtexTokenRequest = request;
+    const releaseRequest = () => {
+      if (vtexTokenRequest === request) vtexTokenRequest = null;
+    };
+    void request.then(releaseRequest, releaseRequest);
   }
   return vtexTokenRequest;
 }

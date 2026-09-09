@@ -25,7 +25,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BEST_SELLING_PRODUCTS_SHELF, RECENT_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
-import { getAccountSession, loginVtexPassword, saveAccountSession, sendVtexAccessKey, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
+import { getAccountSession, loginVtexPassword, sendVtexAccessKey, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, addItemOffering, checkGiftCardAvailability, clearCart, createFreshOrderForm, getCustomerGiftCards, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type CartOffering, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
@@ -1922,16 +1922,25 @@ export default function CheckoutScreen() {
     {step === 'customer' && <>
       {customerExists && !editingCustomer
         ? <CustomerDataSummary email={email} firstName={firstName} lastName={lastName} phone={phone} birthDate={birthDate} document={document} gender={gender} onEdit={() => setEditingCustomer(true)} />
-        : <Card>
-          <ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText>
-          <ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente</ThemedText>
-          <Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={customerValidationAttempted ? customerErrors.email : ''} />
-          <Field label="Nome" value={firstName} setValue={setFirstName} required placeholder="Nome" error={customerValidationAttempted ? customerErrors.firstName : ''} />
-          <Field label="Sobrenome" value={lastName} setValue={setLastName} required placeholder="Sobrenome" error={customerValidationAttempted ? customerErrors.lastName : ''} />
-          <Field label="Telefone com DDD" value={formatPhoneWithoutCountryCode(phone)} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11999999999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} />
-          <Field label="Data de nascimento" value={birthDate} setValue={(value) => setBirthDate(formatBirthDateInput(value))} placeholder="DD/MM/AAAA" keyboardType="numeric" />
-          <Field label="CPF" value={document} setValue={(value) => setDocument(formatCpf(value))} required placeholder="000.000.000-00" keyboardType="numeric" error={customerValidationAttempted ? customerErrors.document : ''} />
-          <View style={styles.field}><ThemedText style={styles.fieldLabel}>Gênero</ThemedText><Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.select}><ThemedText style={styles.bodyText} themeColor="textSecondary">{formatGenderLabel(gender) || genders[0].text}</ThemedText><View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option.value || 'optional'} disabled={option.disabled} onPress={() => { if (option.disabled) return; setGender(option.value); setGenderOpen(false); }} style={styles.option}><ThemedText style={styles.bodyText}>{option.text}</ThemedText></Pressable>)}</View>}</View>
+        : <Card style={styles.customerEditCard}>
+          <ThemedText style={styles.customerDataTitle}>Dados Pessoais</ThemedText>
+          <ThemedText style={styles.customerDataDescription}>Vamos verificar se você já fez alguma compra com a gente.</ThemedText>
+          <View style={styles.customerEditFields}>
+            <Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={customerValidationAttempted ? customerErrors.email : ''} variant="personal" />
+            <Field label="Nome" value={firstName} setValue={setFirstName} required placeholder="Nome" error={customerValidationAttempted ? customerErrors.firstName : ''} variant="personal" />
+            <Field label="Sobrenome" value={lastName} setValue={setLastName} required placeholder="Sobrenome" error={customerValidationAttempted ? customerErrors.lastName : ''} variant="personal" />
+            <Field label="Telefone com DDD" value={formatPhoneWithoutCountryCode(phone)} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11999999999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} variant="personal" />
+            <Field label="Data de nascimento" value={birthDate} setValue={(value) => setBirthDate(formatBirthDateInput(value))} placeholder="DD/MM/AAAA" keyboardType="numeric" variant="personal" />
+            <Field label="CPF" value={document} setValue={(value) => setDocument(formatCpf(value))} required placeholder="000.000.000-00" keyboardType="numeric" error={customerValidationAttempted ? customerErrors.document : ''} variant="personal" />
+            <View style={[styles.field, styles.personalField]}>
+              <ThemedText style={styles.personalFieldLabel}>Gênero</ThemedText>
+              <Pressable onPress={() => setGenderOpen((value) => !value)} style={styles.personalDataSelect}>
+                <ThemedText style={styles.personalDataSelectText}>{formatGenderLabel(gender) || genders[0].text}</ThemedText>
+                <View style={[styles.dropdownIcon, genderOpen && styles.dropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View>
+              </Pressable>
+              {genderOpen && <View style={styles.personalDataDropdown}>{genders.map((option) => <Pressable key={option.value || 'optional'} disabled={option.disabled} onPress={() => { if (option.disabled) return; setGender(option.value); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option.text}</ThemedText></Pressable>)}</View>}
+            </View>
+          </View>
           <NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={() => router.push('/privacy-policy' as never)} />
         </Card>}
       {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
@@ -2236,11 +2245,11 @@ function PixPaymentScreen({
   </ThemedView>;
 }
 
-function Card({ children }: { children: ReactNode }) { return <ThemedView style={styles.card}>{children}</ThemedView>; }
+function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) { return <ThemedView style={[styles.card, style]}>{children}</ThemedView>; }
 function CustomerDataSummary({ email, firstName, lastName, phone, birthDate, document, gender, onEdit }: { email: string; firstName: string; lastName: string; phone: string; birthDate: string; document: string; gender: string; onEdit: () => void }) {
   const row = (label: string, value: string) => <View style={styles.customerDataRow}><ThemedText style={styles.customerDataLabel}>{label}</ThemedText><ThemedText style={styles.customerDataValue}>{value || 'Não informado'}</ThemedText></View>;
   return <ThemedView style={[styles.card, styles.customerDataCard]}>
-    <ThemedText style={styles.customerDataTitle}>Informe seu e-mail para continuar</ThemedText>
+    <ThemedText style={styles.customerDataTitle}>Dados Pessoais</ThemedText>
     <View style={styles.customerDataRows}>
       {row('E-mail', email)}
       {row('Nome', `${firstName} ${lastName}`.trim())}
@@ -2249,7 +2258,9 @@ function CustomerDataSummary({ email, firstName, lastName, phone, birthDate, doc
       {row('CPF', document)}
       {row('Gênero', formatGenderLabel(gender))}
     </View>
-    <Pressable onPress={onEdit}><ThemedText style={styles.link}>Editar dados</ThemedText></Pressable>
+    <View style={styles.customerDataEditSection}>
+      <Pressable onPress={onEdit}><ThemedText style={styles.customerDataEditLink}>Editar dados pessoais</ThemedText></Pressable>
+    </View>
   </ThemedView>;
 }
 function CustomerReviewData({ email, firstName, lastName, phone, document }: { email: string; firstName: string; lastName: string; phone: string; document: string }) {
@@ -2270,10 +2281,10 @@ function PickupStoreCard({ option, selected, disabled, onPress }: { option: Ship
     </View>
   </Pressable>;
 }
-function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '', accessory, style }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string; accessory?: ReactNode; style?: StyleProp<ViewStyle> }) {
+function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '', accessory, style, variant = 'default' }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string; accessory?: ReactNode; style?: StyleProp<ViewStyle>; variant?: 'default' | 'personal' }) {
   const isFreeText = !keyboardType || keyboardType === 'default';
   const inputMode = isFreeText ? 'text' : keyboardType === 'email-address' ? 'email' : keyboardType === 'phone-pad' ? 'tel' : 'numeric';
-  return <View style={[styles.field, style]}><ThemedText style={styles.fieldLabel}>{label + (required ? ' *' : '')}</ThemedText><View style={styles.inputWrap}><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} inputMode={inputMode} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={false} spellCheck={false} placeholderTextColor="#96918b" style={[styles.input, accessory ? styles.inputWithAccessory : undefined, error ? styles.inputError : undefined]} />{accessory && <View style={styles.fieldAccessory}>{accessory}</View>}</View>{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
+  return <View style={[styles.field, variant === 'personal' && styles.personalField, style]}><ThemedText style={[styles.fieldLabel, variant === 'personal' && styles.personalFieldLabel]}>{label + (required ? ' *' : '')}</ThemedText><View style={styles.inputWrap}><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} inputMode={inputMode} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={false} spellCheck={false} placeholderTextColor="#96918b" style={[styles.input, variant === 'personal' && styles.personalInput, accessory ? styles.inputWithAccessory : undefined, error ? styles.inputError : undefined]} />{accessory && <View style={styles.fieldAccessory}>{accessory}</View>}</View>{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
 }
 function Primary({ title, onPress, loading }: { title: string; onPress: () => void; loading?: boolean }) {
   const isLoading = loading ?? title.endsWith('...');
@@ -2399,7 +2410,8 @@ function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthenticate
       setMessage('');
       setLoading(true);
       await action();
-      await saveAccountSession(normalizedEmail);
+      // Confirmar a identidade do vale-presente não é login na conta. A
+      // sessão persistente deve ser criada somente pelos fluxos da conta.
       await onAuthenticated(normalizedEmail);
       onClose();
     } catch (error) {
@@ -2538,12 +2550,24 @@ const styles = StyleSheet.create({
   emptyCartShelfTitle: { fontSize: 16, lineHeight: 22 },
   pageTitle: { fontSize: 16, lineHeight: 21, fontFamily: Fonts.bold, fontWeight: '700' },
   card: { gap: 6, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
-  customerDataCard: { gap: 10, padding: 14 },
-  customerDataTitle: { fontSize: 15, lineHeight: 20, fontFamily: Fonts.bold, fontWeight: '700' },
-  customerDataRows: { gap: 20 },
-  customerDataRow: { gap: 1 },
-  customerDataLabel: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 11, lineHeight: 15 },
-  customerDataValue: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 19 },
+  customerDataCard: { gap: 0, padding: 24, borderRadius: 16 },
+  customerDataTitle: { marginBottom: 28, color: '#0a0a0a', fontFamily: Fonts.medium, fontSize: 26, lineHeight: 34, fontWeight: '500' },
+  customerDataDescription: { marginBottom: 24, color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, fontWeight: '400' },
+  customerDataRows: { gap: 21 },
+  customerDataRow: { gap: 4 },
+  customerDataLabel: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  customerDataValue: { color: '#a29b93', fontFamily: Fonts.sans, fontSize: 17, lineHeight: 24, fontWeight: '400' },
+  customerDataEditSection: { marginTop: 28, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#e8e3dd' },
+  customerDataEditLink: { color: '#5d5852', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22, textDecorationLine: 'underline' },
+  customerEditCard: { gap: 0, padding: 24, borderRadius: 16 },
+  customerEditFields: { gap: 18 },
+  personalField: { gap: 6 },
+  personalFieldLabel: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  personalInput: { minHeight: 52, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: '#4e4a46', backgroundColor: '#ffffff', color: '#45413d', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22 },
+  personalDataSelect: { minHeight: 52, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4e4a46', backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  personalDataSelectText: { color: '#45413d', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22, fontWeight: '400' },
+  personalDataDropdown: { borderWidth: 1, borderColor: '#d9d3cc', borderRadius: 8, backgroundColor: '#ffffff' },
+  personalDataOption: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
   customerReviewData: { gap: 2, marginTop: 1, marginBottom: 2 },
   customerReviewValue: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
   cardTitle: { fontSize: 15, lineHeight: 20, fontFamily: Fonts.bold, fontWeight: '700' },

@@ -138,6 +138,6 @@ const styles = StyleSheet.create({
   item: { flexDirection: 'row', gap: Spacing.two },
   thumb: { width: 42, height: 52, backgroundColor: '#e8e8ea', borderRadius: 4, resizeMode: 'cover' },
   itemInfo: { flex: 1, justifyContent: 'center' },
-  primaryButton: { padding: Spacing.three, borderRadius: 8, alignItems: 'center', backgroundColor: '#e8e5df' },
-  primaryText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  primaryButton: { padding: Spacing.three, borderRadius: 8, alignItems: 'center', backgroundColor: '#0a0a0a' },
+  primaryText: { color: '#ffffff', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 16, fontWeight: '700' },
 });

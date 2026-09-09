@@ -148,22 +148,30 @@ export default function AccountScreen() {
   }, [requestedView]);
 
   useEffect(() => {
+    let active = true;
     getAccountSession().then((session) => {
-      if (session) {
-        setEmail(session.email); setLoggedIn(true);
-        getCustomerProfileFromMasterData(session.email).then((customer) => {
-          if (!customer) return;
-          setProfile(customer);
-          if (customer.email) setEmail(customer.email);
-        }).catch((error) => setProfileMessage(error instanceof Error ? error.message : 'Não foi possível carregar o perfil VTEX.'));
-        getOrderForm().then((orderForm) => {
-          if (orderForm.clientProfileData) {
-            setProfile((current) => mergeOrderFormProfile(current, orderForm.clientProfileData!));
-            if (orderForm.clientProfileData.email) setEmail(orderForm.clientProfileData.email);
-          }
-        }).catch(() => undefined);
-      }
-    });
+      if (!active || !session?.email?.trim()) return;
+      const sessionEmail = session.email.trim().toLowerCase();
+      setEmail(sessionEmail);
+      setLoggedIn(true);
+      getCustomerProfileFromMasterData(sessionEmail).then((customer) => {
+        if (!active || !customer) return;
+        setProfile(customer);
+        // O e-mail da sessão autenticada é a identidade da conta. O perfil
+        // remoto pode retornar outra capitalização, mas nunca deve ser
+        // substituído pelo e-mail temporário do carrinho.
+      }).catch((error) => {
+        if (active) setProfileMessage(error instanceof Error ? error.message : 'Não foi possível carregar o perfil VTEX.');
+      });
+      getOrderForm().then((orderForm) => {
+        if (!active || !orderForm.clientProfileData) return;
+        setProfile((current) => ({
+          ...mergeOrderFormProfile(current, orderForm.clientProfileData!),
+          email: sessionEmail,
+        }));
+      }).catch(() => undefined);
+    }).catch(() => undefined);
+    return () => { active = false; };
   }, [loggedIn]);
 
   async function login() {
@@ -190,7 +198,10 @@ export default function AccountScreen() {
     try {
       await clearAccountSession();
       setLoggedIn(false);
+      setEmail('');
       setPassword('');
+      setProfile({});
+      setProfileMessage(null);
       setView('home');
     } finally {
       setLogoutLoading(false);
@@ -521,7 +532,7 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
         </Pressable>
       </View>
       <Pressable disabled={loading} onPress={onForgot} style={styles.forgotButton}><ThemedText type="smallBold" style={styles.linkText}>Esqueceu a senha?</ThemedText></Pressable>
-      {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
+      {!!message && <ThemedText themeColor="textSecondary" style={styles.linkTextAlert}>{message}</ThemedText>}
       <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Entrar</ThemedText>}</Pressable>
       <Pressable onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable>
     </ThemedView>
@@ -718,11 +729,81 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
   }
 
   const fields = [{ label: 'Nome', value: firstName, set: setFirstName }, { label: 'Sobrenome', value: lastName, set: setLastName }, { label: 'CPF', value: document, set: setDocument }, { label: 'Data de nascimento', value: birthDate, set: (value: string) => setBirthDate(formatBirthDateInput(value)) }, { label: 'Telefone com DDD', value: phone, displayValue: formatPhoneWithoutCountryCode(phone), set: (value: string) => setPhone(formatPhoneInput(value)) }];
-  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Dados Pessoais" onBack={onBack} /><ScrollView contentContainerStyle={styles.content}><ThemedView style={styles.card}><ThemedText style={styles.cardTitle} type="subtitle">Dados Pessoais</ThemedText><ThemedText themeColor="textSecondary">E-mail</ThemedText>{editing ? <TextInput value={email} editable={false} style={[styles.input, styles.readonly]} /> : <ThemedText>{email || 'Não informado'}</ThemedText>}{fields.map((field) => <View key={field.label}><ThemedText themeColor="textSecondary">{field.label}</ThemedText>{editing ? <TextInput value={field.label === 'Telefone com DDD' ? formatPhoneWithoutCountryCode(field.value) : field.value} onChangeText={field.set} style={styles.input} /> : <ThemedText>{(field.displayValue ?? field.value) || 'Não informado'}</ThemedText>}</View>)}<ThemedText themeColor="textSecondary">Gênero (opcional)</ThemedText>{editing ? <><Pressable onPress={() => setGenderOpen(!genderOpen)} style={styles.select}><ThemedText>{formatGenderLabel(gender) || 'Selecione'}</ThemedText><View style={[styles.genderDropdownIcon, genderOpen && styles.genderDropdownIconOpen]}><ChevronRightIcon color="#625d57" size={16} /></View></Pressable>{genderOpen && <View style={styles.dropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.option}><ThemedText>{option}</ThemedText></Pressable>)}</View>}</> : <ThemedText>{formatGenderLabel(gender) || 'Não informado'}</ThemedText>}{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}{editing ? <Pressable disabled={saving} onPress={save} style={[styles.primaryButton, saving && styles.disabled]}>{saving ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Confirmar</ThemedText>}</Pressable> : <Pressable onPress={() => setEditing(true)}><ThemedText style={styles.primaryDadosText} type="link">Editar dados pessoais</ThemedText></Pressable>}</ThemedView><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={onPrivacyPress} disabled={newsletterSaving} outlined /></ScrollView></SafeAreaView></ThemedView>;
+  const feedbackMessage = message || profileMessage;
+
+  return (
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScreenHeader title="Dados Pessoais" onBack={onBack} />
+        <ScrollView contentContainerStyle={[styles.content, styles.personalDataContent]}>
+          <ThemedView style={[styles.card, styles.personalDataCard]}>
+            <ThemedText style={styles.personalDataTitle}>Dados Pessoais</ThemedText>
+            <View style={styles.personalDataFields}>
+              <View style={styles.personalDataField}>
+                <ThemedText style={styles.personalDataLabel}>E-mail</ThemedText>
+                {editing ? (
+                  <TextInput value={email} editable={false} style={[styles.personalDataInput, styles.personalDataReadonlyInput]} />
+                ) : (
+                  <ThemedText style={styles.personalDataValue}>{email || 'Não informado'}</ThemedText>
+                )}
+              </View>
+
+              {fields.map((field) => (
+                <View key={field.label} style={styles.personalDataField}>
+                  <ThemedText style={styles.personalDataLabel}>{field.label}</ThemedText>
+                  {editing ? (
+                    <TextInput
+                      value={field.label === 'Telefone com DDD' ? formatPhoneWithoutCountryCode(field.value) : field.value}
+                      onChangeText={field.set}
+                      style={styles.personalDataInput}
+                    />
+                  ) : (
+                    <ThemedText style={styles.personalDataValue}>{(field.displayValue ?? field.value) || 'Não informado'}</ThemedText>
+                  )}
+                </View>
+              ))}
+
+              <View style={styles.personalDataField}>
+                <ThemedText style={styles.personalDataLabel}>Gênero (opcional)</ThemedText>
+                {editing ? (
+                  <>
+                    <Pressable onPress={() => setGenderOpen(!genderOpen)} style={styles.personalDataSelect}>
+                      <ThemedText style={styles.personalDataSelectText}>{formatGenderLabel(gender) || 'Selecione'}</ThemedText>
+                      <View style={[styles.genderDropdownIcon, genderOpen && styles.genderDropdownIconOpen]}>
+                        <ChevronRightIcon color="#625d57" size={16} />
+                      </View>
+                    </Pressable>
+                    {genderOpen && <View style={styles.personalDataDropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option}</ThemedText></Pressable>)}</View>}
+                  </>
+                ) : (
+                  <ThemedText style={styles.personalDataValue}>{formatGenderLabel(gender) || 'Não informado'}</ThemedText>
+                )}
+              </View>
+            </View>
+
+            {!!feedbackMessage && <ThemedText style={styles.personalDataFeedback}>{feedbackMessage}</ThemedText>}
+
+            <View style={styles.personalDataEditSection}>
+              {editing ? (
+                <Pressable disabled={saving} onPress={save} style={[styles.primaryButton, styles.personalDataConfirmButton, saving && styles.disabled]}>
+                  {saving ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Confirmar</ThemedText>}
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => setEditing(true)}>
+                  <ThemedText style={styles.personalDataEditLink}>Editar dados pessoais</ThemedText>
+                </Pressable>
+              )}
+            </View>
+          </ThemedView>
+          <NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={onPrivacyPress} disabled={newsletterSaving} outlined />
+        </ScrollView>
+      </SafeAreaView>
+    </ThemedView>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingTop: 20, paddingBottom: 20 }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#0a0a0a' }, primaryText: { color: '#ffffff', fontWeight: '700' }, primaryDadosText: { textDecorationLine: 'underline', color: '#0a0a0a' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#0a0a0a', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 0, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, notificationSwitch: { width: 30, height: 16, padding: 3, borderRadius: 14, justifyContent: 'center' }, notificationSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' }, notificationSwitchOff: { backgroundColor: '#dedbd5', alignItems: 'flex-start' }, notificationThumb: { width: 12, height: 12, borderRadius: 11, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, cardTitle: { fontSize: 20 }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#f7f6f3', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] }, genderDropdownIconOpen: { transform: [{ rotate: '-90deg' }] }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, forgotButton: { alignSelf: 'flex-start' }, linkText: { color: '#625d57', textDecorationLine: 'underline' }, authFooter: { flexDirection: 'row', gap: Spacing.two }, authFooterButton: { flex: 1, minHeight: 48, justifyContent: 'center' }, passwordRules: { gap: Spacing.one, paddingVertical: Spacing.one }, passwordRule: { fontSize: 12, lineHeight: 17 }, passwordRuleValid: { color: '#2f8f5b' }, passwordRuleInvalid: { color: '#df5f5f' }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }, checkboxMark: { color: '#ffffff', fontSize: 13, lineHeight: 16, fontWeight: '700' }, resendButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#e7e3da' }, resendText: { color: '#5d5955', fontWeight: '700' }, checked: { backgroundColor: '#0a0a0a' }, disabled: { opacity: 0.5 },
+  container: { flex: 1 }, safeArea: { flex: 1, padding: 20}, content: { gap: Spacing.three, paddingTop: 20, paddingBottom: 20 }, greeting: { textAlign: 'center', color: '#8f8f8f' }, loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 }, primaryButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#0a0a0a' }, primaryText: { color: '#ffffff', fontWeight: '700' }, primaryDadosText: { textDecorationLine: 'underline', color: '#0a0a0a' }, logout: { alignSelf: 'flex-start', paddingVertical: Spacing.one, width: '100%', textAlign: 'center' }, logoutText: { color: '#0a0a0a', fontWeight: '600', width: '100%', textAlign: 'center', borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 5, padding: 8 }, tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, tile: { width: '48%', minHeight: 72, padding: Spacing.three, borderRadius: 14, backgroundColor: '#e9e7e3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, preference: { paddingVertical: Spacing.three, borderBottomWidth: 0, borderBottomColor: '#dedbd5', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, notificationSwitch: { width: 30, height: 16, padding: 3, borderRadius: 14, justifyContent: 'center' }, notificationSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' }, notificationSwitchOff: { backgroundColor: '#dedbd5', alignItems: 'flex-start' }, notificationThumb: { width: 12, height: 12, borderRadius: 11, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, helpTitle: { fontSize: 18, textAlign: 'center' }, helpButton: { padding: Spacing.four, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center' }, powered: { textAlign: 'center', fontSize: 10, color: '#777' }, card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' }, cardTitle: { fontSize: 20 }, divider: { height: 1, backgroundColor: '#dedbd5' }, outlineButton: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#7b7772', alignItems: 'center' }, googleButton: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.two, minHeight: 48 }, centerText: { textAlign: 'center' }, input: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e0ddd7', fontSize: 15, fontFamily: Fonts.sans }, passwordInputWrap: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' }, passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' }, passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }, readonly: { color: '#999' }, select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' }, genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] }, genderDropdownIconOpen: { transform: [{ rotate: '-90deg' }] }, dropdown: { borderWidth: 1, borderColor: '#e0ddd7', borderRadius: 8, backgroundColor: '#fff' }, option: { padding: Spacing.three, borderBottomWidth: 1, borderBottomColor: '#eee' }, textButton: { alignItems: 'center', padding: Spacing.two }, forgotButton: { alignSelf: 'flex-start' }, linkText: { color: '#625d57', textDecorationLine: 'underline' }, linkTextAlert: { color: '#df5f5f', fontSize: 11 }, authFooter: { flexDirection: 'row', gap: Spacing.two }, authFooterButton: { flex: 1, minHeight: 48, justifyContent: 'center' }, passwordRules: { gap: Spacing.one, paddingVertical: Spacing.one }, passwordRule: { fontSize: 12, lineHeight: 17 }, passwordRuleValid: { color: '#2f8f5b' }, passwordRuleInvalid: { color: '#df5f5f' }, checkRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }, checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#aaa', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }, checkboxMark: { color: '#ffffff', fontSize: 13, lineHeight: 16, fontWeight: '700' }, resendButton: { padding: Spacing.four, borderRadius: 8, alignItems: 'center', backgroundColor: '#e7e3da' }, resendText: { color: '#5d5955', fontWeight: '700' }, checked: { backgroundColor: '#0a0a0a' }, disabled: { opacity: 0.5 },
   authTitle: { fontFamily: Fonts.bold, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   privacyLink: { color: '#4f4b47', textDecorationLine: 'underline' },
   accountTile: { minHeight: 96, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'stretch' },
@@ -731,4 +812,21 @@ const styles = StyleSheet.create({
   tileLabel: { color: '#0a0a0a', fontSize: 13, lineHeight: 18 },
   preferenceLabel: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   preferenceText: { color: '#0a0a0a', fontSize: 14 },
+  personalDataContent: { paddingTop: Spacing.three, paddingBottom: 70 },
+  personalDataCard: { gap: 0, padding: 24, borderRadius: 16 },
+  personalDataTitle: { marginBottom: 28, color: '#0a0a0a', fontFamily: Fonts.medium, fontSize: 26, lineHeight: 34, fontWeight: '500' },
+  personalDataFields: { gap: 21 },
+  personalDataField: { gap: 4 },
+  personalDataLabel: { color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  personalDataValue: { color: '#a29b93', fontFamily: Fonts.sans, fontSize: 17, lineHeight: 24, fontWeight: '400' },
+  personalDataInput: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: '#4e4a46', backgroundColor: '#ffffff', color: '#45413d', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22 },
+  personalDataReadonlyInput: { borderColor: '#e2ded9', backgroundColor: '#ebe8e5', color: '#a7a099' },
+  personalDataSelect: { minHeight: 50, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4e4a46', backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  personalDataSelectText: { color: '#45413d', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22, fontWeight: '400' },
+  personalDataDropdown: { borderWidth: 1, borderColor: '#d9d3cc', borderRadius: 8, backgroundColor: '#ffffff' },
+  personalDataOption: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
+  personalDataFeedback: { marginTop: 18, color: '#df5f5f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17 },
+  personalDataEditSection: { marginTop: 28, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#e8e3dd' },
+  personalDataEditLink: { color: '#5d5850', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22, textDecorationLine: 'underline' },
+  personalDataConfirmButton: { minHeight: 50, display: 'flex', justifyContent: 'center' , alignItems: 'center' },
 });
