@@ -3,7 +3,7 @@ import { getAccountSession, getCachedAccountSession, getCachedVtexUserToken, get
 import { getStoredJson, setStoredJson } from './storage';
 import { storeConfig } from '@/config/store';
 
-const SHARED_FAVORITES_REQUEST_TIMEOUT_MS = 15000;
+const SHARED_FAVORITES_REQUEST_TIMEOUT_MS = 4000;
 
 function cacheKey(email: string) {
   return `lojahr:favorites:${email.toLowerCase()}`;

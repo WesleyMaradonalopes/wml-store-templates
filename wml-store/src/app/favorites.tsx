@@ -1,7 +1,6 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Share, StyleSheet } from 'react-native';
-import { Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProductShelf } from '@/components/cms-section';
@@ -63,7 +62,7 @@ export default function FavoritesScreen() {
       const url = await createSharedFavoritesUrl(favorites, session?.email);
       await Share.share({
         title: 'Meus favoritos',
-        message: `Confira meus favoritos na Hope Resort:\n${url}`,
+        message: `${url}`,
         url,
       });
     } catch (error) {
