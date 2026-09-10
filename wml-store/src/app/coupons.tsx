@@ -299,6 +299,6 @@ const styles = StyleSheet.create({
   backToTopButton: { alignSelf: 'center', minHeight: 40, paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, borderWidth: 1, borderColor: '#e6e1dc', backgroundColor: '#ffffff' },
   backToTopText: { fontFamily: Fonts.medium, fontSize: 13, lineHeight: 18, color: '#0a0a0a' },
   toastContainer: { position: 'absolute', left: 0, right: 0, top: '42%', alignItems: 'center' },
-  toast: { width: 150, alignItems: 'center', paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, borderRadius: 12, backgroundColor: 'rgba(15, 8, 5, 0.7)' },
+  toast: { width: 150, alignItems: 'center', paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, borderRadius: 8, backgroundColor: 'rgba(15, 8, 5, 0.7)' },
   toastText: { color: '#ece8e4', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16, textAlign: 'center' },
 });

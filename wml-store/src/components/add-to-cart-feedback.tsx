@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
     paddingHorizontal: 22,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     shadowColor: '#0a0a0a',
     shadowOpacity: 0.2,
     shadowRadius: 8,

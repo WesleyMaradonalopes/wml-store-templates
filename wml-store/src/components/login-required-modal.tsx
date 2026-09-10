@@ -45,6 +45,6 @@ const styles = StyleSheet.create({
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   closeText: { color: '#0a0a0a', fontSize: 24, lineHeight: 28, fontWeight: '400' },
   message: { color: '#393531', fontSize: 15, lineHeight: 23 },
-  loginButton: { minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
+  loginButton: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loginText: { color: '#FFFFFF', fontWeight: '700' },
 });

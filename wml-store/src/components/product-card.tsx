@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import { type Product } from '@/services/catalog';
 import { getAccountSession } from '@/services/auth';
+import { type Product } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, subscribeFavoriteChanges, toggleFavorite } from '@/services/favorites';
 
 import HeartIcon from './icons/HeartIcon';
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   card: { minWidth: 0, gap: Spacing.two, backgroundColor: 'transparent' },
   productLink: { gap: 5 },
   imageArea: { position: 'relative', width: '100%' },
-  image: { width: '100%', aspectRatio: 0.76, borderRadius: 12, backgroundColor: '#e8e8ea' },
+  image: { width: '100%', aspectRatio: 0.76, borderRadius: 8, backgroundColor: '#e8e8ea' },
   badges: { position: 'absolute', left: 5, top: 5, zIndex: 10, alignItems: 'flex-start', gap: 4 },
   badge: { minHeight: 20, paddingHorizontal: 5, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
   newBadge: { backgroundColor: '#0a0a0a' },

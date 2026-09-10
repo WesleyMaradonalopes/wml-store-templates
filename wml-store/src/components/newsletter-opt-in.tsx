@@ -19,7 +19,7 @@ export function NewsletterOptIn({ value, onChange, onPrivacyPress, disabled = fa
 
 const styles = StyleSheet.create({
   container: { gap: 4, paddingTop: 10 },
-  containerOutlined: { padding: Spacing.three, borderRadius: 12, borderWidth: 1, borderColor: '#e6e2dc', backgroundColor: '#ffffff' },
+  containerOutlined: { padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#e6e2dc', backgroundColor: '#ffffff' },
   disabled: { opacity: 0.55 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   checkbox: { width: 16, height: 16, borderRadius: 4, borderWidth: 1, borderColor: '#aaa49c', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },

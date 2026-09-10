@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Image } from 'expo-image';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { CartItem, getOrderForm, OrderForm, updateCartItem } from '@/services/cart';
-import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { useTabBar } from '@/context/tab-bar-context';
+import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
+import { CartItem, getOrderForm, OrderForm, updateCartItem } from '@/services/cart';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CartScreen() {
   const onScroll = useTabBarScroll();
@@ -33,4 +33,4 @@ export default function CartScreen() {
 function CartRow({ item, updating, onDecrease, onIncrease, onRemove }: { item: CartItem; updating: boolean; onDecrease: () => void; onIncrease: () => void; onRemove: () => void }) {
   return <ThemedView style={styles.row}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.image} />}<ThemedView style={styles.rowContent}><ThemedText type="smallBold" numberOfLines={2}>{item.name}</ThemedText><ThemedText themeColor="textSecondary">R$ {item.price.toFixed(2)} cada</ThemedText><ThemedText type="smallBold">Subtotal: R$ {(item.price * item.quantity).toFixed(2)}</ThemedText><ThemedView style={styles.actions}><Pressable disabled={updating || item.quantity <= 1} onPress={onDecrease} style={styles.quantityButton}><ThemedText type="smallBold">-</ThemedText></Pressable><ThemedText type="smallBold">{updating ? '...' : item.quantity}</ThemedText><Pressable disabled={updating} onPress={onIncrease} style={styles.quantityButton}><ThemedText type="smallBold">+</ThemedText></Pressable><Pressable disabled={updating} onPress={onRemove} style={styles.removeButton}><ThemedText style={styles.removeText}>Remover</ThemedText></Pressable></ThemedView></ThemedView></ThemedView>;
 }
-const styles = StyleSheet.create({ container: { flex: 1 }, safeArea: { flex: 1, padding: Spacing.four, gap: Spacing.three }, list: { gap: Spacing.three, paddingVertical: Spacing.three }, row: { flexDirection: 'row', gap: Spacing.three, padding: Spacing.three, borderRadius: 16, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.1, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, rowContent: { flex: 1, gap: Spacing.one }, image: { width: 88, height: 116, borderRadius: 10, backgroundColor: '#e8e8ea' }, button: { padding: Spacing.four, borderRadius: 24, alignItems: 'center', backgroundColor: '#0a0a0a' }, actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.one }, quantityButton: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0ece5' }, removeButton: { marginLeft: 'auto', paddingVertical: Spacing.one }, removeText: { color: '#B42318', fontSize: 12 } });
+const styles = StyleSheet.create({ container: { flex: 1 }, safeArea: { flex: 1, padding: Spacing.four, gap: Spacing.three }, list: { gap: Spacing.three, paddingVertical: Spacing.three }, row: { flexDirection: 'row', gap: Spacing.three, padding: Spacing.three, borderRadius: 16, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.1, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 2 }, rowContent: { flex: 1, gap: Spacing.one }, image: { width: 88, height: 116, borderRadius: 8, backgroundColor: '#e8e8ea' }, button: { padding: Spacing.four, borderRadius: 24, alignItems: 'center', backgroundColor: '#0a0a0a' }, actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.one }, quantityButton: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0ece5' }, removeButton: { marginLeft: 'auto', paddingVertical: Spacing.one }, removeText: { color: '#B42318', fontSize: 12 } });

@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   unavailableText: { textDecorationLine: 'line-through' },
   messageText: { color: '#B42318', fontWeight: '600' },
   productButton: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  addButton: { minHeight: 50, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
+  addButton: { minHeight: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   addButtonText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.5 },

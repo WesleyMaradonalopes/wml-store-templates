@@ -1114,7 +1114,7 @@ const styles = StyleSheet.create({
   colorModalCloseText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
   colorModalList: { padding: Spacing.three, paddingBottom: Spacing.five },
   colorModalRow: { gap: Spacing.two },
-  colorModalItem: { width: '31.5%', minWidth: 0, marginBottom: Spacing.three, padding: 3, borderRadius: 10, borderWidth: 1, borderColor: 'transparent', backgroundColor: '#FFFFFF' },
+  colorModalItem: { width: '31.5%', minWidth: 0, marginBottom: Spacing.three, padding: 3, borderRadius: 8, borderWidth: 1, borderColor: 'transparent', backgroundColor: '#FFFFFF' },
   selectedColorModalItem: { borderColor: '#0a0a0a' },
   colorModalImage: { width: '100%', aspectRatio: 0.72, borderRadius: 8, backgroundColor: '#e8e8ea' },
   colorModalName: { minHeight: 34, paddingTop: Spacing.one, fontSize: 11, lineHeight: 15 },

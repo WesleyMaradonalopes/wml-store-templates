@@ -748,7 +748,7 @@ const styles = StyleSheet.create({
   tileStack: { gap: 12 },
   contentRow: { flexDirection: 'row', gap: 12 },
   contentCard: { width: 190, gap: 8, padding: 10, borderRadius: 14, backgroundColor: '#FFFFFF' },
-  contentCardImage: { width: 170, height: 130, borderRadius: 10 },
+  contentCardImage: { width: 170, height: 130, borderRadius: 8 },
   scheduleCard: { flex: 1, minWidth: 130, gap: 6, padding: 12, borderRadius: 14, backgroundColor: '#FFFFFF' },
   couponCard: { gap: 6, padding: 14, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e0ddd7' },
   couponCode: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0a0a0a', color: '#FFFFFF', fontWeight: '700' },

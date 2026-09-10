@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useEffect, useState } from 'react';
+import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts, Spacing } from '@/constants/theme';
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
     paddingHorizontal: 22,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: '#358846',
     shadowColor: '#0a0a0a',
     shadowOpacity: 0.2,
@@ -153,14 +153,14 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: 20, lineHeight: 25, fontFamily: Fonts.semibold },
   closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   productRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three, paddingTop: 14, paddingBottom: 18 },
-  productImage: { width: 96, height: 126, borderRadius: 10, backgroundColor: '#e9e4dd' },
+  productImage: { width: 96, height: 126, borderRadius: 8, backgroundColor: '#e9e4dd' },
   productImagePlaceholder: { borderWidth: 1, borderColor: '#ded7cf' },
   productCopy: { flex: 1, minWidth: 0, paddingTop: 2, gap: 5 },
   productName: { fontSize: 14, lineHeight: 19, fontFamily: Fonts.medium },
   productDetails: { color: '#625d57', fontSize: 13, lineHeight: 18 },
   productPrice: { color: '#0a0a0a', fontSize: 15, lineHeight: 20, fontFamily: Fonts.semibold },
   actions: { flexDirection: 'row', gap: Spacing.three },
-  actionButton: { flex: 1, minHeight: 50, paddingHorizontal: Spacing.three, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  actionButton: { flex: 1, minHeight: 50, paddingHorizontal: Spacing.three, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   secondaryButton: { borderWidth: 1, borderColor: '#e0dbd4', backgroundColor: '#FFFFFF' },
   primaryButton: { backgroundColor: '#0a0a0a' },
   secondaryButtonText: { color: '#0a0a0a', fontSize: 13, lineHeight: 17, fontFamily: Fonts.semibold },

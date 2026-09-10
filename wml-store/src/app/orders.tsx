@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   loader: { marginTop: Spacing.two },
   list: { gap: Spacing.three, paddingVertical: Spacing.three, paddingBottom: 100 },
   emptyList: { flexGrow: 1 },
-  card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e2dc' },
+  card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e2dc' },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.two },
   orderIdentity: { flex: 1, minWidth: 0 },
   meta: { flexDirection: 'row', justifyContent: 'space-between' },
