@@ -2671,7 +2671,7 @@ const styles = StyleSheet.create({
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#0a0a0a' },
   summary: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1 },
   summaryTotal: { marginTop: 4, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eeeae5' },
-  progressCard: { gap: 8, padding: Spacing.two, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e1da' },
+  progressCard: { gap: 8, padding: Spacing.two, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#fff' },
   progressLabel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.one },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#e3ded5' },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: '#2f8f5b' },
