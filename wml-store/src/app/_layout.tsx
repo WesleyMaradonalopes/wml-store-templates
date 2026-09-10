@@ -90,8 +90,8 @@ function NotificationBootstrap() {
 
   useEffect(() => {
     configureNotificationPresentation();
-    void initializeNotifications().catch((error) => {
-      console.warn('[notifications] Falha ao inicializar notificações.', error);
+    void initializeNotifications().catch(() => {
+      console.warn('[notifications] Falha ao inicializar notificações.');
     });
 
     const responseSubscription = addNotificationResponseListener(handleResponse);
@@ -99,8 +99,8 @@ function NotificationBootstrap() {
       .then((response) => {
         if (response) handleResponse(response);
       })
-      .catch((error) => {
-        console.warn('[notifications] Falha ao ler a última notificação.', error);
+      .catch(() => {
+        console.warn('[notifications] Falha ao ler a última notificação.');
       });
 
     return () => responseSubscription?.remove();

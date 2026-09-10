@@ -1,3 +1,4 @@
+import { isRunningInExpoGo } from 'expo';
 import type * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -15,7 +16,6 @@ let notificationOperation: Promise<unknown> = Promise.resolve();
 let initializationPromise: Promise<NotificationState> | null = null;
 let nativeRegistrationReady = false;
 let notificationsModule: NotificationsModule | null | undefined;
-let moduleWarningShown = false;
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -53,17 +53,16 @@ export class NotificationModuleUnavailableError extends Error {
  * development/release build generated after installing this dependency.
  */
 function getNotificationsModule(): NotificationsModule | null {
-  if (!nativePlatform) return null;
+  // Expo Go intentionally does not include remote push notifications from
+  // SDK 53 onward. Avoid importing expo-notifications there because its
+  // native module lookup is reported as an uncaught Metro error.
+  if (!nativePlatform || isRunningInExpoGo()) return null;
   if (notificationsModule !== undefined) return notificationsModule;
 
   try {
     notificationsModule = require('expo-notifications') as NotificationsModule;
-  } catch (error) {
+  } catch {
     notificationsModule = null;
-    if (!moduleWarningShown) {
-      moduleWarningShown = true;
-      console.warn('[notifications] O runtime atual não possui o módulo nativo. Use um development build.', error);
-    }
   }
 
   return notificationsModule;
@@ -115,7 +114,6 @@ async function ensureAndroidNotificationChannel() {
       importance: notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#0a0a0a',
-      sound: 'default',
     }).then(() => undefined);
   }
   await channelRequest;
@@ -264,9 +262,9 @@ export function initializeNotifications() {
         nativeRegistrationReady = false;
         await registerNativePush();
         await writeNotificationsPreference(true);
-      } catch (error) {
+      } catch {
         nativeRegistrationReady = false;
-        console.warn('[notifications] Não foi possível registrar o dispositivo.', error);
+        console.warn('[notifications] Não foi possível registrar o dispositivo.');
       }
     } else {
       nativeRegistrationReady = false;
