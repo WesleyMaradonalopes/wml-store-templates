@@ -15,4 +15,5 @@ export const storeConfig = {
   cmsProjectId: env.EXPO_PUBLIC_VTEX_CMS_PROJECT_ID || 'lojahr-mobile-app',
   salesChannel: env.EXPO_PUBLIC_VTEX_SALES_CHANNEL || '1',
   backendUrl: env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:6001',
+  publicStoreUrl: (env.EXPO_PUBLIC_PUBLIC_STORE_URL || 'https://www.hoperesort.com.br').replace(/\/$/, ''),
 } as const;

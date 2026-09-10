@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Share, StyleSheet } from 'react-native';
 import { Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,8 +12,9 @@ import { ThemedView } from '@/components/themed-view';
 import { BEST_SELLING_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
+import { getAccountSession } from '@/services/auth';
 import { type Product } from '@/services/catalog';
-import { getCachedFavorites, getFavorites } from '@/services/favorites';
+import { createSharedFavoritesUrl, getCachedFavorites, getFavorites } from '@/services/favorites';
 
 const EMPTY_FAVORITES_SHELF: Record<string, unknown> = {
   ...BEST_SELLING_PRODUCTS_SHELF,
@@ -26,6 +27,7 @@ export default function FavoritesScreen() {
   const onScroll = useTabBarScroll();
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
+  const [sharingFavorites, setSharingFavorites] = useState(false);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -48,10 +50,33 @@ export default function FavoritesScreen() {
     return () => { active = false; };
   }, []));
 
+  const shareFavorites = useCallback(async () => {
+    if (sharingFavorites) return;
+    if (favorites.length === 0) {
+      Alert.alert('Favoritos', 'Adicione um item aos favoritos para compartilhar.');
+      return;
+    }
+
+    setSharingFavorites(true);
+    try {
+      const session = await getAccountSession();
+      const url = await createSharedFavoritesUrl(favorites, session?.email);
+      await Share.share({
+        title: 'Meus favoritos',
+        message: `Confira meus favoritos na Hope Resort:\n${url}`,
+        url,
+      });
+    } catch (error) {
+      Alert.alert('Favoritos', error instanceof Error ? error.message : 'Não foi possível compartilhar os favoritos.');
+    } finally {
+      setSharingFavorites(false);
+    }
+  }, [favorites, sharingFavorites]);
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} />
+        <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} showShare onShare={shareFavorites} />
         {loadingFavorites && <ActivityIndicator color="#0a0a0a" />}
         <FlatList
           data={favorites}

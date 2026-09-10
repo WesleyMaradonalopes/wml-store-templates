@@ -3,8 +3,64 @@ import { getAccountSession, getCachedAccountSession, getCachedVtexUserToken, get
 import { getStoredJson, setStoredJson } from './storage';
 import { storeConfig } from '@/config/store';
 
+const SHARED_FAVORITES_REQUEST_TIMEOUT_MS = 15000;
+
 function cacheKey(email: string) {
   return `lojahr:favorites:${email.toLowerCase()}`;
+}
+
+export async function createSharedFavoritesUrl(
+  products: Pick<Product, 'id' | 'linkText'>[],
+  email?: string | null,
+) {
+  const productIds = Array.from(new Set(products.map((product) => product.id.trim()).filter(Boolean)));
+  if (productIds.length === 0) {
+    throw new Error('Adicione um item aos favoritos para compartilhar.');
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SHARED_FAVORITES_REQUEST_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(`${storeConfig.publicStoreUrl}/_v/share-wishlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productIds,
+          email: email?.trim().toLowerCase() || null,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const payload = await response.json().catch(() => ({})) as {
+      token?: string;
+      message?: string;
+      error?: string;
+    };
+
+    if (!response.ok || !payload.token) {
+      throw new Error(payload.message || payload.error || `Não foi possível criar o link de favoritos (HTTP ${response.status}).`);
+    }
+
+    return `${storeConfig.publicStoreUrl}/favoritos/${encodeURIComponent(payload.token)}`;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      error = new Error('O serviço de compartilhamento está indisponível.');
+    }
+
+    const fallbackSlugs = Array.from(new Set(
+      products
+        .map((product) => product.linkText.trim())
+        .filter((slug) => slug.length > 5),
+    ));
+    if (fallbackSlugs.length === 0) throw error;
+
+    return `${storeConfig.publicStoreUrl}/favoritos?productSlugs=${encodeURIComponent(fallbackSlugs.join(','))}`;
+  }
 }
 
 export type FavoriteChange = {
