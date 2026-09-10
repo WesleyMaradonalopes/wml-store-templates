@@ -73,6 +73,10 @@ function estimateLabel(value: string) {
 const DESCRIPTION_PREVIEW_LINES = 5;
 const DESCRIPTION_LINE_HEIGHT = 20;
 
+// Keep the feature implementation available for a future activation, but do
+// not render it or make its recommendation requests while it is disabled.
+const COMPLETE_LOOK_ENABLED = false;
+
 export default function ProductScreen() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -165,11 +169,13 @@ export default function ProductScreen() {
           .then((items) => { if (active) setSimilarProducts(items); })
           .catch(() => undefined)
           .finally(() => { if (active) setSimilarLoading(false); });
-        setLookLoading(true);
-        getCompleteLookProducts(value, 2)
-          .then((items) => { if (active) setLookProducts([value, ...items.filter((item) => item.id !== value.id)]); })
-          .catch(() => { if (active) setLookProducts([value]); })
-          .finally(() => { if (active) setLookLoading(false); });
+        if (COMPLETE_LOOK_ENABLED) {
+          setLookLoading(true);
+          getCompleteLookProducts(value, 2)
+            .then((items) => { if (active) setLookProducts([value, ...items.filter((item) => item.id !== value.id)]); })
+            .catch(() => { if (active) setLookProducts([value]); })
+            .finally(() => { if (active) setLookLoading(false); });
+        }
       })
       .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
@@ -537,8 +543,8 @@ export default function ProductScreen() {
                 <ThemedText style={styles.accordionText}>{product.care || 'Informações não cadastradas.'}</ThemedText>
               </Accordion>
 
-              {lookLoading && <ActivityIndicator color="#0a0a0a" />}
-              {!lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onFeedback={showCartFeedback} />}
+              {COMPLETE_LOOK_ENABLED && lookLoading && <ActivityIndicator color="#0a0a0a" />}
+              {COMPLETE_LOOK_ENABLED && !lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onFeedback={showCartFeedback} />}
 
               <View style={styles.similarSection}>
                 <ThemedText style={styles.similarProducts} type="subtitle">Quem viu isso, viu também</ThemedText>

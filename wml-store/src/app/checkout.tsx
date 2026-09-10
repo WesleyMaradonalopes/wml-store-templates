@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
@@ -30,6 +30,7 @@ import { addCouponToCart, addGiftCardToCart, addItemOffering, checkGiftCardAvail
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult, type PaymentAppData } from '@/services/orders';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
+import { getCheckoutProductImageUrl } from '@/utils/product-images';
 
 type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'installments' | 'review';
 type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
@@ -1917,7 +1918,7 @@ export default function CheckoutScreen() {
   const cardErrors = getCardErrors();
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{recaptchaSiteKey && (step === 'payment' || step === 'card' || step === 'review') && <Recaptcha ref={recaptchaRef} siteKey={recaptchaSiteKey} />}<ScrollView ref={checkoutScrollRef} contentContainerStyle={styles.content}>
-     {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />}<View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><ThemedText style={styles.dataLabel}>{money(item.price)}</ThemedText><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View></View></View></View></View>)}{giftWrappingAvailable && <Pressable disabled={giftWrapLoading || saving} onPress={toggleGiftWrapping} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable>}</ThemedView>{giftWrap && <View style={styles.giftMessage}><ThemedText style={styles.giftMessageText}>Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC.</ThemedText></View>}<ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /><ProductShelf data={CART_BEST_SELLING_PRODUCTS_SHELF} titleStyle={styles.checkoutShelfTitle} onAdded={showCheckoutAddFeedback} showAddedModal={false} /></>}
+     {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}><CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.itemImage} /><View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText numberOfLines={3} style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View><ThemedText style={styles.itemPrice}>{money(item.price)}</ThemedText></View></View></View></View>)}{giftWrappingAvailable && <Pressable disabled={giftWrapLoading || saving} onPress={toggleGiftWrapping} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable>}</ThemedView>{giftWrap && <View style={styles.giftMessage}><ThemedText style={styles.giftMessageText}>Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC.</ThemedText></View>}<ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /><ProductShelf data={CART_BEST_SELLING_PRODUCTS_SHELF} titleStyle={styles.checkoutShelfTitle} onAdded={showCheckoutAddFeedback} showAddedModal={false} /></>}
     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={() => router.push('/privacy-policy' as never)} /></Card>}
     {step === 'customer' && <>
       {customerExists && !editingCustomer
@@ -1999,7 +2000,7 @@ export default function CheckoutScreen() {
            <ThemedText style={styles.sectionTitle}>{selectedPickup ? 'Loja para retirada' : 'Endereço de Entrega'}</ThemedText>
            {selectedPickup ? pickupAddressLines(selectedPickup).map((line, index) => <ThemedText key={line + index} style={styles.bodyText}>{line}</ThemedText>) : <><ThemedText style={styles.bodyText}>{street + ', ' + number}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText></>}
          </View>
-         <View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}>{!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.reviewItemImage} />}<ThemedText style={styles.reviewItemName}>{item.name + ' ' + item.quantity + ' un.'}</ThemedText></View>)}</View>
+          <View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}><CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.reviewItemImage} /><View style={styles.reviewItemDetails}><ThemedText style={styles.reviewItemName}>{item.name}</ThemedText><ThemedText style={styles.reviewItemQuantity}>{item.quantity + ' un.'}</ThemedText></View></View>)}</View>
          <Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable>
        </Card>
        <Card>
@@ -2243,6 +2244,19 @@ function PixPaymentScreen({
       </View>
     </SafeAreaView>
   </ThemedView>;
+}
+
+function CheckoutProductImage({ imageUrl, label, style }: { imageUrl: string; label: string; style: StyleProp<ImageStyle> }) {
+  const highResolutionUrl = getCheckoutProductImageUrl(imageUrl);
+  if (!highResolutionUrl) return null;
+  return <Image
+    accessibilityLabel={label}
+    allowDownscaling={false}
+    cachePolicy="memory-disk"
+    contentFit="cover"
+    source={{ uri: highResolutionUrl }}
+    style={style}
+  />;
 }
 
 function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) { return <ThemedView style={[styles.card, style]}>{children}</ThemedView>; }
@@ -2576,12 +2590,13 @@ const styles = StyleSheet.create({
   productsCard: { padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
   productBlock: { paddingVertical: Spacing.one },
   productDivider: { marginTop: Spacing.two, paddingTop: Spacing.three, borderTopWidth: 1, borderTopColor: '#ece8e2' },
-  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
-  itemImage: { width: 64, height: 84, borderRadius: 8, backgroundColor: '#e8e8ea' },
-  itemDetails: { flex: 1, gap: 5 },
+  itemRow: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.three },
+  itemImage: { width: '25%', maxWidth: 142, aspectRatio: 0.76, borderRadius: 8, backgroundColor: '#e8e8ea' },
+  itemDetails: { flex: 1, minWidth: 0, justifyContent: 'space-between', gap: Spacing.two },
   itemTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.one },
-  itemName: { flex: 1, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '400' },
-  itemBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  itemName: { flex: 1, minWidth: 0, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  itemBottomRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Spacing.two },
+  itemPrice: { flexShrink: 0, fontFamily: Fonts.sans, fontSize: 15, lineHeight: 20, fontWeight: '600' },
   quantityControl: { minHeight: 34, flexDirection: 'row', alignItems: 'center', borderRadius: 9, borderWidth: 1, borderColor: '#cfc8bf', overflow: 'hidden' },
   quantityButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   quantityValue: { minWidth: 42, height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
@@ -2733,10 +2748,12 @@ const styles = StyleSheet.create({
   freeText: { color: '#2f9b62', fontFamily: Fonts.sans, fontSize: 13 },
   deliveryText: { color: '#2f9b62', fontFamily: Fonts.sans, fontSize: 12 },
   reviewAddress: { gap: 2, marginTop: Spacing.one, padding: Spacing.two, borderRadius: 8, backgroundColor: '#f8f8f8' },
-  reviewItems: { gap: 6 },
-  reviewItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  reviewItemImage: { width: 48, height: 62, borderRadius: 4, backgroundColor: '#eeeae5' },
-  reviewItemName: { flex: 1, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  reviewItems: { gap: Spacing.two, marginTop: Spacing.two },
+  reviewItem: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.three },
+  reviewItemImage: { width: 88, height: 116, borderRadius: 8, backgroundColor: '#eeeae5' },
+  reviewItemDetails: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 4 },
+  reviewItemName: { fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  reviewItemQuantity: { color: '#77736f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, fontWeight: '400' },
   paymentReview: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
   paymentReviewCard: { width: '100%', gap: Spacing.two, alignItems: 'center' },
   pixRemainingSummary: { alignItems: 'center', gap: 2, paddingTop: Spacing.one },
