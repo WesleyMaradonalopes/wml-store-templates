@@ -17,6 +17,11 @@ export type CmsPage = {
 
 const cacheTtl = 24 * 60 * 60 * 1000;
 
+export type CmsPageOptions = {
+  cacheTtl?: number;
+  forceRefresh?: boolean;
+};
+
 type CachedPage = CmsPage & { cachedAt: number };
 
 function normalizePage(payload: unknown): CmsPage | null {
@@ -68,18 +73,28 @@ async function fetchPage(contentType: string, documentId: string): Promise<CmsPa
   return normalizePage(match);
 }
 
-export async function getCmsPage(contentType = 'home', documentId = 'home'): Promise<CmsPage | null> {
+export async function getCmsPage(
+  contentType = 'home',
+  documentId = 'home',
+  options: CmsPageOptions = {},
+): Promise<CmsPage | null> {
   const cacheKey = `cms:${storeConfig.cmsProjectId}:${contentType}:${documentId}`;
   const cached = await getStoredJson<CachedPage>(cacheKey);
+  const ttl = Math.max(0, options.cacheTtl ?? cacheTtl);
 
-  if (cached && Date.now() - cached.cachedAt < cacheTtl) {
+  if (!options.forceRefresh && cached && Date.now() - cached.cachedAt < ttl) {
     fetchPage(contentType, documentId)
       .then((page) => page && setStoredJson(cacheKey, { ...page, cachedAt: Date.now() }))
       .catch(() => undefined);
     return cached;
   }
 
-  const page = await fetchPage(contentType, documentId);
-  if (page) await setStoredJson(cacheKey, { ...page, cachedAt: Date.now() });
-  return page;
+  try {
+    const page = await fetchPage(contentType, documentId);
+    if (page) await setStoredJson(cacheKey, { ...page, cachedAt: Date.now() });
+    return page;
+  } catch (error) {
+    if (cached) return cached;
+    throw error;
+  }
 }

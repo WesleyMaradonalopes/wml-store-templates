@@ -40,12 +40,16 @@ export function useCartItemCount() {
 type CartCountBadgeProps = {
   count: number;
   variant?: 'top' | 'bottomTab';
+  backgroundColor?: string;
+  textColor?: string;
 };
 
-export function CartCountBadge({ count, variant = 'top' }: CartCountBadgeProps) {
+export function CartCountBadge({ count, variant = 'top', backgroundColor, textColor }: CartCountBadgeProps) {
   if (count <= 0) return null;
   const bottomTab = variant === 'bottomTab';
-  return <View style={[styles.topBadge, bottomTab && styles.bottomTabBadge]}><Text style={[styles.topBadgeText, bottomTab && styles.bottomTabBadgeText]}>{count > 99 ? '99+' : count}</Text></View>;
+  const defaultBackgroundColor = bottomTab ? '#FFFFFF' : '#0a0a0a';
+  const defaultTextColor = bottomTab ? '#0a0a0a' : '#FFFFFF';
+  return <View style={[styles.topBadge, bottomTab && styles.bottomTabBadge, { backgroundColor: backgroundColor ?? defaultBackgroundColor }]}><Text style={[styles.topBadgeText, bottomTab && styles.bottomTabBadgeText, { color: textColor ?? defaultTextColor }]}>{count > 99 ? '99+' : count}</Text></View>;
 }
 
 export function CartIconButton({ onPress, color = '#0a0a0a', size = 20, style }: Props) {

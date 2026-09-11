@@ -24,5 +24,12 @@
     "name": "Busca",
     "scopes": ["search"],
     "configurationSchemaSets": []
+  },
+  {
+    "id": "appSettings",
+    "name": "Configurações globais do app",
+    "scopes": ["appSettings"],
+    "isSingleton": true,
+    "configurationSchemaSets": []
   }
 ]

@@ -560,6 +560,10 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     return () => clearInterval(timer);
   }, [bannerImages.length, heroIndex, isHeroBanner]);
 
+  // A configuração global pode ser publicada dentro da Home durante a fase
+  // de teste, mas nunca deve aparecer como conteúdo visual da página.
+  if (section.name === 'BottomTabSettings') return null;
+
   if (section.name === 'RichText') {
     return (
       <ThemedView style={styles.section}>

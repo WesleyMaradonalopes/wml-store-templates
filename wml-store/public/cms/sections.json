@@ -1409,5 +1409,78 @@
 				}
 			}
 		}
+	},
+	{
+		"name": "BottomTabSettings",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Configurações da BottomTab",
+			"description": "Define as cores da barra inferior do aplicativo. Use valores hexadecimais no formato #RRGGBB.",
+			"type": "object",
+			"properties": {
+				"backgroundColor": {
+					"title": "Cor do fundo",
+					"type": "string",
+					"default": "#7D7D7D",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"backgroundOpacity": {
+					"title": "Opacidade do fundo (0 a 1)",
+					"type": "number",
+					"minimum": 0,
+					"maximum": 1,
+					"default": 0.78
+				},
+				"activeBackgroundColor": {
+					"title": "Cor do fundo selecionado",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"activeBackgroundOpacity": {
+					"title": "Opacidade do selecionado (0 a 1)",
+					"type": "number",
+					"minimum": 0,
+					"maximum": 1,
+					"default": 0.16
+				},
+				"activeIconColor": {
+					"title": "Cor do ícone ativo",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"inactiveIconColor": {
+					"title": "Cor do ícone inativo",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"activeTextColor": {
+					"title": "Cor do texto ativo",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"inactiveTextColor": {
+					"title": "Cor do texto inativo",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"badgeBackgroundColor": {
+					"title": "Cor do fundo do contador da sacola",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"badgeTextColor": {
+					"title": "Cor do texto do contador da sacola",
+					"type": "string",
+					"default": "#0A0A0A",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				}
+			}
+		}
 	}
 ]
