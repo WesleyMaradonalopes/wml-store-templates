@@ -13,8 +13,15 @@ export async function createSharedFavoritesUrl(
   products: Pick<Product, 'id' | 'linkText'>[],
   email?: string | null,
 ) {
-  const productIds = Array.from(new Set(products.map((product) => product.id.trim()).filter(Boolean)));
-  if (productIds.length === 0) {
+  // O backend mantém o nome `productIds`, mas o `link-share` do site envia
+  // os linkTexts (slugs). O costumer-wishlist usa esses valores para buscar
+  // cada produto publicamente pelo endpoint `/.../{linkText}/p`.
+  const productSlugs = Array.from(new Set(
+    products
+      .map((product) => product.linkText.trim())
+      .filter((slug) => slug.length > 5),
+  ));
+  if (productSlugs.length === 0) {
     throw new Error('Adicione um item aos favoritos para compartilhar.');
   }
 
@@ -27,7 +34,7 @@ export async function createSharedFavoritesUrl(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productIds,
+          productIds: productSlugs,
           email: email?.trim().toLowerCase() || null,
         }),
         signal: controller.signal,
@@ -52,14 +59,7 @@ export async function createSharedFavoritesUrl(
       error = new Error('O serviço de compartilhamento está indisponível.');
     }
 
-    const fallbackSlugs = Array.from(new Set(
-      products
-        .map((product) => product.linkText.trim())
-        .filter((slug) => slug.length > 5),
-    ));
-    if (fallbackSlugs.length === 0) throw error;
-
-    return `${storeConfig.publicStoreUrl}/favoritos?productSlugs=${encodeURIComponent(fallbackSlugs.join(','))}`;
+    return `${storeConfig.publicStoreUrl}/favoritos?productSlugs=${encodeURIComponent(productSlugs.join(','))}`;
   }
 }
 

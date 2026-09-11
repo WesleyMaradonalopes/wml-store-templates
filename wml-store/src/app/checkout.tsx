@@ -695,6 +695,18 @@ export default function CheckoutScreen() {
     if (!newsletterOptInTouched.current && profile.isNewsletterOptIn !== undefined) setNewsletterOptIn(Boolean(profile.isNewsletterOptIn));
   }
 
+  function customerFullName() {
+    return [firstName, lastName].map((value) => value.trim()).filter(Boolean).join(' ');
+  }
+
+  function ensureReceiverName() {
+    const currentReceiverName = receiverName.trim();
+    if (currentReceiverName) return currentReceiverName;
+    const defaultReceiverName = customerFullName();
+    if (defaultReceiverName) setReceiverName(defaultReceiverName);
+    return defaultReceiverName;
+  }
+
   function changeNewsletterOptIn(value: boolean) {
     newsletterOptInTouched.current = true;
     setNewsletterOptIn(value);
@@ -721,7 +733,7 @@ export default function CheckoutScreen() {
     setSelectedAddressId(id);
     setAddressSaved(true);
     setEditingAddress(false);
-    setReceiverName(address.receiverName ?? '');
+    setReceiverName(String(address.receiverName || '').trim() || customerFullName());
     setPostalCode(formatPostalCode(address.postalCode ?? ''));
     setStreet(address.street ?? '');
     setNumber(address.number ?? '');
@@ -763,6 +775,7 @@ export default function CheckoutScreen() {
       // reenviado por completo. Preservar esse orderForm.userProfileId é
       // essencial para vales-presentes restritos ao CPF do proprietário.
       if (customerExists && !editingCustomer && orderForm.userProfileId) {
+        ensureReceiverName();
         setStep('address');
         return;
       }
@@ -790,6 +803,7 @@ export default function CheckoutScreen() {
       customerDataRequests.delete(email.trim().toLowerCase());
       setCustomerExists(true);
       setEditingCustomer(false);
+      ensureReceiverName();
       setStep('address');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.');
@@ -974,6 +988,7 @@ export default function CheckoutScreen() {
 
   function openAddressSelection() {
     const hasSavedAddresses = customerAddresses.length > 1;
+    ensureReceiverName();
     setAddressSelectionOpen(hasSavedAddresses);
     setEditingAddress(!hasSavedAddresses);
     setStep('address');
@@ -1919,7 +1934,7 @@ export default function CheckoutScreen() {
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{recaptchaSiteKey && (step === 'payment' || step === 'card' || step === 'review') && <Recaptcha ref={recaptchaRef} siteKey={recaptchaSiteKey} />}<ScrollView ref={checkoutScrollRef} contentContainerStyle={styles.content}>
      {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}><CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.itemImage} /><View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText numberOfLines={3} style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#65666E" /></Pressable></View><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#65666E" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View><ThemedText style={styles.itemPrice}>{money(item.price)}</ThemedText></View></View></View></View>)}{giftWrappingAvailable && <Pressable disabled={giftWrapLoading || saving} onPress={toggleGiftWrapping} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable>}</ThemedView>{giftWrap && <View style={styles.giftMessage}><ThemedText style={styles.giftMessageText}>Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC.</ThemedText></View>}<ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.removeButton}>{couponLoading ? <ActivityIndicator size="small" color="#65666E" /> : <TrashIcon size={21} color="#65666E" />}</Pressable> : <Pressable disabled={saving || couponLoading || !coupon.trim()} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /><ProductShelf data={CART_BEST_SELLING_PRODUCTS_SHELF} titleStyle={styles.checkoutShelfTitle} onAdded={showCheckoutAddFeedback} showAddedModal={false} /></>}
-    {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /><NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={() => router.push('/privacy-policy' as never)} /></Card>}
+     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} /></Card>}
     {step === 'customer' && <>
       {customerExists && !editingCustomer
         ? <CustomerDataSummary email={email} firstName={firstName} lastName={lastName} phone={phone} birthDate={birthDate} document={document} gender={gender} onEdit={() => setEditingCustomer(true)} />
@@ -2563,7 +2578,7 @@ const styles = StyleSheet.create({
   emptyCartDescription: { maxWidth: 330, fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, textAlign: 'center' },
   emptyCartShelfTitle: { fontSize: 16, lineHeight: 22 },
   pageTitle: { fontSize: 16, lineHeight: 21, fontFamily: Fonts.bold, fontWeight: '700' },
-  card: { gap: 6, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da' },
+  card: { gap: 6, paddingVertical: 20, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e1da'  },
   customerDataCard: { gap: 0, padding: 24, borderRadius: 16 },
   customerDataTitle: { marginBottom: 28, color: '#0a0a0a', fontFamily: Fonts.medium, fontSize: 26, lineHeight: 34, fontWeight: '500' },
   customerDataDescription: { marginBottom: 24, color: '#6f6c69', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, fontWeight: '400' },

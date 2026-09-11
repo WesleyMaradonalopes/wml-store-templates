@@ -1,8 +1,8 @@
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -187,6 +187,22 @@ export default function AccountScreen() {
     }).catch(() => undefined);
     return () => { active = false; };
   }, [loggedIn]);
+
+  useFocusEffect(useCallback(() => {
+    if (!loggedIn || view !== 'personal' || !email.trim()) return undefined;
+
+    let active = true;
+    const sessionEmail = email.trim().toLowerCase();
+    getCustomerProfileFromMasterData(sessionEmail).then((customer) => {
+      if (!active || !customer) return;
+      setProfile({ ...customer, email: sessionEmail });
+      setProfileMessage(null);
+    }).catch((error) => {
+      if (active) setProfileMessage(error instanceof Error ? error.message : 'Não foi possível atualizar o perfil VTEX.');
+    });
+
+    return () => { active = false; };
+  }, [email, loggedIn, view]));
 
   async function changeNotifications(value: boolean) {
     if (notificationsLoading) return;
@@ -719,6 +735,7 @@ function LoggedAccountV2({ email, notifications, onNotificationsChange, notifica
 function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPrivacyPress }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void; onPrivacyPress: () => void }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveSuccessVisible, setSaveSuccessVisible] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [firstName, setFirstName] = useState(profile.firstName ?? '');
   const [lastName, setLastName] = useState(profile.lastName ?? '');
@@ -741,13 +758,20 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
     setNewsletterOptIn(profile.isNewsletterOptIn ?? true);
   }, [profile]);
 
+  useEffect(() => {
+    if (!saveSuccessVisible) return;
+    const timeout = setTimeout(() => setSaveSuccessVisible(false), 2600);
+    return () => clearTimeout(timeout);
+  }, [saveSuccessVisible]);
+
   async function save() {
     try {
-      setSaving(true); setMessage(null);
+      setSaving(true); setMessage(null); setSaveSuccessVisible(false);
       const normalizedBirthDate = birthDateToApi(birthDate);
       const updated = await updateCustomerProfile(email, { email, firstName, lastName, document, phone: phoneToApi(phone), gender, ...(normalizedBirthDate ? { birthDate: normalizedBirthDate } : {}), isNewsletterOptIn: newsletterOptIn });
       onSaved(updated);
       setEditing(false);
+      setSaveSuccessVisible(true);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.'); }
     finally { setSaving(false); }
   }
@@ -821,6 +845,8 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
               </View>
             </View>
 
+            {editing && <NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={onPrivacyPress} disabled={newsletterSaving} />}
+
             {!!feedbackMessage && <ThemedText style={styles.personalDataFeedback}>{feedbackMessage}</ThemedText>}
 
             <View style={styles.personalDataEditSection}>
@@ -835,8 +861,12 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
               )}
             </View>
           </ThemedView>
-          <NewsletterOptIn value={newsletterOptIn} onChange={changeNewsletterOptIn} onPrivacyPress={onPrivacyPress} disabled={newsletterSaving} outlined />
         </ScrollView>
+        {saveSuccessVisible && <View accessibilityLiveRegion="polite" pointerEvents="none" style={styles.saveSuccessOverlay}>
+          <View style={styles.saveSuccessToast}>
+            <ThemedText style={styles.saveSuccessText}>Salvo com sucesso!</ThemedText>
+          </View>
+        </View>}
       </SafeAreaView>
     </ThemedView>
   );
@@ -866,6 +896,9 @@ const styles = StyleSheet.create({
   personalDataDropdown: { borderWidth: 1, borderColor: '#d9d3cc', borderRadius: 8, backgroundColor: '#ffffff' },
   personalDataOption: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
   personalDataFeedback: { marginTop: 18, color: '#df5f5f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17 },
+  saveSuccessOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, zIndex: 10 },
+  saveSuccessToast: { maxWidth: '92%', paddingHorizontal: 22, paddingVertical: 14, borderRadius: 8, backgroundColor: '#358846', shadowColor: '#0a0a0a', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 8 },
+  saveSuccessText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', textAlign: 'center' },
   personalDataEditSection: { marginTop: 28, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#e8e3dd' },
   personalDataEditLink: { color: '#5d5850', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22, textDecorationLine: 'underline' },
   personalDataConfirmButton: { minHeight: 50, display: 'flex', justifyContent: 'center' , alignItems: 'center' },

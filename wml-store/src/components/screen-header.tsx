@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleProp, StyleSheet, TextStyle, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, TextStyle, View } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
 import { CartIconButton } from './cart-icon-button';
@@ -16,6 +16,7 @@ type ScreenHeaderProps = {
   onBack?: () => void;
   onSearch?: () => void;
   onShare?: () => void;
+  shareLoading?: boolean;
   showSearch?: boolean;
   showShare?: boolean;
   showCart?: boolean;
@@ -25,7 +26,7 @@ type ScreenHeaderProps = {
   logoOffsetY?: number;
 };
 
-export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, onSearch, onShare, showSearch = true, showShare = false, showCart = true, titleStyle, logoWidth = 76, logoHeight = 20, logoOffsetY = 0 }: ScreenHeaderProps) {
+export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, onSearch, onShare, shareLoading = false, showSearch = true, showShare = false, showCart = true, titleStyle, logoWidth = 76, logoHeight = 20, logoOffsetY = 0 }: ScreenHeaderProps) {
   const router = useRouter();
   const goBack = onBack ?? (() => router.back());
   return (
@@ -34,7 +35,7 @@ export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack
       <View pointerEvents="box-none" style={titleAlign === 'left' && title ? styles.leftTitle : styles.center}>{title ? <ThemedTitle style={titleStyle}>{title}</ThemedTitle> : <Pressable accessibilityLabel="Ir para o início" onPress={() => router.replace('/')} style={[styles.logoButton, logoOffsetY !== 0 && { transform: [{ translateY: logoOffsetY }] }]}><HopeLogoIcon color="#0a0a0a" width={logoWidth} height={logoHeight} /></Pressable>}</View>
       <View style={styles.actions}>
         {showSearch && <Pressable accessibilityLabel="Buscar" onPress={onSearch ?? (() => router.push('/search'))} style={styles.action}><SearchIcon size={20} color="#0a0a0a" /></Pressable>}
-        {showShare && onShare && <Pressable accessibilityLabel="Compartilhar favoritos" onPress={onShare} style={styles.action}><ShareIcon size={21} color="#0a0a0a" /></Pressable>}
+        {showShare && onShare && <Pressable accessibilityLabel={shareLoading ? 'Gerando link dos favoritos' : 'Compartilhar favoritos'} accessibilityState={{ busy: shareLoading, disabled: shareLoading }} disabled={shareLoading} onPress={onShare} style={styles.action}>{shareLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ShareIcon size={21} color="#0a0a0a" />}</Pressable>}
         {showCart && <CartIconButton style={styles.action} />}
       </View>
     </View>

@@ -60,22 +60,22 @@ export default function FavoritesScreen() {
     try {
       const session = await getAccountSession();
       const url = await createSharedFavoritesUrl(favorites, session?.email);
+      setSharingFavorites(false);
       await Share.share({
         title: 'Meus favoritos',
         message: `${url}`,
         url,
       });
     } catch (error) {
-      Alert.alert('Favoritos', error instanceof Error ? error.message : 'Não foi possível compartilhar os favoritos.');
-    } finally {
       setSharingFavorites(false);
+      Alert.alert('Favoritos', error instanceof Error ? error.message : 'Não foi possível compartilhar os favoritos.');
     }
   }, [favorites, sharingFavorites]);
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} showShare onShare={shareFavorites} />
+        <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} showShare shareLoading={sharingFavorites} onShare={shareFavorites} />
         {loadingFavorites && <ActivityIndicator color="#0a0a0a" />}
         <FlatList
           data={favorites}
