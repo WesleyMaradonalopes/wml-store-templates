@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { storeConfig } from '@/config/store';
 
 export type AccountSession = { email: string; loggedAt: string };
+type AccountSessionListener = (session: AccountSession | null) => void;
 
 const SESSION_KEY = 'lojahr:account-session';
 const AUTH_TOKEN_KEY = 'lojahr_vtex_user_token';
@@ -13,6 +14,22 @@ let accountSessionRevision = 0;
 let vtexTokenCache: string | null | undefined;
 let vtexTokenRequest: Promise<string | null> | null = null;
 let vtexTokenRevision = 0;
+const accountSessionListeners = new Set<AccountSessionListener>();
+
+export function subscribeAccountSession(listener: AccountSessionListener) {
+  accountSessionListeners.add(listener);
+  return () => { accountSessionListeners.delete(listener); };
+}
+
+function notifyAccountSessionChange(session: AccountSession | null) {
+  accountSessionListeners.forEach((listener) => {
+    try {
+      listener(session);
+    } catch {
+      // Um componente não deve interromper a atualização dos demais.
+    }
+  });
+}
 
 export function getAccountSession() {
   if (accountSessionCache !== undefined) return Promise.resolve(accountSessionCache);
@@ -38,6 +55,7 @@ export function saveAccountSession(email: string) {
   accountSessionRevision += 1;
   accountSessionCache = session;
   accountSessionRequest = null;
+  notifyAccountSessionChange(session);
   return setStoredJson<AccountSession>(SESSION_KEY, session);
 }
 
@@ -48,6 +66,7 @@ export function clearAccountSession() {
   accountSessionRequest = null;
   vtexTokenCache = null;
   vtexTokenRequest = null;
+  notifyAccountSessionChange(null);
   return Promise.all([
     removeStoredValue(SESSION_KEY),
     SecureStore.deleteItemAsync(AUTH_TOKEN_KEY).catch(() => undefined),

@@ -1,10 +1,10 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import { getAccountSession } from '@/services/auth';
+import { getAccountSession, subscribeAccountSession } from '@/services/auth';
 import { type Product } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, subscribeFavoriteChanges, toggleFavorite } from '@/services/favorites';
 
@@ -38,7 +38,9 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
   const [localFavorite, setLocalFavorite] = useState(Boolean(controlledFavorite));
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
-  const favorite = controlledFavorite ?? localFavorite;
+  const authSyncRevision = useRef(0);
+  const authState = getKnownFavoriteAuthState();
+  const favorite = authState === 'anonymous' ? false : (controlledFavorite ?? localFavorite);
   const discount = discountPercentage(product);
 
   useEffect(() => {
@@ -47,9 +49,38 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
       return;
     }
     let active = true;
-    isFavorite(product.id).then((value) => { if (active) setLocalFavorite(value); }).catch(() => undefined);
+    const revision = authSyncRevision.current;
+    isFavorite(product.id).then((value) => {
+      if (active && revision === authSyncRevision.current) setLocalFavorite(value);
+    }).catch(() => undefined);
     return () => { active = false; };
   }, [controlledFavorite, product.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    const unsubscribe = subscribeAccountSession((session) => {
+      if (!active) return;
+      const revision = ++authSyncRevision.current;
+
+      if (!session?.email) {
+        setLocalFavorite(false);
+        onFavoriteChange?.(false);
+        return;
+      }
+
+      isFavorite(product.id).then((value) => {
+        if (!active || revision !== authSyncRevision.current) return;
+        setLocalFavorite(value);
+        if (controlledFavorite !== value) onFavoriteChange?.(value);
+      }).catch(() => undefined);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [controlledFavorite, onFavoriteChange, product.id]);
 
   useEffect(() => {
     let active = true;
@@ -79,6 +110,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
   async function changeFavorite() {
     if (favoriteLoading) return;
     const previous = favorite;
+    const authRevision = authSyncRevision.current;
     const authState = getKnownFavoriteAuthState();
     if (authState === 'anonymous') {
       setLoginModalVisible(true);
@@ -97,7 +129,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
         updateFavorite(nextFavorite);
       }
       const result = await toggleFavorite(product, { hydrate: false });
-      updateFavorite(result.favorite);
+      if (authRevision === authSyncRevision.current) updateFavorite(result.favorite);
     } catch (error) {
       updateFavorite(previous);
       Alert.alert('Favoritos', error instanceof Error ? error.message : 'Não foi possível atualizar os favoritos.');

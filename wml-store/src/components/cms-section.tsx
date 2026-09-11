@@ -8,6 +8,7 @@ import { getProductFacets, Product, searchProductListing, searchProducts, type C
 import { CmsSection } from '@/services/cms';
 import { buildCmsActionRoute, readCmsAction, type CmsAction } from '@/services/cms-actions';
 import { cmsInternalRoute, openCmsExternalLink } from '@/services/cms-links';
+import { subscribeAccountSession } from '@/services/auth';
 import { isFavorite } from '@/services/favorites';
 
 import { CmsRichText } from './cms-rich-text';
@@ -127,6 +128,13 @@ export function ProductShelf({ data, titleStyle, onAdded, showAddedModal = true 
     return () => { active = false; };
   }, [products]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeAccountSession((session) => {
+      if (!session?.email) setFavoriteIds([]);
+    });
+    return () => { unsubscribe(); };
+  }, []);
+
   return (
     <ThemedView style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -212,6 +220,13 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [baseSignature, query, selectedSignature, sort]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAccountSession((session) => {
+      if (!session?.email) setFavoriteIds([]);
+    });
+    return () => { unsubscribe(); };
+  }, []);
 
   async function loadMore() {
     if (loadingMore || products.length >= resultCount) return;

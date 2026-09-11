@@ -14,6 +14,7 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { parseCmsRouteFacets } from '@/services/cms-actions';
 import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
+import { subscribeAccountSession } from '@/services/auth';
 import { isFavorite } from '@/services/favorites';
 
 function paramText(value: string | string[] | undefined) {
@@ -81,6 +82,13 @@ export default function SearchScreen() {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const activeFacets = mergeFacets(contextFacets, selectedFacets);
   const facetSignature = JSON.stringify(selectedFacets);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAccountSession((session) => {
+      if (!session?.email) setFavoriteIds([]);
+    });
+    return () => { unsubscribe(); };
+  }, []);
 
   useEffect(() => {
     const nextQuery = paramText(q).trim();

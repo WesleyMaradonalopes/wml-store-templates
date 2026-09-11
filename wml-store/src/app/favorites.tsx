@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BEST_SELLING_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
-import { getAccountSession } from '@/services/auth';
+import { getAccountSession, subscribeAccountSession } from '@/services/auth';
 import { type Product } from '@/services/catalog';
 import { createSharedFavoritesUrl, getCachedFavorites, getFavorites } from '@/services/favorites';
 
@@ -27,6 +27,16 @@ export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
   const [sharingFavorites, setSharingFavorites] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAccountSession((session) => {
+      if (!session?.email) {
+        setFavorites([]);
+        setLoadingFavorites(false);
+      }
+    });
+    return () => { unsubscribe(); };
+  }, []);
 
   useFocusEffect(useCallback(() => {
     let active = true;
