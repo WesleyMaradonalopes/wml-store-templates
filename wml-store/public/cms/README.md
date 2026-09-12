@@ -6,7 +6,7 @@ O app lê o conteúdo publicado do projeto definido por `EXPO_PUBLIC_VTEX_CMS_PR
 
 ## Configuração da BottomTab
 
-O tipo singleton `appSettings` representa as configurações globais do aplicativo. Crie o documento `app-settings` e adicione a seção `BottomTabSettings` com os valores de cor desejados:
+O tipo singleton `appSettings` representa as configurações globais do aplicativo. Crie o documento `bottom-bar-settings` e adicione a seção `BottomTabSettings` com os valores de cor desejados:
 
 ```json
 {
