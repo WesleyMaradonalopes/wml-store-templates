@@ -1479,6 +1479,76 @@
 					"type": "string",
 					"default": "#0A0A0A",
 					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"homeLabel": {
+					"title": "Texto do Home",
+					"type": "string",
+					"default": "Home",
+					"minLength": 1,
+					"maxLength": 24
+				},
+				"categoriesLabel": {
+					"title": "Texto de Categorias",
+					"type": "string",
+					"default": "Categorias",
+					"minLength": 1,
+					"maxLength": 24
+				},
+				"favoritesLabel": {
+					"title": "Texto de Favoritos",
+					"type": "string",
+					"default": "Favoritos",
+					"minLength": 1,
+					"maxLength": 24
+				},
+				"cartLabel": {
+					"title": "Texto da Sacola",
+					"type": "string",
+					"default": "Sacola",
+					"minLength": 1,
+					"maxLength": 24
+				},
+				"accountLabel": {
+					"title": "Texto da Conta",
+					"type": "string",
+					"default": "Conta",
+					"minLength": 1,
+					"maxLength": 24
+				},
+				"homeOrder": {
+					"title": "Posição do Home (1 a 5)",
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 5,
+					"default": 1
+				},
+				"categoriesOrder": {
+					"title": "Posição de Categorias (1 a 5)",
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 5,
+					"default": 2
+				},
+				"favoritesOrder": {
+					"title": "Posição de Favoritos (1 a 5)",
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 5,
+					"default": 3
+				},
+				"cartOrder": {
+					"title": "Posição da Sacola (1 a 5)",
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 5,
+					"default": 4
+				},
+				"accountOrder": {
+					"title": "Posição da Conta (1 a 5)",
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 5,
+					"default": 5
 				}
 			}
 		}

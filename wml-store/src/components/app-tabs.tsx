@@ -3,7 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { withOpacity, type BottomTabSettings } from '@/config/bottom-tab';
+import { getBottomTabItems, withOpacity, type BottomTabSettings } from '@/config/bottom-tab';
 import { Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
 import HeartIcon from './icons/HeartIcon';
@@ -14,15 +14,17 @@ import { ThemedText } from './themed-text';
 
 export default function AppTabs({ showBar = true }: { showBar?: boolean }) {
   const { hidden, bottomTabSettings } = useTabBar();
+  const items = getBottomTabItems(bottomTabSettings).filter((item) => item.key !== 'cart');
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <FloatingTabList hidden={hidden || !showBar} settings={bottomTabSettings}>
-          <TabTrigger name="home" href="/(tabs)" asChild><TabButton icon="home" settings={bottomTabSettings}>Home</TabButton></TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild><TabButton icon="category" settings={bottomTabSettings}>Categorias</TabButton></TabTrigger>
-          <TabTrigger name="favorites" href="/favorites" asChild><TabButton icon="favorite" settings={bottomTabSettings}>Favoritos</TabButton></TabTrigger>
-          <TabTrigger name="account" href="/account" asChild><TabButton icon="account" settings={bottomTabSettings}>Conta</TabButton></TabTrigger>
+          {items.map((item) => (
+            <TabTrigger key={item.key} name={item.routeName} href={item.path} asChild>
+              <TabButton icon={item.icon} settings={bottomTabSettings}>{item.label}</TabButton>
+            </TabTrigger>
+          ))}
         </FloatingTabList>
       </TabList>
     </Tabs>

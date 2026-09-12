@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { withOpacity } from '@/config/bottom-tab';
+import { getBottomTabItems, withOpacity } from '@/config/bottom-tab';
 import { Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
 import { CartCountBadge, useCartItemCount } from './cart-icon-button';
@@ -14,19 +14,12 @@ import ShoppingBagIcon from './icons/ShoppingBagIcon';
 import UserIcon from './icons/UserIcon';
 import { ThemedText } from './themed-text';
 
-const items = [
-  { path: '/(tabs)', label: 'Home', icon: 'home' },
-  { path: '/explore', label: 'Categorias', icon: 'category' },
-  { path: '/favorites', label: 'Favoritos', icon: 'favorite' },
-  { path: '/checkout', label: 'Sacola', icon: 'bag' },
-  { path: '/account', label: 'Conta', icon: 'account' },
-] as const;
-
 export default function GlobalTabBar() {
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { hidden, setHidden, showOnCheckout, bottomTabSettings } = useTabBar();
+  const items = getBottomTabItems(bottomTabSettings);
   const cartCount = useCartItemCount();
   const excluded = (pathname.startsWith('/checkout') && !showOnCheckout) || pathname.startsWith('/product/');
 

@@ -9,6 +9,16 @@ export type BottomTabSettings = {
   inactiveTextColor: string;
   badgeBackgroundColor: string;
   badgeTextColor: string;
+  homeLabel: string;
+  categoriesLabel: string;
+  favoritesLabel: string;
+  cartLabel: string;
+  accountLabel: string;
+  homeOrder: number;
+  categoriesOrder: number;
+  favoritesOrder: number;
+  cartOrder: number;
+  accountOrder: number;
 };
 
 export const DEFAULT_BOTTOM_TAB_SETTINGS: BottomTabSettings = {
@@ -22,7 +32,35 @@ export const DEFAULT_BOTTOM_TAB_SETTINGS: BottomTabSettings = {
   inactiveTextColor: '#FFFFFF',
   badgeBackgroundColor: '#FFFFFF',
   badgeTextColor: '#0A0A0A',
+  homeLabel: 'Home',
+  categoriesLabel: 'Categorias',
+  favoritesLabel: 'Favoritos',
+  cartLabel: 'Sacola',
+  accountLabel: 'Conta',
+  homeOrder: 1,
+  categoriesOrder: 2,
+  favoritesOrder: 3,
+  cartOrder: 4,
+  accountOrder: 5,
 };
+
+const bottomTabItemDefinitions = [
+  { key: 'home', routeName: 'home', path: '/(tabs)', icon: 'home', labelKey: 'homeLabel', orderKey: 'homeOrder', defaultOrder: 1 },
+  { key: 'categories', routeName: 'explore', path: '/explore', icon: 'category', labelKey: 'categoriesLabel', orderKey: 'categoriesOrder', defaultOrder: 2 },
+  { key: 'favorites', routeName: 'favorites', path: '/favorites', icon: 'favorite', labelKey: 'favoritesLabel', orderKey: 'favoritesOrder', defaultOrder: 3 },
+  { key: 'cart', routeName: 'checkout', path: '/checkout', icon: 'bag', labelKey: 'cartLabel', orderKey: 'cartOrder', defaultOrder: 4 },
+  { key: 'account', routeName: 'account', path: '/account', icon: 'account', labelKey: 'accountLabel', orderKey: 'accountOrder', defaultOrder: 5 },
+] as const;
+
+export function getBottomTabItems(settings: BottomTabSettings) {
+  return bottomTabItemDefinitions
+    .map((item) => ({
+      ...item,
+      label: settings[item.labelKey],
+      order: settings[item.orderKey],
+    }))
+    .sort((first, second) => first.order - second.order || first.defaultOrder - second.defaultOrder);
+}
 
 const hexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -44,6 +82,20 @@ function readOpacity(source: Record<string, unknown>, key: keyof BottomTabSettin
   const opacity = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(opacity)) return fallback;
   return Math.min(1, Math.max(0, opacity));
+}
+
+function readLabel(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: string) {
+  const value = source[key];
+  if (typeof value !== 'string') return fallback;
+  const label = value.trim();
+  return label || fallback;
+}
+
+function readOrder(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: number) {
+  const value = source[key];
+  const order = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(order)) return fallback;
+  return Math.min(5, Math.max(1, Math.round(order)));
 }
 
 function sourceFrom(value: unknown): Record<string, unknown> {
@@ -76,6 +128,16 @@ export function readBottomTabSettings(value: unknown): BottomTabSettings {
     inactiveTextColor: readColor(source, 'inactiveTextColor', DEFAULT_BOTTOM_TAB_SETTINGS.inactiveTextColor),
     badgeBackgroundColor: readColor(source, 'badgeBackgroundColor', DEFAULT_BOTTOM_TAB_SETTINGS.badgeBackgroundColor),
     badgeTextColor: readColor(source, 'badgeTextColor', DEFAULT_BOTTOM_TAB_SETTINGS.badgeTextColor),
+    homeLabel: readLabel(source, 'homeLabel', DEFAULT_BOTTOM_TAB_SETTINGS.homeLabel),
+    categoriesLabel: readLabel(source, 'categoriesLabel', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesLabel),
+    favoritesLabel: readLabel(source, 'favoritesLabel', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesLabel),
+    cartLabel: readLabel(source, 'cartLabel', DEFAULT_BOTTOM_TAB_SETTINGS.cartLabel),
+    accountLabel: readLabel(source, 'accountLabel', DEFAULT_BOTTOM_TAB_SETTINGS.accountLabel),
+    homeOrder: readOrder(source, 'homeOrder', DEFAULT_BOTTOM_TAB_SETTINGS.homeOrder),
+    categoriesOrder: readOrder(source, 'categoriesOrder', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesOrder),
+    favoritesOrder: readOrder(source, 'favoritesOrder', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesOrder),
+    cartOrder: readOrder(source, 'cartOrder', DEFAULT_BOTTOM_TAB_SETTINGS.cartOrder),
+    accountOrder: readOrder(source, 'accountOrder', DEFAULT_BOTTOM_TAB_SETTINGS.accountOrder),
   };
 }
 
