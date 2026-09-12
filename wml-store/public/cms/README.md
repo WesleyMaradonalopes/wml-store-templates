@@ -29,10 +29,17 @@ O tipo singleton `appSettings` representa as configurações globais do aplicati
   "categoriesOrder": 2,
   "favoritesOrder": 3,
   "cartOrder": 4,
-  "accountOrder": 5
+  "accountOrder": 5,
+  "homeEnabled": true,
+  "categoriesEnabled": true,
+  "favoritesEnabled": true,
+  "cartEnabled": true,
+  "accountEnabled": true
 }
 ```
 
 As posições devem ser números de 1 a 5. Use cada número uma única vez para evitar empate; por exemplo, para colocar Favoritos primeiro, use `favoritesOrder: 1` e mova o Home para outra posição.
+
+Os campos `*Enabled` controlam se cada item aparece na BottomTab. Use `false` para ocultar um item temporariamente; o app mantém a rota disponível mesmo quando o item está oculto.
 
 Durante o teste, a mesma seção também pode ser adicionada ao documento `home`; o aplicativo usa essa configuração como fallback enquanto o documento global ainda não estiver publicado. Publique o documento e reabra/recarregue o aplicativo para buscar os valores atualizados.

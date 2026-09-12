@@ -19,6 +19,11 @@ export type BottomTabSettings = {
   favoritesOrder: number;
   cartOrder: number;
   accountOrder: number;
+  homeEnabled: boolean;
+  categoriesEnabled: boolean;
+  favoritesEnabled: boolean;
+  cartEnabled: boolean;
+  accountEnabled: boolean;
 };
 
 export const DEFAULT_BOTTOM_TAB_SETTINGS: BottomTabSettings = {
@@ -42,18 +47,24 @@ export const DEFAULT_BOTTOM_TAB_SETTINGS: BottomTabSettings = {
   favoritesOrder: 3,
   cartOrder: 4,
   accountOrder: 5,
+  homeEnabled: true,
+  categoriesEnabled: true,
+  favoritesEnabled: true,
+  cartEnabled: true,
+  accountEnabled: true,
 };
 
 const bottomTabItemDefinitions = [
-  { key: 'home', routeName: 'home', path: '/(tabs)', icon: 'home', labelKey: 'homeLabel', orderKey: 'homeOrder', defaultOrder: 1 },
-  { key: 'categories', routeName: 'explore', path: '/explore', icon: 'category', labelKey: 'categoriesLabel', orderKey: 'categoriesOrder', defaultOrder: 2 },
-  { key: 'favorites', routeName: 'favorites', path: '/favorites', icon: 'favorite', labelKey: 'favoritesLabel', orderKey: 'favoritesOrder', defaultOrder: 3 },
-  { key: 'cart', routeName: 'checkout', path: '/checkout', icon: 'bag', labelKey: 'cartLabel', orderKey: 'cartOrder', defaultOrder: 4 },
-  { key: 'account', routeName: 'account', path: '/account', icon: 'account', labelKey: 'accountLabel', orderKey: 'accountOrder', defaultOrder: 5 },
+  { key: 'home', routeName: 'home', path: '/(tabs)', icon: 'home', labelKey: 'homeLabel', orderKey: 'homeOrder', enabledKey: 'homeEnabled', defaultOrder: 1 },
+  { key: 'categories', routeName: 'explore', path: '/explore', icon: 'category', labelKey: 'categoriesLabel', orderKey: 'categoriesOrder', enabledKey: 'categoriesEnabled', defaultOrder: 2 },
+  { key: 'favorites', routeName: 'favorites', path: '/favorites', icon: 'favorite', labelKey: 'favoritesLabel', orderKey: 'favoritesOrder', enabledKey: 'favoritesEnabled', defaultOrder: 3 },
+  { key: 'cart', routeName: 'checkout', path: '/checkout', icon: 'bag', labelKey: 'cartLabel', orderKey: 'cartOrder', enabledKey: 'cartEnabled', defaultOrder: 4 },
+  { key: 'account', routeName: 'account', path: '/account', icon: 'account', labelKey: 'accountLabel', orderKey: 'accountOrder', enabledKey: 'accountEnabled', defaultOrder: 5 },
 ] as const;
 
 export function getBottomTabItems(settings: BottomTabSettings) {
   return bottomTabItemDefinitions
+    .filter((item) => settings[item.enabledKey])
     .map((item) => ({
       ...item,
       label: settings[item.labelKey],
@@ -98,6 +109,16 @@ function readOrder(source: Record<string, unknown>, key: keyof BottomTabSettings
   return Math.min(5, Math.max(1, Math.round(order)));
 }
 
+function readBoolean(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: boolean) {
+  const value = source[key];
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+  }
+  return fallback;
+}
+
 function sourceFrom(value: unknown): Record<string, unknown> {
   const root = asRecord(value);
   if (!root) return {};
@@ -138,6 +159,11 @@ export function readBottomTabSettings(value: unknown): BottomTabSettings {
     favoritesOrder: readOrder(source, 'favoritesOrder', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesOrder),
     cartOrder: readOrder(source, 'cartOrder', DEFAULT_BOTTOM_TAB_SETTINGS.cartOrder),
     accountOrder: readOrder(source, 'accountOrder', DEFAULT_BOTTOM_TAB_SETTINGS.accountOrder),
+    homeEnabled: readBoolean(source, 'homeEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.homeEnabled),
+    categoriesEnabled: readBoolean(source, 'categoriesEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesEnabled),
+    favoritesEnabled: readBoolean(source, 'favoritesEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesEnabled),
+    cartEnabled: readBoolean(source, 'cartEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.cartEnabled),
+    accountEnabled: readBoolean(source, 'accountEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.accountEnabled),
   };
 }
 

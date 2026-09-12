@@ -1549,6 +1549,31 @@
 					"minimum": 1,
 					"maximum": 5,
 					"default": 5
+				},
+				"homeEnabled": {
+					"title": "Exibir Home",
+					"type": "boolean",
+					"default": true
+				},
+				"categoriesEnabled": {
+					"title": "Exibir Categorias",
+					"type": "boolean",
+					"default": true
+				},
+				"favoritesEnabled": {
+					"title": "Exibir Favoritos",
+					"type": "boolean",
+					"default": true
+				},
+				"cartEnabled": {
+					"title": "Exibir Sacola",
+					"type": "boolean",
+					"default": true
+				},
+				"accountEnabled": {
+					"title": "Exibir Conta",
+					"type": "boolean",
+					"default": true
 				}
 			}
 		}
