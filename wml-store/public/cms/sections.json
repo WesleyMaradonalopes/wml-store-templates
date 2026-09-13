@@ -207,7 +207,7 @@
 									},
 					"position": {
 						"title": "Posição do botão no banner",
-						"description": "Informe a distância do canto superior esquerdo do banner. Os valores são os mesmos para qualquer dispositivo.",
+								"description": "Informe a posição do botão no banner. O topo é medido até a parte superior do botão e a esquerda representa o centro horizontal dele. Os valores são os mesmos para qualquer dispositivo.",
 						"type": "object",
 						"properties": {
 							"top": {
@@ -217,7 +217,7 @@
 								"default": "70%"
 							},
 							"left": {
-								"title": "Distância da esquerda (ex.: 31%)",
+								"title": "Posição horizontal do centro (ex.: 50%)",
 								"type": "string",
 								"pattern": "^(?:0|[1-9][0-9]?|100)%$",
 								"default": "30%"

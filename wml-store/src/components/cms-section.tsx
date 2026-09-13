@@ -143,7 +143,11 @@ function bannerButtonConfig(value: unknown): BannerButtonConfig | null {
 }
 
 function bannerButtonPositionStyle(position: BannerButtonPositionConfig, isHero: boolean): ViewStyle {
-  if (!position.legacy) return { top: position.top, left: position.left };
+  if (!position.legacy) {
+    // A largura mínima cria um ponto de ancoragem. O botão fica centralizado
+    // nesse ponto, então left: 50% representa o centro real do botão.
+    return { top: position.top, left: position.left, width: 1, alignItems: 'center' };
+  }
 
   const horizontalInset = 16;
   const topInset = isHero ? 72 : 16;
