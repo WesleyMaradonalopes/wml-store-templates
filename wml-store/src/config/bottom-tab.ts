@@ -1,6 +1,8 @@
 export type BottomTabSettings = {
   backgroundColor: string;
   backgroundOpacity: number;
+  borderColor: string;
+  borderWidth: number;
   activeBackgroundColor: string;
   activeBackgroundOpacity: number;
   activeIconColor: string;
@@ -29,6 +31,8 @@ export type BottomTabSettings = {
 export const DEFAULT_BOTTOM_TAB_SETTINGS: BottomTabSettings = {
   backgroundColor: '#7D7D7D',
   backgroundOpacity: 0.78,
+  borderColor: '#FFFFFF',
+  borderWidth: 0,
   activeBackgroundColor: '#FFFFFF',
   activeBackgroundOpacity: 0.16,
   activeIconColor: '#FFFFFF',
@@ -81,35 +85,35 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function readColor(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: string) {
+function readColor(source: Record<string, unknown>, key: string, fallback: string) {
   const value = source[key];
   if (typeof value !== 'string') return fallback;
   const color = value.trim();
   return hexColorPattern.test(color) ? color : fallback;
 }
 
-function readOpacity(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: number) {
+function readOpacity(source: Record<string, unknown>, key: string, fallback: number) {
   const value = source[key];
   const opacity = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(opacity)) return fallback;
   return Math.min(1, Math.max(0, opacity));
 }
 
-function readLabel(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: string) {
+function readLabel(source: Record<string, unknown>, key: string, fallback: string) {
   const value = source[key];
   if (typeof value !== 'string') return fallback;
   const label = value.trim();
   return label || fallback;
 }
 
-function readOrder(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: number) {
+function readOrder(source: Record<string, unknown>, key: string, fallback: number) {
   const value = source[key];
   const order = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(order)) return fallback;
   return Math.min(5, Math.max(1, Math.round(order)));
 }
 
-function readBoolean(source: Record<string, unknown>, key: keyof BottomTabSettings, fallback: boolean) {
+function readBoolean(source: Record<string, unknown>, key: string, fallback: boolean) {
   const value = source[key];
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
@@ -117,6 +121,37 @@ function readBoolean(source: Record<string, unknown>, key: keyof BottomTabSettin
     if (value.toLowerCase() === 'false') return false;
   }
   return fallback;
+}
+
+function readBorderWidth(source: Record<string, unknown>, key: string, fallback: number) {
+  const value = source[key];
+  const width = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(width)) return fallback;
+  return Math.min(8, Math.max(0, Math.round(width)));
+}
+
+function readItemLabel(source: Record<string, unknown>, itemKey: string, legacyKey: string, fallback: string) {
+  const item = asRecord(source[itemKey]);
+  const legacyValue = readLabel(source, legacyKey, fallback);
+  return item && Object.prototype.hasOwnProperty.call(item, 'label')
+    ? readLabel(item, 'label', legacyValue)
+    : legacyValue;
+}
+
+function readItemOrder(source: Record<string, unknown>, itemKey: string, legacyKey: string, fallback: number) {
+  const item = asRecord(source[itemKey]);
+  const legacyValue = readOrder(source, legacyKey, fallback);
+  return item && Object.prototype.hasOwnProperty.call(item, 'order')
+    ? readOrder(item, 'order', legacyValue)
+    : legacyValue;
+}
+
+function readItemEnabled(source: Record<string, unknown>, itemKey: string, legacyKey: string, fallback: boolean) {
+  const item = asRecord(source[itemKey]);
+  const legacyValue = readBoolean(source, legacyKey, fallback);
+  return item && Object.prototype.hasOwnProperty.call(item, 'enabled')
+    ? readBoolean(item, 'enabled', legacyValue)
+    : legacyValue;
 }
 
 function sourceFrom(value: unknown): Record<string, unknown> {
@@ -141,6 +176,8 @@ export function readBottomTabSettings(value: unknown): BottomTabSettings {
   return {
     backgroundColor: readColor(source, 'backgroundColor', DEFAULT_BOTTOM_TAB_SETTINGS.backgroundColor),
     backgroundOpacity: readOpacity(source, 'backgroundOpacity', DEFAULT_BOTTOM_TAB_SETTINGS.backgroundOpacity),
+    borderColor: readColor(source, 'borderColor', DEFAULT_BOTTOM_TAB_SETTINGS.borderColor),
+    borderWidth: readBorderWidth(source, 'borderWidth', DEFAULT_BOTTOM_TAB_SETTINGS.borderWidth),
     activeBackgroundColor: readColor(source, 'activeBackgroundColor', DEFAULT_BOTTOM_TAB_SETTINGS.activeBackgroundColor),
     activeBackgroundOpacity: readOpacity(source, 'activeBackgroundOpacity', DEFAULT_BOTTOM_TAB_SETTINGS.activeBackgroundOpacity),
     activeIconColor: readColor(source, 'activeIconColor', DEFAULT_BOTTOM_TAB_SETTINGS.activeIconColor),
@@ -149,21 +186,21 @@ export function readBottomTabSettings(value: unknown): BottomTabSettings {
     inactiveTextColor: readColor(source, 'inactiveTextColor', DEFAULT_BOTTOM_TAB_SETTINGS.inactiveTextColor),
     badgeBackgroundColor: readColor(source, 'badgeBackgroundColor', DEFAULT_BOTTOM_TAB_SETTINGS.badgeBackgroundColor),
     badgeTextColor: readColor(source, 'badgeTextColor', DEFAULT_BOTTOM_TAB_SETTINGS.badgeTextColor),
-    homeLabel: readLabel(source, 'homeLabel', DEFAULT_BOTTOM_TAB_SETTINGS.homeLabel),
-    categoriesLabel: readLabel(source, 'categoriesLabel', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesLabel),
-    favoritesLabel: readLabel(source, 'favoritesLabel', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesLabel),
-    cartLabel: readLabel(source, 'cartLabel', DEFAULT_BOTTOM_TAB_SETTINGS.cartLabel),
-    accountLabel: readLabel(source, 'accountLabel', DEFAULT_BOTTOM_TAB_SETTINGS.accountLabel),
-    homeOrder: readOrder(source, 'homeOrder', DEFAULT_BOTTOM_TAB_SETTINGS.homeOrder),
-    categoriesOrder: readOrder(source, 'categoriesOrder', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesOrder),
-    favoritesOrder: readOrder(source, 'favoritesOrder', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesOrder),
-    cartOrder: readOrder(source, 'cartOrder', DEFAULT_BOTTOM_TAB_SETTINGS.cartOrder),
-    accountOrder: readOrder(source, 'accountOrder', DEFAULT_BOTTOM_TAB_SETTINGS.accountOrder),
-    homeEnabled: readBoolean(source, 'homeEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.homeEnabled),
-    categoriesEnabled: readBoolean(source, 'categoriesEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesEnabled),
-    favoritesEnabled: readBoolean(source, 'favoritesEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesEnabled),
-    cartEnabled: readBoolean(source, 'cartEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.cartEnabled),
-    accountEnabled: readBoolean(source, 'accountEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.accountEnabled),
+    homeLabel: readItemLabel(source, 'home', 'homeLabel', DEFAULT_BOTTOM_TAB_SETTINGS.homeLabel),
+    categoriesLabel: readItemLabel(source, 'categories', 'categoriesLabel', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesLabel),
+    favoritesLabel: readItemLabel(source, 'favorites', 'favoritesLabel', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesLabel),
+    cartLabel: readItemLabel(source, 'cart', 'cartLabel', DEFAULT_BOTTOM_TAB_SETTINGS.cartLabel),
+    accountLabel: readItemLabel(source, 'account', 'accountLabel', DEFAULT_BOTTOM_TAB_SETTINGS.accountLabel),
+    homeOrder: readItemOrder(source, 'home', 'homeOrder', DEFAULT_BOTTOM_TAB_SETTINGS.homeOrder),
+    categoriesOrder: readItemOrder(source, 'categories', 'categoriesOrder', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesOrder),
+    favoritesOrder: readItemOrder(source, 'favorites', 'favoritesOrder', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesOrder),
+    cartOrder: readItemOrder(source, 'cart', 'cartOrder', DEFAULT_BOTTOM_TAB_SETTINGS.cartOrder),
+    accountOrder: readItemOrder(source, 'account', 'accountOrder', DEFAULT_BOTTOM_TAB_SETTINGS.accountOrder),
+    homeEnabled: readItemEnabled(source, 'home', 'homeEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.homeEnabled),
+    categoriesEnabled: readItemEnabled(source, 'categories', 'categoriesEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.categoriesEnabled),
+    favoritesEnabled: readItemEnabled(source, 'favorites', 'favoritesEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.favoritesEnabled),
+    cartEnabled: readItemEnabled(source, 'cart', 'cartEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.cartEnabled),
+    accountEnabled: readItemEnabled(source, 'account', 'accountEnabled', DEFAULT_BOTTOM_TAB_SETTINGS.accountEnabled),
   };
 }
 

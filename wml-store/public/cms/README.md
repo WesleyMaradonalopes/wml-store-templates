@@ -6,12 +6,14 @@ O app lê o conteúdo publicado do projeto definido por `EXPO_PUBLIC_VTEX_CMS_PR
 
 ## Configuração da BottomTab
 
-O tipo singleton `appSettings` representa as configurações globais do aplicativo. Crie o documento `bottom-bar-settings` e adicione a seção `BottomTabSettings` com os valores de cor, textos e posições desejados:
+O tipo singleton `appSettings` representa as configurações globais do aplicativo. Crie o documento `bottom-bar-settings` e adicione a seção `BottomTabSettings` com os valores de cor e as configurações de cada item:
 
 ```json
 {
   "backgroundColor": "#7D7D7D",
   "backgroundOpacity": 0.78,
+  "borderColor": "#FFFFFF",
+  "borderWidth": 0,
   "activeBackgroundColor": "#FFFFFF",
   "activeBackgroundOpacity": 0.16,
   "activeIconColor": "#FFFFFF",
@@ -20,26 +22,40 @@ O tipo singleton `appSettings` representa as configurações globais do aplicati
   "inactiveTextColor": "#D9D9D9",
   "badgeBackgroundColor": "#FFFFFF",
   "badgeTextColor": "#0A0A0A",
-  "homeLabel": "Home",
-  "categoriesLabel": "Categorias",
-  "favoritesLabel": "Favoritos",
-  "cartLabel": "Sacola",
-  "accountLabel": "Conta",
-  "homeOrder": 1,
-  "categoriesOrder": 2,
-  "favoritesOrder": 3,
-  "cartOrder": 4,
-  "accountOrder": 5,
-  "homeEnabled": true,
-  "categoriesEnabled": true,
-  "favoritesEnabled": true,
-  "cartEnabled": true,
-  "accountEnabled": true
+  "home": {
+    "enabled": true,
+    "order": 1,
+    "label": "Home"
+  },
+  "categories": {
+    "enabled": true,
+    "order": 2,
+    "label": "Categorias"
+  },
+  "favorites": {
+    "enabled": true,
+    "order": 3,
+    "label": "Favoritos"
+  },
+  "cart": {
+    "enabled": true,
+    "order": 4,
+    "label": "Sacola"
+  },
+  "account": {
+    "enabled": true,
+    "order": 5,
+    "label": "Conta"
+  }
 }
 ```
 
-As posições devem ser números de 1 a 5. Use cada número uma única vez para evitar empate; por exemplo, para colocar Favoritos primeiro, use `favoritesOrder: 1` e mova o Home para outra posição.
+`borderWidth` aceita valores de 0 a 8. O valor `0` mantém a aparência atual sem borda; para exibir uma borda, informe a cor em `borderColor` e uma espessura maior que zero.
 
-Os campos `*Enabled` controlam se cada item aparece na BottomTab. Use `false` para ocultar um item temporariamente; o app mantém a rota disponível mesmo quando o item está oculto.
+Cada item da BottomTab possui três campos juntos: `enabled` controla a exibição, `order` define a posição e `label` define o nome mostrado. As posições devem ser números de 1 a 5; use cada número uma única vez para evitar empate. Por exemplo, para colocar Favoritos primeiro, use `favorites.order: 1` e mova o Home para outra posição.
+
+Use `enabled: false` para ocultar um item temporariamente; o app mantém a rota disponível mesmo quando o item está oculto.
+
+O app ainda aceita os campos antigos (`homeLabel`, `homeOrder`, `homeEnabled` etc.) como fallback, para que documentos publicados anteriormente continuem funcionando durante a migração.
 
 Durante o teste, a mesma seção também pode ser adicionada ao documento `home`; o aplicativo usa essa configuração como fallback enquanto o documento global ainda não estiver publicado. Publique o documento e reabra/recarregue o aplicativo para buscar os valores atualizados.

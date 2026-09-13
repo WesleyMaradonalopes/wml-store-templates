@@ -1415,7 +1415,7 @@
 		"requiredScopes": [],
 		"schema": {
 			"title": "Configurações da BottomTab",
-			"description": "Define as cores da barra inferior do aplicativo. Use valores hexadecimais no formato #RRGGBB.",
+			"description": "Define as cores, a borda e os itens da barra inferior do aplicativo. Use valores hexadecimais no formato #RRGGBB.",
 			"type": "object",
 			"properties": {
 				"backgroundColor": {
@@ -1430,6 +1430,19 @@
 					"minimum": 0,
 					"maximum": 1,
 					"default": 0.78
+				},
+				"borderColor": {
+					"title": "Cor da borda",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+				},
+				"borderWidth": {
+					"title": "Espessura da borda (0 a 8)",
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 8,
+					"default": 0
 				},
 				"activeBackgroundColor": {
 					"title": "Cor do fundo selecionado",
@@ -1480,100 +1493,130 @@
 					"default": "#0A0A0A",
 					"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
 				},
-				"homeLabel": {
-					"title": "Texto do Home",
-					"type": "string",
-					"default": "Home",
-					"minLength": 1,
-					"maxLength": 24
+				"home": {
+					"title": "Home",
+					"type": "object",
+					"properties": {
+						"enabled": {
+							"title": "Exibir Home",
+							"type": "boolean",
+							"default": true
+						},
+						"order": {
+							"title": "Posição do Home (1 a 5)",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 5,
+							"default": 1
+						},
+						"label": {
+							"title": "Nome do botão",
+							"type": "string",
+							"default": "Home",
+							"minLength": 1,
+							"maxLength": 24
+						}
+					}
 				},
-				"categoriesLabel": {
-					"title": "Texto de Categorias",
-					"type": "string",
-					"default": "Categorias",
-					"minLength": 1,
-					"maxLength": 24
+				"categories": {
+					"title": "Categorias",
+					"type": "object",
+					"properties": {
+						"enabled": {
+							"title": "Exibir Categorias",
+							"type": "boolean",
+							"default": true
+						},
+						"order": {
+							"title": "Posição de Categorias (1 a 5)",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 5,
+							"default": 2
+						},
+						"label": {
+							"title": "Nome do botão",
+							"type": "string",
+							"default": "Categorias",
+							"minLength": 1,
+							"maxLength": 24
+						}
+					}
 				},
-				"favoritesLabel": {
-					"title": "Texto de Favoritos",
-					"type": "string",
-					"default": "Favoritos",
-					"minLength": 1,
-					"maxLength": 24
+				"favorites": {
+					"title": "Favoritos",
+					"type": "object",
+					"properties": {
+						"enabled": {
+							"title": "Exibir Favoritos",
+							"type": "boolean",
+							"default": true
+						},
+						"order": {
+							"title": "Posição de Favoritos (1 a 5)",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 5,
+							"default": 3
+						},
+						"label": {
+							"title": "Nome do botão",
+							"type": "string",
+							"default": "Favoritos",
+							"minLength": 1,
+							"maxLength": 24
+						}
+					}
 				},
-				"cartLabel": {
-					"title": "Texto da Sacola",
-					"type": "string",
-					"default": "Sacola",
-					"minLength": 1,
-					"maxLength": 24
+				"cart": {
+					"title": "Sacola",
+					"type": "object",
+					"properties": {
+						"enabled": {
+							"title": "Exibir Sacola",
+							"type": "boolean",
+							"default": true
+						},
+						"order": {
+							"title": "Posição da Sacola (1 a 5)",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 5,
+							"default": 4
+						},
+						"label": {
+							"title": "Nome do botão",
+							"type": "string",
+							"default": "Sacola",
+							"minLength": 1,
+							"maxLength": 24
+						}
+					}
 				},
-				"accountLabel": {
-					"title": "Texto da Conta",
-					"type": "string",
-					"default": "Conta",
-					"minLength": 1,
-					"maxLength": 24
-				},
-				"homeOrder": {
-					"title": "Posição do Home (1 a 5)",
-					"type": "integer",
-					"minimum": 1,
-					"maximum": 5,
-					"default": 1
-				},
-				"categoriesOrder": {
-					"title": "Posição de Categorias (1 a 5)",
-					"type": "integer",
-					"minimum": 1,
-					"maximum": 5,
-					"default": 2
-				},
-				"favoritesOrder": {
-					"title": "Posição de Favoritos (1 a 5)",
-					"type": "integer",
-					"minimum": 1,
-					"maximum": 5,
-					"default": 3
-				},
-				"cartOrder": {
-					"title": "Posição da Sacola (1 a 5)",
-					"type": "integer",
-					"minimum": 1,
-					"maximum": 5,
-					"default": 4
-				},
-				"accountOrder": {
-					"title": "Posição da Conta (1 a 5)",
-					"type": "integer",
-					"minimum": 1,
-					"maximum": 5,
-					"default": 5
-				},
-				"homeEnabled": {
-					"title": "Exibir Home",
-					"type": "boolean",
-					"default": true
-				},
-				"categoriesEnabled": {
-					"title": "Exibir Categorias",
-					"type": "boolean",
-					"default": true
-				},
-				"favoritesEnabled": {
-					"title": "Exibir Favoritos",
-					"type": "boolean",
-					"default": true
-				},
-				"cartEnabled": {
-					"title": "Exibir Sacola",
-					"type": "boolean",
-					"default": true
-				},
-				"accountEnabled": {
-					"title": "Exibir Conta",
-					"type": "boolean",
-					"default": true
+				"account": {
+					"title": "Conta",
+					"type": "object",
+					"properties": {
+						"enabled": {
+							"title": "Exibir Conta",
+							"type": "boolean",
+							"default": true
+						},
+						"order": {
+							"title": "Posição da Conta (1 a 5)",
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 5,
+							"default": 5
+						},
+						"label": {
+							"title": "Nome do botão",
+							"type": "string",
+							"default": "Conta",
+							"minLength": 1,
+							"maxLength": 24
+						}
+					}
 				}
 			}
 		}

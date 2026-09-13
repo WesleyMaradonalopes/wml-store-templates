@@ -28,7 +28,7 @@ export default function GlobalTabBar() {
 
   return (
     <View style={[styles.outer, { paddingBottom: Math.max(insets.bottom, Spacing.two) }, hidden && styles.hidden]}>
-      <View style={[styles.inner, { backgroundColor: withOpacity(bottomTabSettings.backgroundColor, bottomTabSettings.backgroundOpacity) }]}>
+      <View style={[styles.inner, { backgroundColor: withOpacity(bottomTabSettings.backgroundColor, bottomTabSettings.backgroundOpacity), borderColor: bottomTabSettings.borderColor, borderWidth: bottomTabSettings.borderWidth }]}>
         {items.map((item) => {
           const active = item.path === '/(tabs)' ? pathname === '/' || pathname === '/(tabs)' : pathname.startsWith(item.path);
           const iconColor = active ? bottomTabSettings.activeIconColor : bottomTabSettings.inactiveIconColor;

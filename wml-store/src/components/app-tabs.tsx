@@ -52,7 +52,7 @@ function FloatingTabList({ hidden, settings, ...props }: TabListProps & { hidden
   const insets = useSafeAreaInsets();
   return (
     <View {...props} style={[styles.outer, { paddingBottom: Math.max(insets.bottom, Spacing.two) }, hidden && styles.hidden]}>
-      <View style={[styles.inner, { backgroundColor: withOpacity(settings.backgroundColor, settings.backgroundOpacity) }]}>{props.children}</View>
+      <View style={[styles.inner, { backgroundColor: withOpacity(settings.backgroundColor, settings.backgroundOpacity), borderColor: settings.borderColor, borderWidth: settings.borderWidth }]}>{props.children}</View>
     </View>
   );
 }
