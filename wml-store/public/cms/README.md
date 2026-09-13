@@ -4,6 +4,38 @@
 
 O app lê o conteúdo publicado do projeto definido por `EXPO_PUBLIC_VTEX_CMS_PROJECT_ID` no VTEX Headless CMS. Portanto, editar este arquivo local não publica nem altera o CMS; ele serve como contrato das seções que o app sabe renderizar.
 
+## Botão individual dos banners
+
+Dentro de cada item de `images` da seção `MultipleImageBanner`, use `button` para exibir um botão independente naquele banner. O botão usa o mesmo destino configurado em `action`:
+
+```json
+{
+  "imageUrl": "https://...",
+  "action": {
+    "type": "link",
+    "value": "/minha-landing-page"
+  },
+  "button": {
+    "enabled": true,
+    "label": "Comprar agora",
+    "backgroundColor": "#FFFFFF",
+    "textColor": "#0A0A0A",
+    "borderColor": "#FFFFFF",
+    "borderWidth": 0,
+    "fontSize": 14,
+    "width": 0,
+    "height": 0,
+    "padding": {
+      "horizontal": 24,
+      "vertical": 10
+    },
+    "position": "bottomCenter"
+  }
+}
+```
+
+`width` e `height` iguais a `0` deixam o tamanho automático. A posição pode ser superior, central ou inferior, alinhada à esquerda, ao centro ou à direita. Se `enabled` for `false`, o botão não aparece nesse banner.
+
 ## Configuração da BottomTab
 
 O tipo singleton `appSettings` representa as configurações globais do aplicativo. Crie o documento `bottom-bar-settings` e adicione a seção `BottomTabSettings` com os valores de cor e as configurações de cada item:

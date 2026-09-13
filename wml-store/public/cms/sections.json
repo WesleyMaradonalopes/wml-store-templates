@@ -122,6 +122,118 @@
 									}
 								}
 							},
+							"button": {
+								"title": "Botão do banner (opcional)",
+								"description": "O botão usa o mesmo destino configurado em Destino da ação deste banner.",
+								"type": "object",
+								"properties": {
+									"enabled": {
+										"title": "Exibir botão",
+										"type": "boolean",
+										"default": false
+									},
+									"label": {
+										"title": "Texto do botão",
+										"type": "string",
+										"default": "Comprar agora",
+										"minLength": 1,
+										"maxLength": 32
+									},
+									"backgroundColor": {
+										"title": "Cor do fundo do botão",
+										"type": "string",
+										"default": "#FFFFFF",
+										"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+									},
+									"textColor": {
+										"title": "Cor do texto do botão",
+										"type": "string",
+										"default": "#0A0A0A",
+										"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+									},
+									"borderColor": {
+										"title": "Cor da borda do botão",
+										"type": "string",
+										"default": "#FFFFFF",
+										"pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$"
+									},
+									"borderWidth": {
+										"title": "Espessura da borda do botão (0 a 8)",
+										"type": "integer",
+										"minimum": 0,
+										"maximum": 8,
+										"default": 0
+									},
+									"fontSize": {
+										"title": "Tamanho da fonte (px)",
+										"type": "integer",
+										"minimum": 8,
+										"maximum": 48,
+										"default": 14
+									},
+									"width": {
+										"title": "Largura do botão (px; 0 = automática)",
+										"type": "integer",
+										"minimum": 0,
+										"maximum": 1000,
+										"default": 0
+									},
+									"height": {
+										"title": "Altura do botão (px; 0 = automática)",
+										"type": "integer",
+										"minimum": 0,
+										"maximum": 300,
+										"default": 0
+									},
+									"padding": {
+										"title": "Padding do botão",
+										"type": "object",
+										"properties": {
+											"horizontal": {
+												"title": "Padding horizontal (px)",
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 100,
+												"default": 24
+											},
+											"vertical": {
+												"title": "Padding vertical (px)",
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 100,
+												"default": 10
+											}
+										}
+									},
+									"position": {
+										"title": "Posição do botão no banner",
+										"type": "string",
+										"enumNames": [
+											"Superior esquerdo",
+											"Superior centralizado",
+											"Superior direito",
+											"Centro esquerdo",
+											"Centro",
+											"Centro direito",
+											"Inferior esquerdo",
+											"Inferior centralizado",
+											"Inferior direito"
+										],
+										"enum": [
+											"topLeft",
+											"topCenter",
+											"topRight",
+											"centerLeft",
+											"center",
+											"centerRight",
+											"bottomLeft",
+											"bottomCenter",
+											"bottomRight"
+										],
+										"default": "bottomCenter"
+									}
+								}
+							},
 							"mktTag": {
 								"title": "Tag de Marketing (nome do evento de clique)",
 								"type": "string"

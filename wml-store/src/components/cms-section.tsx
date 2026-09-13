@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
@@ -25,6 +25,112 @@ type Props = { section: CmsSection; categoryPageSlug?: string };
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
+}
+
+type BannerButtonPosition = 'topLeft' | 'topCenter' | 'topRight' | 'centerLeft' | 'center' | 'centerRight' | 'bottomLeft' | 'bottomCenter' | 'bottomRight';
+
+type BannerButtonConfig = {
+  label: string;
+  backgroundColor: string;
+  textColor: string;
+  borderColor: string;
+  borderWidth: number;
+  fontSize: number;
+  width: number;
+  height: number;
+  paddingHorizontal: number;
+  paddingVertical: number;
+  position: BannerButtonPosition;
+};
+
+const bannerButtonPositions: BannerButtonPosition[] = [
+  'topLeft',
+  'topCenter',
+  'topRight',
+  'centerLeft',
+  'center',
+  'centerRight',
+  'bottomLeft',
+  'bottomCenter',
+  'bottomRight',
+];
+
+const bannerHexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function bannerColor(value: unknown, fallback: string) {
+  const color = text(value).trim();
+  return bannerHexColorPattern.test(color) ? color : fallback;
+}
+
+function bannerNumber(source: Record<string, unknown>, key: string, fallback: number, minimum: number, maximum: number) {
+  const value = source[key];
+  const number = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.round(number)));
+}
+
+function bannerBoolean(value: unknown, fallback: boolean) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.trim().toLowerCase() === 'true') return true;
+    if (value.trim().toLowerCase() === 'false') return false;
+  }
+  return fallback;
+}
+
+function bannerButtonConfig(value: unknown): BannerButtonConfig | null {
+  const source = record(value);
+  if (!source || !bannerBoolean(source.enabled, false)) return null;
+
+  const label = text(source.label).trim();
+  if (!label) return null;
+
+  const padding = record(source.padding);
+  const fallbackPaddingHorizontal = bannerNumber(source, 'paddingHorizontal', 24, 0, 100);
+  const fallbackPaddingVertical = bannerNumber(source, 'paddingVertical', 10, 0, 100);
+  const position = text(source.position) as BannerButtonPosition;
+
+  return {
+    label,
+    backgroundColor: bannerColor(source.backgroundColor, '#FFFFFF'),
+    textColor: bannerColor(source.textColor, '#0A0A0A'),
+    borderColor: bannerColor(source.borderColor, '#FFFFFF'),
+    borderWidth: bannerNumber(source, 'borderWidth', 0, 0, 8),
+    fontSize: bannerNumber(source, 'fontSize', 14, 8, 48),
+    width: bannerNumber(source, 'width', 0, 0, 1000),
+    height: bannerNumber(source, 'height', 0, 0, 300),
+    paddingHorizontal: padding
+      ? bannerNumber(padding, 'horizontal', fallbackPaddingHorizontal, 0, 100)
+      : fallbackPaddingHorizontal,
+    paddingVertical: padding
+      ? bannerNumber(padding, 'vertical', fallbackPaddingVertical, 0, 100)
+      : fallbackPaddingVertical,
+    position: bannerButtonPositions.includes(position) ? position : 'bottomCenter',
+  };
+}
+
+function bannerButtonPositionStyle(position: BannerButtonPosition, isHero: boolean): ViewStyle {
+  const horizontalInset = 16;
+  const topInset = isHero ? 72 : 16;
+  const bottomInset = isHero ? 110 : 16;
+
+  switch (position) {
+    case 'topLeft': return { top: topInset, left: horizontalInset };
+    case 'topCenter': return { top: topInset, left: 0, right: 0, alignItems: 'center' };
+    case 'topRight': return { top: topInset, right: horizontalInset };
+    case 'centerLeft': return { top: 0, bottom: 0, left: horizontalInset, justifyContent: 'center' };
+    case 'center': return { top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' };
+    case 'centerRight': return { top: 0, right: horizontalInset, bottom: 0, justifyContent: 'center' };
+    case 'bottomLeft': return { bottom: bottomInset, left: horizontalInset };
+    case 'bottomRight': return { bottom: bottomInset, right: horizontalInset };
+    case 'bottomCenter': return { right: 0, bottom: bottomInset, left: 0, alignItems: 'center' };
+  }
 }
 
 function slugPart(value: string) {
@@ -580,6 +686,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
       const imageUrl = text(image.imageUrl);
       if (!imageUrl) return null;
       const openBanner = () => openCmsAction(router, image.action);
+      const button = bannerButtonConfig(image.button);
       return (
         <Pressable key={`${imageUrl}-${index}`} onPress={openBanner} style={[styles.banner, isHero && styles.heroBanner]}>
           <Image source={{ uri: imageUrl }} style={[styles.bannerImage, isHero && styles.heroImage]} contentFit="cover" />
@@ -587,6 +694,32 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
             {!!text(image.overlayTitle) && <ThemedText style={styles.overlayTitle}>{text(image.overlayTitle)}</ThemedText>}
             {!!text(image.overlaySubtitle) && <ThemedText style={styles.overlaySubtitle}>{text(image.overlaySubtitle)}</ThemedText>}
           </View>
+          {button && (
+            <View pointerEvents="box-none" style={[styles.bannerButtonPosition, bannerButtonPositionStyle(button.position, isHero)]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={button.label}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  openBanner();
+                }}
+                style={({ pressed }) => [
+                  styles.bannerButton,
+                  {
+                    backgroundColor: button.backgroundColor,
+                    borderColor: button.borderColor,
+                    borderWidth: button.borderWidth,
+                    paddingHorizontal: button.paddingHorizontal,
+                    paddingVertical: button.paddingVertical,
+                    ...(button.width > 0 ? { width: button.width } : {}),
+                    ...(button.height > 0 ? { height: button.height } : {}),
+                  },
+                  pressed && styles.pressed,
+                ]}>
+                <ThemedText style={[styles.bannerButtonText, { color: button.textColor, fontSize: button.fontSize }]}>{button.label}</ThemedText>
+              </Pressable>
+            </View>
+          )}
         </Pressable>
       );
     };
@@ -764,6 +897,9 @@ const styles = StyleSheet.create({
   },
   overlayTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   overlaySubtitle: { color: '#FFFFFF', fontSize: 14, marginTop: 4 },
+  bannerButtonPosition: { position: 'absolute' },
+  bannerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 24 },
+  bannerButtonText: { fontWeight: '700', textAlign: 'center' },
   tileStack: { gap: 12 },
   contentRow: { flexDirection: 'row', gap: 12 },
   contentCard: { width: 190, gap: 8, padding: 10, borderRadius: 14, backgroundColor: '#FFFFFF' },
