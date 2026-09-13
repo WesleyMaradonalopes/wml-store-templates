@@ -205,33 +205,25 @@
 											}
 										}
 									},
-									"position": {
-										"title": "Posição do botão no banner",
-										"type": "string",
-										"enumNames": [
-											"Superior esquerdo",
-											"Superior centralizado",
-											"Superior direito",
-											"Centro esquerdo",
-											"Centro",
-											"Centro direito",
-											"Inferior esquerdo",
-											"Inferior centralizado",
-											"Inferior direito"
-										],
-										"enum": [
-											"topLeft",
-											"topCenter",
-											"topRight",
-											"centerLeft",
-											"center",
-											"centerRight",
-											"bottomLeft",
-											"bottomCenter",
-											"bottomRight"
-										],
-										"default": "bottomCenter"
-									}
+					"position": {
+						"title": "Posição do botão no banner",
+						"description": "Informe a distância do canto superior esquerdo do banner. Os valores são os mesmos para qualquer dispositivo.",
+						"type": "object",
+						"properties": {
+							"top": {
+								"title": "Distância do topo (ex.: 56%)",
+								"type": "string",
+								"pattern": "^(?:0|[1-9][0-9]?|100)%$",
+								"default": "70%"
+							},
+							"left": {
+								"title": "Distância da esquerda (ex.: 31%)",
+								"type": "string",
+								"pattern": "^(?:0|[1-9][0-9]?|100)%$",
+								"default": "30%"
+							}
+						}
+					}
 								}
 							},
 							"mktTag": {

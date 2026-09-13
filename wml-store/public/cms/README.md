@@ -29,12 +29,15 @@ Dentro de cada item de `images` da seção `MultipleImageBanner`, use `button` p
       "horizontal": 24,
       "vertical": 10
     },
-    "position": "bottomCenter"
+    "position": {
+      "top": "70%",
+      "left": "30%"
+    }
   }
 }
 ```
 
-`width` e `height` iguais a `0` deixam o tamanho automático. A posição pode ser superior, central ou inferior, alinhada à esquerda, ao centro ou à direita. Se `enabled` for `false`, o botão não aparece nesse banner.
+`width` e `height` iguais a `0` deixam o tamanho automático. `position.top` e `position.left` aceitam valores de `0%` a `100%` e definem a distância do canto superior esquerdo do banner. Por exemplo, `top: "56%"` e `left: "31%"`. Os valores são compartilhados entre os dispositivos, sem uma configuração mobile separada. Se `enabled` for `false`, o botão não aparece nesse banner.
 
 ## Configuração da BottomTab
 

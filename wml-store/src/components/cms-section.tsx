@@ -28,6 +28,13 @@ function text(value: unknown) {
 }
 
 type BannerButtonPosition = 'topLeft' | 'topCenter' | 'topRight' | 'centerLeft' | 'center' | 'centerRight' | 'bottomLeft' | 'bottomCenter' | 'bottomRight';
+type BannerPercentage = `${number}%`;
+
+type BannerButtonPositionConfig = {
+  top: BannerPercentage;
+  left: BannerPercentage;
+  legacy?: BannerButtonPosition;
+};
 
 type BannerButtonConfig = {
   label: string;
@@ -40,7 +47,7 @@ type BannerButtonConfig = {
   height: number;
   paddingHorizontal: number;
   paddingVertical: number;
-  position: BannerButtonPosition;
+  position: BannerButtonPositionConfig;
 };
 
 const bannerButtonPositions: BannerButtonPosition[] = [
@@ -84,6 +91,15 @@ function bannerBoolean(value: unknown, fallback: boolean) {
   return fallback;
 }
 
+function bannerPercentage(value: unknown, fallback: BannerPercentage): BannerPercentage {
+  const raw = typeof value === 'number' ? `${value}%` : text(value).trim();
+  const normalized = raw.endsWith('%') ? raw.slice(0, -1).trim() : raw;
+  if (!normalized) return fallback;
+  const percentage = Number(normalized);
+  if (!Number.isFinite(percentage)) return fallback;
+  return `${Math.min(100, Math.max(0, percentage))}%` as BannerPercentage;
+}
+
 function bannerButtonConfig(value: unknown): BannerButtonConfig | null {
   const source = record(value);
   if (!source || !bannerBoolean(source.enabled, false)) return null;
@@ -94,7 +110,14 @@ function bannerButtonConfig(value: unknown): BannerButtonConfig | null {
   const padding = record(source.padding);
   const fallbackPaddingHorizontal = bannerNumber(source, 'paddingHorizontal', 24, 0, 100);
   const fallbackPaddingVertical = bannerNumber(source, 'paddingVertical', 10, 0, 100);
-  const position = text(source.position) as BannerButtonPosition;
+  const positionSource = record(source.position);
+  const legacyPosition = text(source.position) as BannerButtonPosition;
+  const top = positionSource
+    ? bannerPercentage(positionSource.top, '70%')
+    : bannerPercentage(source.top, '70%');
+  const left = positionSource
+    ? bannerPercentage(positionSource.left, '30%')
+    : bannerPercentage(source.left, '30%');
 
   return {
     label,
@@ -111,16 +134,22 @@ function bannerButtonConfig(value: unknown): BannerButtonConfig | null {
     paddingVertical: padding
       ? bannerNumber(padding, 'vertical', fallbackPaddingVertical, 0, 100)
       : fallbackPaddingVertical,
-    position: bannerButtonPositions.includes(position) ? position : 'bottomCenter',
+    position: {
+      top,
+      left,
+      legacy: bannerButtonPositions.includes(legacyPosition) ? legacyPosition : undefined,
+    },
   };
 }
 
-function bannerButtonPositionStyle(position: BannerButtonPosition, isHero: boolean): ViewStyle {
+function bannerButtonPositionStyle(position: BannerButtonPositionConfig, isHero: boolean): ViewStyle {
+  if (!position.legacy) return { top: position.top, left: position.left };
+
   const horizontalInset = 16;
   const topInset = isHero ? 72 : 16;
   const bottomInset = isHero ? 110 : 16;
 
-  switch (position) {
+  switch (position.legacy) {
     case 'topLeft': return { top: topInset, left: horizontalInset };
     case 'topCenter': return { top: topInset, left: 0, right: 0, alignItems: 'center' };
     case 'topRight': return { top: topInset, right: horizontalInset };
