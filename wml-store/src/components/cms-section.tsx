@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 import { CmsSection } from '@/services/cms';
 import { buildCmsActionRoute, readCmsAction, type CmsAction } from '@/services/cms-actions';
@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
   bannerButton: { position: 'relative', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 24 },
   bannerButtonBlur: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   bannerButtonColor: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  bannerButtonText: { fontWeight: '700', textAlign: 'center' },
+  bannerButtonText: { fontFamily: Fonts.bold, fontWeight: '700', textAlign: 'center' },
   tileStack: { gap: 12 },
   contentRow: { flexDirection: 'row', gap: 12 },
   contentCard: { width: 190, gap: 8, padding: 10, borderRadius: 14, backgroundColor: '#FFFFFF' },
