@@ -1,4 +1,4 @@
-import { BlurView } from 'expo-blur';
+import { BlurTargetView, BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -51,6 +51,8 @@ type BannerButtonConfig = {
   paddingVertical: number;
   position: BannerButtonPositionConfig;
 };
+
+type BannerBlurTargetRef = { current: View | null };
 
 const bannerButtonPositions: BannerButtonPosition[] = [
   'topLeft',
@@ -704,6 +706,14 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
   const bannerImages = section.name === 'MultipleImageBanner' && Array.isArray(data.images) ? data.images : [];
   const isHeroBanner = section.name === 'MultipleImageBanner' && (text(data.mode) === 'SliderHero' || text(data.mode) === 'FitOnScreen');
   const loopedBannerImages = bannerImages.length > 1 ? [bannerImages[bannerImages.length - 1], ...bannerImages, bannerImages[0]] : bannerImages;
+  const bannerBlurTargets = useRef<Record<string, BannerBlurTargetRef>>({});
+  const getBannerBlurTarget = (key: string) => {
+    const current = bannerBlurTargets.current[key];
+    if (current) return current;
+    const target: BannerBlurTargetRef = { current: null };
+    bannerBlurTargets.current[key] = target;
+    return target;
+  };
 
   useEffect(() => {
     if (!isHeroBanner || bannerImages.length < 2) return;
@@ -741,13 +751,17 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
       if (!imageUrl) return null;
       const openBanner = () => openCmsAction(router, image.action);
       const button = bannerButtonConfig(image.button);
+      const bannerKey = `${imageUrl}-${index}`;
+      const blurTarget = getBannerBlurTarget(bannerKey);
       return (
-        <Pressable key={`${imageUrl}-${index}`} onPress={openBanner} style={[styles.banner, isHero && styles.heroBanner]}>
+        <Pressable key={bannerKey} onPress={openBanner} style={[styles.banner, isHero && styles.heroBanner]}>
+          <BlurTargetView ref={blurTarget} style={styles.bannerTarget}>
           <Image source={{ uri: imageUrl }} style={[styles.bannerImage, isHero && styles.heroImage]} contentFit="cover" />
           <View style={styles.overlay}>
             {!!text(image.overlayTitle) && <ThemedText style={styles.overlayTitle}>{text(image.overlayTitle)}</ThemedText>}
             {!!text(image.overlaySubtitle) && <ThemedText style={styles.overlaySubtitle}>{text(image.overlaySubtitle)}</ThemedText>}
           </View>
+          </BlurTargetView>
           {button && (
             <View pointerEvents="box-none" style={[styles.bannerButtonPosition, bannerButtonPositionStyle(button.position, isHero)]}>
               <Pressable
@@ -772,6 +786,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
                 {button.blurRadius > 0 && (
                   <BlurView
                     pointerEvents="none"
+                    blurTarget={blurTarget}
                     intensity={Math.min(100, Math.max(1, button.blurRadius * 5))}
                     tint="default"
                     blurMethod="dimezisBlurViewSdk31Plus"
@@ -947,6 +962,7 @@ const styles = StyleSheet.create({
   subcategoryRow: { minHeight: 46, paddingHorizontal: 12, justifyContent: 'center', borderLeftWidth: 2, borderLeftColor: '#e2ded8' },
   subcategoryText: { fontSize: 16, lineHeight: 22, color: '#625d57' },
   banner: { overflow: 'hidden', borderRadius: 16, minHeight: 180 },
+  bannerTarget: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   bannerImage: { width: '100%', height: 180 },
   heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },
   heroImage: { width: '100%', height: Dimensions.get('window').height },
