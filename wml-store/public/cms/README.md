@@ -18,9 +18,10 @@ Dentro de cada item de `images` da seção `MultipleImageBanner`, use `button` p
   "button": {
     "enabled": true,
     "label": "Comprar agora",
-    "backgroundColor": "#FFFFFF",
-    "textColor": "#0A0A0A",
+    "backgroundColor": "rgba(0, 0, 0, 0.72)",
+    "textColor": "#FFFFFF",
     "borderColor": "#FFFFFF",
+    "blurRadius": 8,
     "borderWidth": 0,
     "fontSize": 14,
     "width": 0,
@@ -36,6 +37,10 @@ Dentro de cada item de `images` da seção `MultipleImageBanner`, use `button` p
   }
 }
 ```
+
+As cores do botão aceitam `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, `rgb(...)` e `rgba(...)`. Por exemplo, `rgba(0, 0, 0, 0.72)` aplica 72% de opacidade. Em hexadecimal com transparência, o último par representa o alpha em hexadecimal: `#00000072` equivale a aproximadamente 45% de opacidade.
+
+`blurRadius` define o desfoque do fundo em pixels; use `0` para desativar e `8` para um efeito semelhante a `blur(8px)`. No Android e no iOS, o app usa o `BlurView` nativo. Na web, o mesmo campo gera o efeito equivalente com `backdrop-filter` e `-webkit-backdrop-filter`. Em dispositivos Android antigos, o efeito pode cair para uma camada translúcida por limitação de desempenho.
 
 `width` e `height` iguais a `0` deixam o tamanho automático. `position.top` aceita valores de `0%` a `100%` e define a distância até a parte superior do botão. `position.left` usa o centro horizontal do botão como referência; portanto, use `left: "50%"` para centralizá-lo. Por exemplo, `top: "56%"` e `left: "50%"`. Os valores são compartilhados entre os dispositivos, sem uma configuração mobile separada. Se `enabled` for `false`, o botão não aparece nesse banner.
 

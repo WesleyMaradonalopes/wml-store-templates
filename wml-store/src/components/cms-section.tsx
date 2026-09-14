@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -45,6 +46,7 @@ type BannerButtonConfig = {
   fontSize: number;
   width: number;
   height: number;
+  blurRadius: number;
   paddingHorizontal: number;
   paddingVertical: number;
   position: BannerButtonPositionConfig;
@@ -62,7 +64,8 @@ const bannerButtonPositions: BannerButtonPosition[] = [
   'bottomRight',
 ];
 
-const bannerHexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+const bannerHexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const bannerFunctionColorPattern = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([0-9]*\.?[0-9]+))?\s*\)$/i;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -72,7 +75,24 @@ function record(value: unknown): Record<string, unknown> | null {
 
 function bannerColor(value: unknown, fallback: string) {
   const color = text(value).trim();
-  return bannerHexColorPattern.test(color) ? color : fallback;
+  if (bannerHexColorPattern.test(color)) return color;
+
+  const match = color.match(bannerFunctionColorPattern);
+  if (!match) return fallback;
+
+  const isRgba = color.slice(0, 4).toLowerCase() === 'rgba';
+  const hasAlpha = typeof match[4] === 'string';
+  if (isRgba !== hasAlpha) return fallback;
+
+  const channels = match.slice(1, 4).map(Number);
+  if (channels.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255)) return fallback;
+
+  if (hasAlpha) {
+    const alpha = Number(match[4]);
+    if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) return fallback;
+  }
+
+  return color;
 }
 
 function bannerNumber(source: Record<string, unknown>, key: string, fallback: number, minimum: number, maximum: number) {
@@ -128,6 +148,7 @@ function bannerButtonConfig(value: unknown): BannerButtonConfig | null {
     fontSize: bannerNumber(source, 'fontSize', 14, 8, 48),
     width: bannerNumber(source, 'width', 0, 0, 1000),
     height: bannerNumber(source, 'height', 0, 0, 300),
+    blurRadius: bannerNumber(source, 'blurRadius', 0, 0, 20),
     paddingHorizontal: padding
       ? bannerNumber(padding, 'horizontal', fallbackPaddingHorizontal, 0, 100)
       : fallbackPaddingHorizontal,
@@ -739,7 +760,6 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
                 style={({ pressed }) => [
                   styles.bannerButton,
                   {
-                    backgroundColor: button.backgroundColor,
                     borderColor: button.borderColor,
                     borderWidth: button.borderWidth,
                     paddingHorizontal: button.paddingHorizontal,
@@ -749,6 +769,16 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
                   },
                   pressed && styles.pressed,
                 ]}>
+                {button.blurRadius > 0 && (
+                  <BlurView
+                    pointerEvents="none"
+                    intensity={Math.min(100, Math.max(1, button.blurRadius * 5))}
+                    tint="default"
+                    blurMethod="dimezisBlurViewSdk31Plus"
+                    style={styles.bannerButtonBlur}
+                  />
+                )}
+                <View pointerEvents="none" style={[styles.bannerButtonColor, { backgroundColor: button.backgroundColor }]} />
                 <ThemedText style={[styles.bannerButtonText, { color: button.textColor, fontSize: button.fontSize }]}>{button.label}</ThemedText>
               </Pressable>
             </View>
@@ -931,7 +961,9 @@ const styles = StyleSheet.create({
   overlayTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   overlaySubtitle: { color: '#FFFFFF', fontSize: 14, marginTop: 4 },
   bannerButtonPosition: { position: 'absolute' },
-  bannerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 24 },
+  bannerButton: { position: 'relative', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 24 },
+  bannerButtonBlur: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  bannerButtonColor: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   bannerButtonText: { fontWeight: '700', textAlign: 'center' },
   tileStack: { gap: 12 },
   contentRow: { flexDirection: 'row', gap: 12 },
