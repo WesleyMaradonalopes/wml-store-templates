@@ -1,7 +1,6 @@
 import { Montserrat_300Light, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, useFonts } from '@expo-google-fonts/montserrat';
-import * as SplashScreen from 'expo-splash-screen';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
-import { Linking, Platform, useColorScheme } from 'react-native';
+import { Linking, useColorScheme } from 'react-native';
 import { DEFAULT_BOTTOM_TAB_SETTINGS } from '@/config/bottom-tab';
 import { TabBarContext } from '@/context/tab-bar-context';
 import { getAccountSession, getVtexUserToken } from '@/services/auth';
@@ -10,24 +9,19 @@ import { addNotificationResponseListener, configureNotificationPresentation, get
 import GlobalTabBar from '@/components/global-tab-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-void SplashScreen.preventAutoHideAsync();
-
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const [hidden, setHidden] = useState(false);
   const [showOnCheckout, setShowOnCheckout] = useState(false);
   const [bottomTabSettings, setBottomTabSettings] = useState(DEFAULT_BOTTOM_TAB_SETTINGS);
-  const [fontsLoaded, fontError] = useFonts({
+  // Font loading must not block the first native frame or leave the dev client behind the splash.
+  useFonts({
     Montserrat_300Light,
     Montserrat_400Regular,
     Montserrat_500Medium,
     Montserrat_600SemiBold,
     Montserrat_700Bold,
   });
-
-  useEffect(() => {
-    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
 
   useEffect(() => {
     void Promise.all([getAccountSession(), getVtexUserToken()]);
@@ -42,8 +36,6 @@ export default function TabLayout() {
       mounted = false;
     };
   }, []);
-
-  if (!fontsLoaded && !fontError && Platform.OS !== 'web') return null;
 
   return (
     <TabBarContext.Provider value={{ hidden, setHidden, showOnCheckout, setShowOnCheckout, bottomTabSettings }}>
