@@ -1,66 +1,79 @@
 import { Product, getProduct } from './catalog';
 import { getAccountSession, getCachedAccountSession, getCachedVtexUserToken, getVtexUserToken } from './auth';
+import { getCustomerProfileFromMasterData } from './customer';
 import { getStoredJson, setStoredJson } from './storage';
 import { storeConfig } from '@/config/store';
 
-const SHARED_FAVORITES_REQUEST_TIMEOUT_MS = 4000;
+const SHARED_FAVORITES_PROFILE_TIMEOUT_MS = 1000;
+
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function binaryToBase64(binary: string) {
+  const btoaFn = (globalThis as typeof globalThis & { btoa?: (value: string) => string }).btoa;
+  if (btoaFn) return btoaFn(binary);
+
+  let encoded = '';
+  for (let index = 0; index < binary.length; index += 3) {
+    const first = binary.charCodeAt(index);
+    const second = index + 1 < binary.length ? binary.charCodeAt(index + 1) : 0;
+    const third = index + 2 < binary.length ? binary.charCodeAt(index + 2) : 0;
+
+    encoded += BASE64_ALPHABET[first >> 2];
+    encoded += BASE64_ALPHABET[((first & 3) << 4) | (second >> 4)];
+    encoded += index + 1 < binary.length ? BASE64_ALPHABET[((second & 15) << 2) | (third >> 6)] : '=';
+    encoded += index + 2 < binary.length ? BASE64_ALPHABET[third & 63] : '=';
+  }
+  return encoded;
+}
+
+function encodeBase64(value: string) {
+  const binary = encodeURIComponent(value).replace(/%([0-9A-F]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  return binaryToBase64(binary);
+}
+
+async function getShareCustomerName(email?: string | null) {
+  const normalizedEmail = email?.trim();
+  if (!normalizedEmail) return '';
+
+  try {
+    const profile = await Promise.race([
+      getCustomerProfileFromMasterData(normalizedEmail),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), SHARED_FAVORITES_PROFILE_TIMEOUT_MS)),
+    ]);
+    return [profile?.firstName, profile?.lastName]
+      .map((value) => value?.trim())
+      .filter(Boolean)
+      .join(' ');
+  } catch {
+    return '';
+  }
+}
 
 function cacheKey(email: string) {
   return `lojahr:favorites:${email.toLowerCase()}`;
 }
 
 export async function createSharedFavoritesUrl(
-  products: Pick<Product, 'id' | 'linkText'>[],
+  products: Pick<Product, 'id' | 'itemId'>[],
   email?: string | null,
 ) {
-  // O backend mantém o nome `productIds`, mas o `link-share` do site envia
-  // os linkTexts (slugs). O costumer-wishlist usa esses valores para buscar
-  // cada produto publicamente pelo endpoint `/.../{linkText}/p`.
-  const productSlugs = Array.from(new Set(
+  // Mantém o mesmo contrato do site: nome|IDs dos produtos|IDs dos SKUs.
+  // A página pública decodifica o `tag` e consulta os produtos sem login.
+  const productIds = Array.from(new Set(
     products
-      .map((product) => product.linkText.trim())
-      .filter((slug) => slug.length > 5),
+      .map((product) => String(product.id).trim())
+      .filter(Boolean),
   ));
-  if (productSlugs.length === 0) {
+  if (productIds.length === 0) {
     throw new Error('Adicione um item aos favoritos para compartilhar.');
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SHARED_FAVORITES_REQUEST_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await fetch(`${storeConfig.publicStoreUrl}/_v/share-wishlist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productIds: productSlugs,
-          email: email?.trim().toLowerCase() || null,
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+  const name = await getShareCustomerName(email);
+  const productSkus = Array.from(new Set(products.map((product) => String(product.itemId).trim()).filter(Boolean)));
+  const tagPayload = `${name}|${productIds.join(',')}|${productSkus.join(',')}`;
+  const tag = encodeBase64(tagPayload);
 
-    const payload = await response.json().catch(() => ({})) as {
-      token?: string;
-      message?: string;
-      error?: string;
-    };
-
-    if (!response.ok || !payload.token) {
-      throw new Error(payload.message || payload.error || `Não foi possível criar o link de favoritos (HTTP ${response.status}).`);
-    }
-
-    return `${storeConfig.publicStoreUrl}/favoritos/${encodeURIComponent(payload.token)}`;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      error = new Error('O serviço de compartilhamento está indisponível.');
-    }
-
-    return `${storeConfig.publicStoreUrl}/favoritos?productSlugs=${encodeURIComponent(productSlugs.join(','))}`;
-  }
+  return `${storeConfig.publicStoreUrl}/favoritos?tag=${encodeURIComponent(tag)}`;
 }
 
 export type FavoriteChange = {
