@@ -11,7 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BEST_SELLING_PRODUCTS_SHELF } from '@/constants/product-shelves';
 import { Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
-import { getAccountSession, subscribeAccountSession } from '@/services/auth';
+import { subscribeAccountSession } from '@/services/auth';
 import { type Product } from '@/services/catalog';
 import { createSharedFavoritesUrl, getCachedFavorites, getFavorites } from '@/services/favorites';
 
@@ -68,8 +68,7 @@ export default function FavoritesScreen() {
 
     setSharingFavorites(true);
     try {
-      const session = await getAccountSession();
-      const url = await createSharedFavoritesUrl(favorites, session?.email);
+      const url = await createSharedFavoritesUrl(favorites);
       setSharingFavorites(false);
       await Share.share({
         title: 'Meus favoritos',

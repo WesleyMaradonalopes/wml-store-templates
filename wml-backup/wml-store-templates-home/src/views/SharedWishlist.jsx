@@ -41,7 +41,7 @@ export default function SharedWishlist(props) {
 	const tag = extractTagFromDeeplink(deeplink) ?? ''
 	const { name, productIds } = decodeTag(tag)
 	const { cart } = useLocalShoppingCart()
-	const title = name ? `Favoritos de ${name}` : 'Lista de favoritos compartilhada'
+	const title = name ? `Favoritos de ${name}` : 'Confira meus itens preferidos!'
 
 	return (
 		<Page
