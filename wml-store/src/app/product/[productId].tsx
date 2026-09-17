@@ -12,6 +12,7 @@ import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CloseIcon from '@/components/icons/CloseIcon';
 import ExchangeIcon from '@/components/icons/ExchangeIcon';
+import HangerStrokeRoundedIcon from '@/components/icons/HangerStrokeRoundedIcon';
 import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
@@ -476,8 +477,8 @@ export default function ProductScreen() {
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
               <View style={styles.helperButtons}>
-                <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><ThemedText>♧</ThemedText><ThemedText style={styles.provadorVirtual} type="smallBold">Provador Virtual</ThemedText></Pressable>
-                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon color="#0a0a0a" size={17} /><ThemedText style={styles.provadorVirtual} type="smallBold">Tabela de medidas</ThemedText></Pressable>
+                <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><HangerStrokeRoundedIcon size={21} /><ThemedText style={styles.provadorVirtual} type="smallBold">Provador Virtual</ThemedText></Pressable>
+                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon size={21} /><ThemedText style={styles.provadorVirtual} type="smallBold">Tabela de medidas</ThemedText></Pressable>
               </View>
 
               <View style={styles.shippingSection}>
@@ -1043,7 +1044,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   messageText: { color: '#B42318' },
   helperButtons: { flexDirection: 'row', gap: Spacing.two },
-  helperButton: { flex: 1, minHeight: 44, paddingHorizontal: Spacing.two, borderRadius: 8, borderWidth: 1, borderColor: '#bdb6ad', flexDirection: 'row', gap: Spacing.one, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  helperButton: { flex: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#bdb6ad', flexDirection: 'row', gap: Spacing.one, alignItems: 'center', justifyContent: 'flex-start', backgroundColor: '#FFFFFF' },
   shippingSection: { gap: Spacing.three, paddingTop: Spacing.two },
   sectionTitle: { fontSize: 15, lineHeight: 23 },
   shippingRow: { minHeight: 32, flexDirection: 'row' },
