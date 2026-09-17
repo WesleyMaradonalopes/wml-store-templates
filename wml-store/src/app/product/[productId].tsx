@@ -22,6 +22,7 @@ import { emptyKitSelection, KitSelector, type KitSelection } from '@/components/
 import { LoginRequiredModal } from '@/components/login-required-modal';
 import { ProductCarousel } from '@/components/product-carousel';
 import { ProductQuickView } from '@/components/product-quick-view';
+import { SizebayModal } from '@/components/sizebay-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
@@ -29,6 +30,7 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
 import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductKitGroup, type ProductKitItem, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
+import { getProductInformation, type SizebayProductInformation } from '@/services/sizebay';
 import { htmlToPlainText } from '@/utils/html';
 import { buildVariationGroups } from '@/utils/product-variations';
 
@@ -71,6 +73,16 @@ function estimateLabel(value: string) {
   return `até ${amount} ${amount === 1 ? 'dia' : 'dias'}`;
 }
 
+function getSizesInStock(product: Product) {
+  const sizes = product.variants
+    .filter((variant) => variant.available)
+    .flatMap((variant) => Object.entries(variant.variations)
+      .filter(([name]) => isSizeVariationName(name))
+      .map(([, value]) => value));
+
+  return Array.from(new Set(sizes));
+}
+
 const DESCRIPTION_PREVIEW_LINES = 5;
 const DESCRIPTION_LINE_HEIGHT = 20;
 
@@ -101,6 +113,8 @@ export default function ProductScreen() {
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [kitSelection, setKitSelection] = useState<KitSelection>(emptyKitSelection);
+  const [sizebayInfo, setSizebayInfo] = useState<SizebayProductInformation | null>(null);
+  const [sizebayModal, setSizebayModal] = useState<'vfr' | 'chart' | null>(null);
   const [selectionMessage, setSelectionMessage] = useState('');
   const [quickViewVisible, setQuickViewVisible] = useState(false);
   const [colorsVisible, setColorsVisible] = useState(false);
@@ -134,6 +148,11 @@ export default function ProductScreen() {
   const galleryImages = Array.from(new Set([...(activeVariant?.images ?? []), ...(product?.images ?? [])].filter(Boolean)));
   const visibleColorProducts = colorProducts.slice(0, 5);
   const hiddenColorCount = Math.max(0, colorProducts.length - visibleColorProducts.length);
+  const sizebayFrameUrl = sizebayModal === 'vfr'
+    ? sizebayInfo?.linkVFR ?? ''
+    : sizebayModal === 'chart'
+      ? sizebayInfo?.linkChart ?? ''
+      : '';
 
   useEffect(() => {
     if (!productId) return;
@@ -146,6 +165,8 @@ export default function ProductScreen() {
     setLookProducts([]);
     setSelectedOptions({});
     setKitSelection(emptyKitSelection());
+    setSizebayInfo(null);
+    setSizebayModal(null);
     setSelectionMessage('');
     setQuickViewVisible(false);
     setColorsVisible(false);
@@ -182,6 +203,29 @@ export default function ProductScreen() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [productId]);
+
+  useEffect(() => {
+    if (!product?.linkText) {
+      setSizebayInfo(null);
+      setSizebayModal(null);
+      return;
+    }
+
+    let active = true;
+    setSizebayInfo(null);
+    setSizebayModal(null);
+    getProductInformation(`${product.linkText}/p`, getSizesInStock(product))
+      .then((information) => {
+        if (active) setSizebayInfo(information);
+      })
+      .catch(() => {
+        if (active) setSizebayInfo(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [product?.id, product?.linkText]);
 
   useEffect(() => {
     setImageIndex(0);
@@ -476,10 +520,10 @@ export default function ProductScreen() {
                 {/*<ShoppingBagIcon size={18} color="#FFFFFF" />*/}
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
-              <View style={styles.helperButtons}>
-                <Pressable onPress={() => Alert.alert('Provador Virtual', 'O provador virtual será conectado nesta etapa da migração.')} style={styles.helperButton}><HangerStrokeRoundedIcon size={21} /><ThemedText style={styles.provadorVirtual} type="smallBold">Provador Virtual</ThemedText></Pressable>
-                <Pressable onPress={() => Alert.alert('Tabela de medidas', 'A tabela de medidas será aberta aqui.')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon size={21} /><ThemedText style={styles.provadorVirtual} type="smallBold">Tabela de medidas</ThemedText></Pressable>
-              </View>
+              {(sizebayInfo?.linkVFR || sizebayInfo?.linkChart) && <View style={styles.helperButtons}>
+                {sizebayInfo.linkVFR && <Pressable accessibilityRole="button" onPress={() => setSizebayModal('vfr')} style={styles.helperButton}><HangerStrokeRoundedIcon size={21} /><ThemedText style={styles.provadorVirtual} type="smallBold">Provador Virtual</ThemedText></Pressable>}
+                {sizebayInfo.linkChart && <Pressable accessibilityRole="button" onPress={() => setSizebayModal('chart')} style={styles.helperButton}><TapeMeasureStrokeRoundedIcon size={21} /><ThemedText style={styles.provadorVirtual} type="smallBold">Tabela de medidas</ThemedText></Pressable>}
+              </View>}
 
               <View style={styles.shippingSection}>
                 <ThemedText style={styles.sectionTitle}>Calcule o frete e prazo de entrega</ThemedText>
@@ -599,6 +643,12 @@ export default function ProductScreen() {
             setImageIndex(index);
             galleryListRef.current?.scrollToIndex({ index, animated: false });
           }}
+        />
+        <SizebayModal
+          visible={Boolean(sizebayModal && sizebayFrameUrl)}
+          frameUrl={sizebayFrameUrl}
+          title={sizebayModal === 'vfr' ? 'Provador Virtual' : 'Tabela de medidas'}
+          onClose={() => setSizebayModal(null)}
         />
         <LoginRequiredModal
           visible={loginModalVisible}
