@@ -17,7 +17,7 @@ import { createSharedFavoritesUrl, getCachedFavorites, getFavorites } from '@/se
 
 const EMPTY_FAVORITES_SHELF: Record<string, unknown> = {
   ...BEST_SELLING_PRODUCTS_SHELF,
-  title: 'Mais vendidos',
+  title: 'Você pode gostar',
   showSeeAll: false,
 };
 
@@ -84,7 +84,7 @@ export default function FavoritesScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} showShare shareLoading={sharingFavorites} onShare={shareFavorites} />
+        <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} showShare={favorites.length > 0} shareLoading={sharingFavorites} onShare={shareFavorites} />
         {loadingFavorites && <ActivityIndicator color="#0a0a0a" />}
         <FlatList
           data={favorites}
@@ -95,7 +95,7 @@ export default function FavoritesScreen() {
           keyExtractor={(item) => item.id}
           columnWrapperStyle={styles.columns}
           contentContainerStyle={styles.list}
-          ListHeaderComponent={favorites.length > 0 ? (
+          ListHeaderComponent={!loadingFavorites ? (
             <View style={styles.productsHeader}>
               <ThemedText style={styles.productsCount}>({favorites.length})</ThemedText>
               <ThemedText style={styles.productsTitle}>Produtos</ThemedText>
@@ -107,7 +107,13 @@ export default function FavoritesScreen() {
               <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.homeButton}>
                 <ThemedText style={styles.homeButtonText}>Ir para Home</ThemedText>
               </Pressable>
-              <ProductShelf data={EMPTY_FAVORITES_SHELF} titleStyle={styles.emptyShelfTitle} />
+              <ProductShelf
+                data={EMPTY_FAVORITES_SHELF}
+                titleStyle={styles.emptyShelfTitle}
+                onFavoriteChange={(product, favorite) => setFavorites((current) => favorite
+                  ? (current.some((item) => item.id === product.id) ? current : [product, ...current])
+                  : current.filter((item) => item.id !== product.id))}
+              />
             </View>
           ) : null}
           renderItem={({ item }) => (
