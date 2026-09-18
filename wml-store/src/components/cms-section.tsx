@@ -5,13 +5,14 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { Fonts, Spacing } from '@/constants/theme';
+import { subscribeAccountSession } from '@/services/auth';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 import { CmsSection } from '@/services/cms';
 import { buildCmsActionRoute, readCmsAction, type CmsAction } from '@/services/cms-actions';
 import { cmsInternalRoute, openCmsExternalLink } from '@/services/cms-links';
-import { subscribeAccountSession } from '@/services/auth';
 import { isFavorite } from '@/services/favorites';
 
+import { AnimatedPaginationDots } from './animated-pagination-dots';
 import { CmsRichText } from './cms-rich-text';
 import ArrowLeftIAIcon from './icons/ArrowLeftIAicon';
 import ArrowRightAIcon from './icons/ArrowRightAicon';
@@ -506,7 +507,7 @@ function CategorySwipeRow({ category, onPress }: { category: Record<string, unkn
       style={({ pressed }) => [styles.categorySwipeRow, pressed && styles.pressed]}>
       {!!icon && <Image source={{ uri: icon }} style={styles.categorySwipeIcon} contentFit="contain" />}
       <ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
-      <ArrowRightAIcon color="#0a0a0a" size={20} />
+      <ArrowRightAIcon color="#0a0a0a" size={16} />
     </Pressable>
   );
 }
@@ -538,7 +539,7 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
 
   return (
     <ThemedView style={styles.section}>
-      <ThemedText type="subtitle">{sectionTitle || 'Todas categorias'}</ThemedText>
+      <ThemedText style={styles.sectionTitleCateg} type="subtitle">{sectionTitle || 'Todas categorias'}</ThemedText>
       <View style={styles.categorySwipePanel}>
         {categories.map((item, index) => (
           <CategorySwipeRow
@@ -829,9 +830,17 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
               {loopedBannerImages.map(renderBanner)}
             </ScrollView>
             {images.length > 1 && (
-              <View pointerEvents="none" style={styles.heroDots}>
-                {images.map((_, index) => <View key={index} style={[styles.dot, index === heroIndex && styles.activeDot]} />)}
-              </View>
+              <AnimatedPaginationDots
+                count={images.length}
+                activeIndex={heroIndex}
+                activeWidth={20}
+                activeColor="#FFFFFF"
+                inactiveColor="#FFFFFF"
+                dotSize={6}
+                gap={6}
+                accessibilityLabel={`Banner ${heroIndex + 1} de ${images.length}`}
+                style={styles.heroDots}
+              />
             )}
           </View>
         ) : images.map(renderBanner)}
@@ -934,10 +943,11 @@ const styles = StyleSheet.create({
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
+	sectionTitleCateg: { fontSize: 20, },
   categorySwipePanel: { overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: '#eeeae5', backgroundColor: '#FFFFFF' },
-  categorySwipeRow: { minHeight: 68, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: 1, borderBottomColor: '#eeeae5', backgroundColor: '#FFFFFF' },
+  categorySwipeRow: { minHeight: 60, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: 1, borderBottomColor: '#eeeae5', backgroundColor: '#FFFFFF' },
   categorySwipeIcon: { width: 28, height: 28, borderRadius: 6 },
-  categorySwipeRowTitle: { flex: 1, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '500', textTransform: 'uppercase' },
+  categorySwipeRowTitle: { flex: 1, fontSize: 14, lineHeight: 26, color: '#0a0a0a', fontWeight: '500', textTransform: 'uppercase' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: '#FFFFFF' },
   categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
   categoryModalBack: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -971,8 +981,6 @@ const styles = StyleSheet.create({
   heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },
   heroImage: { width: '100%', height: Dimensions.get('window').height },
   heroDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  activeDot: { width: 20, backgroundColor: '#fff' },
   overlay: {
     position: 'absolute',
     left: 16,

@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { AddedToCartModal, type AddedProductInfo } from '@/components/added-to-cart-modal';
+import { AnimatedPaginationDots } from '@/components/animated-pagination-dots';
 import { CartIconButton } from '@/components/cart-icon-button';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
@@ -93,9 +94,10 @@ const COMPLETE_LOOK_ENABLED = false;
 export default function ProductScreen() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  // The header and the bottom safe area handle their own insets. The gallery
-  // must stay within the viewport so its overlay content is visible on load.
-  const galleryHeight = screenHeight;
+  const insets = useSafeAreaInsets();
+  // The SafeAreaView adds bottom padding, so include that inset in the hero
+  // height to keep the product image filling the viewport on every device.
+  const galleryHeight = screenHeight * 1.07;
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [colorProducts, setColorProducts] = useState<Product[]>([]);
@@ -106,8 +108,7 @@ export default function ProductScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [cartMessage, setCartMessage] = useState<string | null>(null);
-  const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
+  const [cartMessage, setCartMessage] = useState<string | null>(null);const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
@@ -394,7 +395,7 @@ export default function ProductScreen() {
     void addProduct();
   }
 
-  const floatingButtonThreshold = screenHeight * 0.2;
+  const floatingButtonThreshold = screenHeight * 0.4;
   const showFloatingButton = Boolean(product && scrollY > floatingButtonThreshold);
   const currentPrice = activeVariant?.price ?? product?.price ?? null;
   const currentListPrice = activeVariant?.listPrice ?? product?.listPrice ?? null;
@@ -439,12 +440,12 @@ export default function ProductScreen() {
                   locations={[0, 0.46, 1]}
                   style={styles.heroShade}
                 />
-                {galleryImages.length > 1 && <View pointerEvents="none" style={styles.heroDots}>{galleryImages.map((_, index) => <View key={index} style={[styles.dot, imageIndex === index && styles.activeDot]} />)}</View>}
+                {galleryImages.length > 1 && <AnimatedPaginationDots count={galleryImages.length} activeIndex={imageIndex} activeWidth={28} activeColor="#FFFFFF" inactiveColor="rgba(255, 255, 255, 0.7)" accessibilityLabel={`Imagem ${imageIndex + 1} de ${galleryImages.length}`} style={styles.heroDots} />}
                 <View style={styles.heroProductInfo}>
                   <View style={styles.heroProductRow}>
                     <View style={styles.heroProductCopy}>
                       <ThemedText numberOfLines={2} style={styles.heroProductName}>{product.name}</ThemedText>
-                      {currentPrice !== null && <ThemedText type="smallBold" style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
+                      {currentPrice !== null && <ThemedText style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
                     </View>
                     <Pressable accessibilityLabel="Comprar" onPress={() => setQuickViewVisible(true)} style={styles.heroBuyButton}>
                       <ThemedText type="smallBold" style={styles.heroBuyButtonText}>Comprar</ThemedText>
@@ -747,9 +748,18 @@ function ProductImageViewer({
           </Pressable>
         </View>
         {images.length > 1 && (
-          <View pointerEvents="none" style={[styles.viewerDots, { bottom: Math.max(insets.bottom, 20) + 20 }]}>
-            {images.map((_, index) => <View key={index} style={[styles.viewerDot, currentIndex === index && styles.viewerDotActive]} />)}
-          </View>
+          <AnimatedPaginationDots
+            count={images.length}
+            activeIndex={currentIndex}
+            activeWidth={20}
+            activeColor="#FFFFFF"
+            inactiveColor="#FFFFFF"
+            dotSize={6}
+            gap={6}
+            pointerEvents="none"
+            accessibilityLabel={`Imagem ${currentIndex + 1} de ${images.length}`}
+            style={[styles.viewerDots, { bottom: Math.max(insets.bottom, 20) + 20 }]}
+          />
         )}
       </View>
     </Modal>
@@ -1038,14 +1048,12 @@ const styles = StyleSheet.create({
   heroImagePressable: { flex: 1 },
   mainImage: { backgroundColor: '#e8e8ea' },
   heroShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 190 },
-  heroDots: { position: 'absolute', left: Spacing.four, bottom: 110, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.7)' },
-  activeDot: { width: 28, backgroundColor: '#FFFFFF' },
-  heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 35 },
+  heroDots: { position: 'absolute', left: Spacing.four, bottom: 85, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 18 },
   heroProductRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.three },
   heroProductCopy: { flex: 1, gap: 3 },
-  heroProductName: { color: '#FFFFFF', fontSize: 14, lineHeight: 18 },
-  heroProductPrice: { color: '#FFFFFF', fontSize: 14 },
+  heroProductName: { width: 250, color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
+  heroProductPrice: { color: '#FFFFFF', fontSize: 12 },
   heroBuyButton: { minWidth: 86, minHeight: 40, paddingHorizontal: Spacing.three, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   heroBuyButtonText: { color: '#0a0a0a' },
 	provadorVirtual: { fontSize: 12, fontFamily: Fonts.medium, fontWeight: '500' },
@@ -1057,11 +1065,9 @@ const styles = StyleSheet.create({
   viewerTopBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 5 },
   viewerCounter: { minWidth: 48, height: 36, paddingHorizontal: Spacing.three, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
   viewerClose: { width: 35, height: 35, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.34)' },
-  viewerText: { color: '#FFFFFF', fontSize: 14, lineHeight: 18, fontWeight: '600' },
+  viewerText: { color: '#FFFFFF', fontSize: 14, lineHeight: 16, fontWeight: '600' },
   viewerCloseText: { color: '#FFFFFF', fontSize: 20, fontWeight: '400' },
   viewerDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 5 },
-  viewerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fff' },
-  viewerDotActive: { width: 20, backgroundColor: '#fff' },
   details: { gap: Spacing.four, padding: Spacing.four, backgroundColor: '#FFFFFF' },
   productHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three },
   headingText: { flex: 1, gap: 4 },
@@ -1153,7 +1159,7 @@ const styles = StyleSheet.create({
   lookOption: { minHeight: 34, paddingHorizontal: Spacing.three, justifyContent: 'center' },
   lookUnavailable: { opacity: 0.45 },
   lookUnavailableText: { textDecorationLine: 'line-through' },
-  lookSelectionError: { color: '#D92D20', fontSize: 13, lineHeight: 18 },
+  lookSelectionError: { color: '#D92D20', fontSize: 13, lineHeight: 16 },
   lookAddButton: { minHeight: 42, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   lookSummary: { gap: Spacing.three, padding: Spacing.four, borderRadius: 20, alignItems: 'center', backgroundColor: '#f0efed' },
   lookTotal: { fontSize: 24, lineHeight: 30 },

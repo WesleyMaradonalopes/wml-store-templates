@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import type { Product } from '@/services/catalog';
 
+import { AnimatedPaginationDots } from './animated-pagination-dots';
 import { ProductCard } from './product-card';
 
 export const PRODUCT_CAROUSEL_GAP = 16;
@@ -75,11 +76,15 @@ export function ProductCarousel({
         )}
       />
       {products.length > 0 && (
-        <View accessibilityLabel={`Produto ${Math.min(activeIndex + 1, products.length)} de ${products.length}`} style={styles.pagination}>
-          {products.map((product, index) => (
-            <View key={product.id} style={[styles.dot, index === activeIndex && styles.activeDot]} />
-          ))}
-        </View>
+        <AnimatedPaginationDots
+          count={products.length}
+          activeIndex={activeIndex}
+          activeWidth={18}
+          activeColor="#0a0a0a"
+          inactiveColor="#b9b4ae"
+          accessibilityLabel={`Produto ${Math.min(activeIndex + 1, products.length)} de ${products.length}`}
+          style={styles.pagination}
+        />
       )}
     </>
   );
@@ -89,6 +94,4 @@ const styles = StyleSheet.create({
   viewport: {},
   list: { gap: PRODUCT_CAROUSEL_GAP },
   pagination: { minHeight: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: 2 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#b9b4ae' },
-  activeDot: { width: 18, backgroundColor: '#0a0a0a' },
 });

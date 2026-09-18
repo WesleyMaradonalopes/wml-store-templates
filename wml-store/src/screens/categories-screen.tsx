@@ -1,13 +1,13 @@
-import { ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
 import { CmsSectionView } from '@/components/cms-section';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { CmsPage, getCmsPage } from '@/services/cms';
-import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
+import { CmsPage, getCmsPage } from '@/services/cms';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CategoriesScreen() {
   const [cmsPage, setCmsPage] = useState<CmsPage | null>(null);
