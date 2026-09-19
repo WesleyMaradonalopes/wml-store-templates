@@ -25,5 +25,5 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   safeArea: { flex: 1, paddingHorizontal: Spacing.four },
-  content: { gap: Spacing.three, paddingTop: Spacing.two, paddingBottom: 50 },
+  content: { gap: Spacing.three, paddingTop: Spacing.two, paddingBottom: 100 },
 });

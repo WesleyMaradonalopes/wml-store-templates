@@ -797,7 +797,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
     const isHero = isHeroBanner;
     const configuredAspectRatio = bannerRatio(data.aspectRatio, 4 / 3);
-    const configuredBorderRadius = bannerDimension(data.borderRadius, 8);
+    const configuredBorderRadius = bannerDimension(data.borderRadius, 5);
     const ratioFor = (key: string, fallback: number) => bannerAspectRatios[key] ?? bannerRatio(data.aspectRatio, fallback);
 
     const renderBanner = (item: unknown, index: number, options: BannerRenderOptions = {}) => {
@@ -1058,18 +1058,17 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
 const styles = StyleSheet.create({
   section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#ffffff' },
-  bannerSection: { gap: 6, paddingHorizontal: 16, paddingTop: 0, paddingBottom: 16, borderRadius: 16, backgroundColor: '#ffffff' },
+  bannerSection: { gap: 6, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderRadius: 16, marginHorizontal: 14, backgroundColor: '#ffffff' },
   bannerSectionTitle: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', fontWeight: '600' },
   categoryMenuSection: {
     gap: 12,
-    padding: 14,
-		marginHorizontal: 14,
+    padding: 0,
+		marginHorizontal: 0,
 		marginVertical: 0,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.9)',
     backgroundColor: '#ffffff',
-		boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)',
   },
   // O hero escapa do padding horizontal usado pelos demais blocos da home.
   heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#ffffff' },
@@ -1093,9 +1092,9 @@ const styles = StyleSheet.create({
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
-  sectionTitleCateg: { marginHorizontal: 0, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700' },
-  categorySwipePanel: { overflow: 'hidden', borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
-  categorySwipeRow: { minHeight: 58, paddingHorizontal: 0, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 0, borderBottomColor: 'rgba(255, 255, 255, 0.82)', backgroundColor: 'transparent' },
+  sectionTitleCateg: { marginHorizontal: 14, fontSize: 20, lineHeight: 26, color: '#r', fontWeight: '700' },
+  categorySwipePanel: { overflow: 'hidden', marginHorizontal: 14, paddingHorizontal: 14, borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff', boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)' },
+  categorySwipeRow: { minHeight: 60, paddingHorizontal: 0, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 0, borderBottomColor: 'rgba(255, 255, 255, 0.82)', backgroundColor: 'transparent' },
   categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#0a0a0a', fontWeight: '500', textTransform: 'none' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: '#f0f1f5' },
   categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.9)' },
@@ -1108,7 +1107,7 @@ const styles = StyleSheet.create({
   categoryGroupsList: { gap: 12, overflow: 'visible', backgroundColor: 'transparent' },
   categoryRow: { minHeight: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.82)' },
   categoryRowTitle: { fontSize: 18, lineHeight: 26, color: '#0a0a0a', fontWeight: '500' },
-  categoryGroup: { gap: 14, paddingHorizontal: 0, paddingVertical: 18, borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
+  categoryGroup: { gap: 14, marginHorizontal: 14, paddingHorizontal: 14, paddingVertical: 18, borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff', boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)' },
   categoryGroupHeader: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   categoryGroupBack: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
   categoryGroupTitle: { flex: 1, fontSize: 24, lineHeight: 30, color: '#0a0a0a' },
