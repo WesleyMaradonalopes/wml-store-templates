@@ -1057,8 +1057,8 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#ffffff' },
-  bannerSection: { gap: 6, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderRadius: 16, marginHorizontal: 14, backgroundColor: '#ffffff' },
+  section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: 'transparent' },
+  bannerSection: { gap: 6, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderRadius: 16, marginHorizontal: 14, backgroundColor: 'transparent' },
   bannerSectionTitle: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', fontWeight: '600' },
   categoryMenuSection: {
     gap: 12,
@@ -1066,9 +1066,9 @@ const styles = StyleSheet.create({
 		marginHorizontal: 0,
 		marginVertical: 0,
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: 'rgba(255, 255, 255, 0.9)',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent',
   },
   // O hero escapa do padding horizontal usado pelos demais blocos da home.
   heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#ffffff' },
@@ -1093,7 +1093,7 @@ const styles = StyleSheet.create({
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
   sectionTitleCateg: { marginHorizontal: 14, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700' },
-  categorySwipePanel: { overflow: 'hidden', marginHorizontal: 14, paddingHorizontal: 14, borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff', boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)' },
+  categorySwipePanel: { overflow: 'hidden', marginHorizontal: 14, paddingHorizontal: 14, borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: 'transparent' },
   categorySwipeRow: { minHeight: 60, paddingHorizontal: 0, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 0, borderBottomColor: 'rgba(255, 255, 255, 0.82)', backgroundColor: 'transparent' },
   categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#0a0a0a', fontWeight: '500', textTransform: 'none' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: '#f0f1f5' },
