@@ -24,7 +24,7 @@ export default function HomeScreen() {
   const [scrollY, setScrollY] = useState(0);
   const firstSection = cmsPage?.sections[0];
   const firstSectionMode = typeof firstSection?.data?.mode === 'string' ? firstSection.data.mode : '';
-  const firstSectionIsHero = firstSection?.name === 'MultipleImageBanner' && (firstSectionMode === 'SliderHero' || firstSectionMode === 'FitOnScreen');
+  const firstSectionIsHero = firstSection?.name === 'MultipleImageBanner' && firstSectionMode === 'SliderHero';
   const transparentHeader = firstSectionIsHero && scrollY <= 8;
   useEffect(() => {
     getCmsPage().then(setCmsPage).catch(() => setCmsError(true)).finally(() => setCmsLoading(false));

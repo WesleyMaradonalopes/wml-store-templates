@@ -2,7 +2,7 @@ import { BlurTargetView, BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { Fonts, Spacing } from '@/constants/theme';
 import { subscribeAccountSession } from '@/services/auth';
@@ -27,6 +27,47 @@ type Props = { section: CmsSection; categoryPageSlug?: string };
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
+}
+
+type BannerDisplayMode = 'SliderHero' | 'SingleBanner' | 'BannerList' | 'RoundedBannerList' | 'GridList' | 'FitOnScreen';
+
+type BannerRenderOptions = {
+  containerStyle?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
+  contentFit?: 'cover' | 'contain';
+  aspectRatioKey?: string;
+};
+
+function bannerDisplayMode(value: unknown): BannerDisplayMode {
+  switch (text(value).trim()) {
+    case 'SingleBanner': return 'SingleBanner';
+    case 'BannerList': return 'BannerList';
+    case 'RoundedBannerList': return 'RoundedBannerList';
+    case 'GridList': return 'GridList';
+    case 'FitOnScreen': return 'FitOnScreen';
+    case 'SliderHero': return 'SliderHero';
+    // Mantém compatibilidade com configurações antigas publicadas antes do
+    // campo de modo receber os valores atuais do Headless CMS.
+    case 'carousel': return 'BannerList';
+    case 'scroll': return 'FitOnScreen';
+    default: return 'SliderHero';
+  }
+}
+
+function bannerRatio(value: unknown, fallback: number) {
+  const raw = typeof value === 'number' ? String(value) : text(value).trim();
+  if (!raw) return fallback;
+
+  const parts = raw.split(/[:/]/).map(Number);
+  if (parts.length === 2 && parts.every((part) => Number.isFinite(part) && part > 0)) return parts[0] / parts[1];
+
+  const ratio = Number(raw);
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : fallback;
+}
+
+function bannerDimension(value: unknown, fallback: number) {
+  const dimension = typeof value === 'number' ? value : Number(text(value));
+  return Number.isFinite(dimension) && dimension > 0 ? dimension : fallback;
 }
 
 type BannerButtonPosition = 'topLeft' | 'topCenter' | 'topRight' | 'centerLeft' | 'center' | 'centerRight' | 'bottomLeft' | 'bottomCenter' | 'bottomRight';
@@ -702,7 +743,9 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
   const heroRef = useRef<ScrollView | null>(null);
   const data = section.data ?? {};
   const bannerImages = section.name === 'MultipleImageBanner' && Array.isArray(data.images) ? data.images : [];
-  const isHeroBanner = section.name === 'MultipleImageBanner' && (text(data.mode) === 'SliderHero' || text(data.mode) === 'FitOnScreen');
+  const bannerMode = bannerDisplayMode(data.mode);
+  const isHeroBanner = section.name === 'MultipleImageBanner' && bannerMode === 'SliderHero';
+  const [bannerAspectRatios, setBannerAspectRatios] = useState<Record<string, number>>({});
   const loopedBannerImages = bannerImages.length > 1 ? [bannerImages[bannerImages.length - 1], ...bannerImages, bannerImages[0]] : bannerImages;
   const bannerBlurTargets = useRef<Record<string, BannerBlurTargetRef>>({});
   const getBannerBlurTarget = (key: string) => {
@@ -711,6 +754,14 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     const target: BannerBlurTargetRef = { current: null };
     bannerBlurTargets.current[key] = target;
     return target;
+  };
+  const rememberBannerAspectRatio = (key: string, event: { source?: unknown }) => {
+    const source = record(event.source);
+    const width = source ? Number(source.width) : 0;
+    const height = source ? Number(source.height) : 0;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    const ratio = width / height;
+    setBannerAspectRatios((current) => current[key] === ratio ? current : { ...current, [key]: ratio });
   };
 
   useEffect(() => {
@@ -742,8 +793,14 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
   if (section.name === 'MultipleImageBanner') {
     const images = bannerImages;
+    if (images.length === 0) return null;
+
     const isHero = isHeroBanner;
-    const renderBanner = (item: unknown, index: number) => {
+    const configuredAspectRatio = bannerRatio(data.aspectRatio, 4 / 3);
+    const configuredBorderRadius = bannerDimension(data.borderRadius, 8);
+    const ratioFor = (key: string, fallback: number) => bannerAspectRatios[key] ?? bannerRatio(data.aspectRatio, fallback);
+
+    const renderBanner = (item: unknown, index: number, options: BannerRenderOptions = {}) => {
       const image = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
       const imageUrl = text(image.imageUrl);
       if (!imageUrl) return null;
@@ -751,14 +808,20 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
       const button = bannerButtonConfig(image.button);
       const bannerKey = `${imageUrl}-${index}`;
       const blurTarget = getBannerBlurTarget(bannerKey);
+      const loadedAspectRatio = options.aspectRatioKey ? bannerAspectRatios[options.aspectRatioKey] : undefined;
       return (
-        <Pressable key={bannerKey} onPress={openBanner} style={[styles.banner, isHero && styles.heroBanner]}>
+        <Pressable key={bannerKey} onPress={openBanner} style={[styles.banner, options.containerStyle, isHero && styles.heroBanner]}>
           <BlurTargetView ref={blurTarget} style={styles.bannerTarget}>
-          <Image source={{ uri: imageUrl }} style={[styles.bannerImage, isHero && styles.heroImage]} contentFit="cover" />
-          <View style={styles.overlay}>
-            {!!text(image.overlayTitle) && <ThemedText style={styles.overlayTitle}>{text(image.overlayTitle)}</ThemedText>}
-            {!!text(image.overlaySubtitle) && <ThemedText style={styles.overlaySubtitle}>{text(image.overlaySubtitle)}</ThemedText>}
-          </View>
+            <Image
+              source={{ uri: imageUrl }}
+              onLoad={options.aspectRatioKey ? (event) => rememberBannerAspectRatio(options.aspectRatioKey!, event) : undefined}
+              style={[styles.bannerImage, options.imageStyle, loadedAspectRatio ? { aspectRatio: loadedAspectRatio } : undefined, isHero && styles.heroImage]}
+              contentFit={options.contentFit ?? (isHero ? 'cover' : 'contain')}
+            />
+            <View style={styles.overlay}>
+              {!!text(image.overlayTitle) && <ThemedText style={styles.overlayTitle}>{text(image.overlayTitle)}</ThemedText>}
+              {!!text(image.overlaySubtitle) && <ThemedText style={styles.overlaySubtitle}>{text(image.overlaySubtitle)}</ThemedText>}
+            </View>
           </BlurTargetView>
           {button && (
             <View pointerEvents="box-none" style={[styles.bannerButtonPosition, bannerButtonPositionStyle(button.position, isHero)]}>
@@ -799,44 +862,125 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
         </Pressable>
       );
     };
-    return (
-      <View style={isHero ? styles.heroSection : styles.section}>
-        {!!text(data.mainTitle) && <ThemedText type="subtitle">{text(data.mainTitle)}</ThemedText>}
-        {isHero ? (
-          <View style={styles.heroViewport}>
-            <ScrollView
-              ref={heroRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              style={styles.heroCarousel}
-              onMomentumScrollEnd={(event) => {
-                const page = Math.round(event.nativeEvent.contentOffset.x / Dimensions.get('window').width);
-                if (images.length > 1 && page === 0) {
-                  heroRef.current?.scrollTo({ x: images.length * Dimensions.get('window').width, animated: false });
-                  setHeroIndex(images.length - 1);
-                } else if (images.length > 1 && page === loopedBannerImages.length - 1) {
-                  heroRef.current?.scrollTo({ x: Dimensions.get('window').width, animated: false });
-                  setHeroIndex(0);
-                } else setHeroIndex(Math.max(0, page - 1));
-              }}>
-              {loopedBannerImages.map(renderBanner)}
-            </ScrollView>
-            {images.length > 1 && (
-              <AnimatedPaginationDots
-                count={images.length}
-                activeIndex={heroIndex}
-                activeWidth={20}
-                activeColor="#FFFFFF"
-                inactiveColor="#FFFFFF"
-                dotSize={6}
-                gap={6}
-                accessibilityLabel={`Banner ${heroIndex + 1} de ${images.length}`}
-                style={styles.heroDots}
-              />
-            )}
+
+    const renderHeroContent = () => (
+      <View style={styles.heroViewport}>
+        <ScrollView
+          ref={heroRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          style={styles.heroCarousel}
+          onMomentumScrollEnd={(event) => {
+            const page = Math.round(event.nativeEvent.contentOffset.x / Dimensions.get('window').width);
+            if (images.length > 1 && page === 0) {
+              heroRef.current?.scrollTo({ x: images.length * Dimensions.get('window').width, animated: false });
+              setHeroIndex(images.length - 1);
+            } else if (images.length > 1 && page === loopedBannerImages.length - 1) {
+              heroRef.current?.scrollTo({ x: Dimensions.get('window').width, animated: false });
+              setHeroIndex(0);
+            } else setHeroIndex(Math.max(0, page - 1));
+          }}>
+          {loopedBannerImages.map((item, index) => renderBanner(item, index))}
+        </ScrollView>
+        {images.length > 1 && (
+          <AnimatedPaginationDots
+            count={images.length}
+            activeIndex={heroIndex}
+            activeWidth={20}
+            activeColor="#FFFFFF"
+            inactiveColor="#FFFFFF"
+            dotSize={6}
+            gap={6}
+            accessibilityLabel={`Banner ${heroIndex + 1} de ${images.length}`}
+            style={styles.heroDots}
+          />
+        )}
+      </View>
+    );
+
+    const renderModeContent = () => {
+      if (bannerMode === 'SliderHero') return renderHeroContent();
+
+      if (bannerMode === 'SingleBanner') {
+        const firstImage = record(images[0]) ?? {};
+        const firstKey = `${text(firstImage.imageUrl)}-0`;
+        return renderBanner(images[0], 0, {
+          containerStyle: { minHeight: 0, borderRadius: configuredBorderRadius },
+          imageStyle: { width: '100%', aspectRatio: ratioFor(firstKey, configuredAspectRatio) },
+          contentFit: 'contain',
+          aspectRatioKey: firstKey,
+        });
+      }
+
+      if (bannerMode === 'BannerList') {
+        const size = record(data.size) ?? {};
+        const cardWidth = bannerDimension(size.maxWidth, 254);
+        const cardHeight = Math.round(cardWidth / bannerRatio(data.aspectRatio, cardWidth / bannerDimension(size.maxHeight, 328)));
+        return (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bannerListRow}>
+            {images.map((item, index) => renderBanner(item, index, {
+              containerStyle: { width: cardWidth, height: cardHeight, minHeight: 0, borderRadius: configuredBorderRadius },
+              imageStyle: { width: '100%', height: '100%' },
+              contentFit: 'cover',
+            }))}
+          </ScrollView>
+        );
+      }
+
+      if (bannerMode === 'RoundedBannerList') {
+        const size = record(data.size) ?? {};
+        const diameter = Math.min(bannerDimension(size.maxWidth, 200), bannerDimension(size.maxHeight, 200));
+        return (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bannerListRow}>
+            {images.map((item, index) => renderBanner(item, index, {
+              containerStyle: { width: diameter, height: diameter, minHeight: 0, borderRadius: diameter / 2 },
+              imageStyle: { width: '100%', height: '100%' },
+              contentFit: 'cover',
+            }))}
+          </ScrollView>
+        );
+      }
+
+      if (bannerMode === 'GridList') {
+        return (
+          <View style={styles.bannerGrid}>
+            {images.map((item, index) => {
+              const image = record(item) ?? {};
+              const key = `${text(image.imageUrl)}-${index}`;
+              return renderBanner(item, index, {
+                containerStyle: { width: '48.5%', minHeight: 0, borderRadius: configuredBorderRadius },
+                imageStyle: { width: '100%', aspectRatio: ratioFor(key, 1) },
+                contentFit: 'contain',
+                aspectRatioKey: key,
+              });
+            })}
           </View>
-        ) : images.map(renderBanner)}
+        );
+      }
+
+      // FitOnScreen mantém todos os banners em uma única linha e deixa cada
+      // imagem definir sua altura pela proporção real retornada pelo servidor.
+      return (
+        <View style={styles.fitOnScreenRow}>
+          {images.map((item, index) => {
+            const image = record(item) ?? {};
+            const key = `${text(image.imageUrl)}-${index}`;
+            return renderBanner(item, index, {
+              containerStyle: { flex: 1, minWidth: 0, minHeight: 0, borderRadius: configuredBorderRadius },
+              imageStyle: { width: '100%', aspectRatio: ratioFor(key, 1) },
+              contentFit: 'contain',
+              aspectRatioKey: key,
+            });
+          })}
+        </View>
+      );
+    };
+
+    return (
+      <View style={isHero ? styles.heroSection : styles.bannerSection}>
+        {!!text(data.mainTitle) && <ThemedText type="subtitle" style={styles.bannerSectionTitle}>{text(data.mainTitle)}</ThemedText>}
+        {renderModeContent()}
       </View>
     );
   }
@@ -914,11 +1058,14 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
 const styles = StyleSheet.create({
   section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#ffffff' },
+  bannerSection: { gap: 6, paddingHorizontal: 16, paddingTop: 0, paddingBottom: 16, borderRadius: 16, backgroundColor: '#ffffff' },
+  bannerSectionTitle: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', fontWeight: '600' },
   categoryMenuSection: {
     gap: 12,
     padding: 14,
-		margin: 14,
-    borderRadius: 16,
+		marginHorizontal: 14,
+		marginVertical: 0,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.9)',
     backgroundColor: '#ffffff',
@@ -931,8 +1078,8 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   seeAll: { textDecorationLine: 'underline', fontSize: 13 },
   tabList: { gap: 8 },
-  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: '#111111' },
-  selectedTab: { backgroundColor: '#111111' },
+  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: '#0a0a0a' },
+  selectedTab: { backgroundColor: '#0a0a0a' },
   selectedTabText: { color: '#FFFFFF' },
   plpSection: { gap: Spacing.three, backgroundColor: '#ffffff' },
   plpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
@@ -946,10 +1093,10 @@ const styles = StyleSheet.create({
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
-  sectionTitleCateg: { marginHorizontal: 4, fontSize: 20, lineHeight: 26, color: '#101114', fontWeight: '700' },
-  categorySwipePanel: { overflow: 'hidden', borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
+  sectionTitleCateg: { marginHorizontal: 0, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700' },
+  categorySwipePanel: { overflow: 'hidden', borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
   categorySwipeRow: { minHeight: 58, paddingHorizontal: 0, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 0, borderBottomColor: 'rgba(255, 255, 255, 0.82)', backgroundColor: 'transparent' },
-  categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#101114', fontWeight: '500', textTransform: 'none' },
+  categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#0a0a0a', fontWeight: '500', textTransform: 'none' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: '#f0f1f5' },
   categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.9)' },
   categoryModalBack: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -960,7 +1107,7 @@ const styles = StyleSheet.create({
   categoryList: { gap: 0, overflow: 'hidden', borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
   categoryGroupsList: { gap: 12, overflow: 'visible', backgroundColor: 'transparent' },
   categoryRow: { minHeight: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.82)' },
-  categoryRowTitle: { fontSize: 18, lineHeight: 26, color: '#101114', fontWeight: '500' },
+  categoryRowTitle: { fontSize: 18, lineHeight: 26, color: '#0a0a0a', fontWeight: '500' },
   categoryGroup: { gap: 14, paddingHorizontal: 0, paddingVertical: 18, borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
   categoryGroupHeader: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   categoryGroupBack: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
@@ -975,9 +1122,12 @@ const styles = StyleSheet.create({
   subcategoryList: { gap: 10 },
   subcategoryRow: { minHeight: 46, paddingHorizontal: 12, justifyContent: 'center', borderLeftWidth: 2, borderLeftColor: '#e2ded8' },
   subcategoryText: { fontSize: 16, lineHeight: 22, color: '#625d57' },
-  banner: { overflow: 'hidden', borderRadius: 16, minHeight: 180 },
-  bannerTarget: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  bannerImage: { width: '100%', height: 180 },
+  banner: { overflow: 'hidden', borderRadius: 16 },
+  bannerTarget: { width: '100%' },
+  bannerImage: { width: '100%' },
+  bannerListRow: { flexDirection: 'row', gap: 12 },
+  bannerGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
+  fitOnScreenRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },
   heroImage: { width: '100%', height: Dimensions.get('window').height },
   heroDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 6 },
