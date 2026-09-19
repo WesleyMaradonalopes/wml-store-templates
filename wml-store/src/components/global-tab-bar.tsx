@@ -7,9 +7,9 @@ import { getBottomTabItems, withOpacity } from '@/config/bottom-tab';
 import { Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
 import { CartCountBadge, useCartItemCount } from './cart-icon-button';
+import CategoryGridIcon from './icons/CategoryGridIcon';
 import HeartIcon from './icons/HeartIcon';
 import HomeIcon from './icons/HomeIcon';
-import MenuIcon from './icons/MenuIcon';
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
 import UserIcon from './icons/UserIcon';
 import { ThemedText } from './themed-text';
@@ -37,8 +37,8 @@ export default function GlobalTabBar() {
             <Pressable key={item.path} onPress={() => router.push(item.path)} style={styles.tabButton}>
               <View style={[styles.tabButtonView, active && styles.selected, active && { backgroundColor: withOpacity(bottomTabSettings.activeBackgroundColor, bottomTabSettings.activeBackgroundOpacity) }]}>
                 {item.icon === 'home' && <HomeIcon color={iconColor} size={20} />}
-                {item.icon === 'category' && <MenuIcon color={iconColor} size={20} />}
-                {item.icon === 'favorite' && <HeartIcon color={iconColor} size={20} />}
+                {item.icon === 'category' && <CategoryGridIcon color={iconColor} size={20} />}
+                {item.icon === 'favorite' && <HeartIcon color={iconColor} size={23} />}
                 {item.icon === 'bag' && <View style={styles.bagIcon}><ShoppingBagIcon color={iconColor} size={20} /><CartCountBadge count={cartCount} variant="bottomTab" backgroundColor={bottomTabSettings.badgeBackgroundColor} textColor={bottomTabSettings.badgeTextColor} /></View>}
                 {item.icon === 'account' && <UserIcon color={iconColor} size={20} />}
                 <ThemedText style={[styles.label, { color: textColor }]}>{item.label}</ThemedText>
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   tabButton: { flex: 1 },
   tabButtonView: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   selected: { borderRadius: 22 },
-  label: { fontSize: 10, lineHeight: 11, marginTop: 1 },
+  label: { fontSize: 10, lineHeight: 10, marginTop: 1 },
   bagIcon: { width: 22, height: 22, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   hidden: { display: 'none' },
 });

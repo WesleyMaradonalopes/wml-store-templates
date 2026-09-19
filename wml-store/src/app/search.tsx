@@ -12,9 +12,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
-import { parseCmsRouteFacets } from '@/services/cms-actions';
-import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
 import { subscribeAccountSession } from '@/services/auth';
+import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
+import { parseCmsRouteFacets } from '@/services/cms-actions';
 import { isFavorite } from '@/services/favorites';
 
 function paramText(value: string | string[] | undefined) {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
   listingHeading: { flex: 1 },
   listingTitle: { fontSize: 18 },
   resultCount: { fontSize: 12 },
-  filterButton: { minHeight: 42, paddingHorizontal: Spacing.three, borderRadius: 22, borderWidth: 1, borderColor: '#6d6862', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
+  filterButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
   filterText: { fontSize: 12 },
   loader: { marginTop: Spacing.four },
   moreLoader: { marginVertical: Spacing.four },

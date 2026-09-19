@@ -1,11 +1,11 @@
 import { TabList, TabListProps, Tabs, TabSlot, TabTrigger, TabTriggerSlotProps } from 'expo-router/ui';
-import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getBottomTabItems, withOpacity, type BottomTabSettings } from '@/config/bottom-tab';
 import { Spacing } from '@/constants/theme';
 import { useTabBar } from '@/context/tab-bar-context';
+import CategoryGridIcon from './icons/CategoryGridIcon';
 import HeartIcon from './icons/HeartIcon';
 import HomeIcon from './icons/HomeIcon';
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
@@ -41,7 +41,7 @@ function TabButton({ children, icon, isFocused, settings, ...props }: TabTrigger
         {icon === 'favorite' && <HeartIcon color={iconColor} size={16} />}
         {icon === 'bag' && <ShoppingBagIcon color={iconColor} size={16} />}
         {icon === 'account' && <UserIcon color={iconColor} size={16} />}
-        {icon === 'category' && <SymbolView name={{ ios: 'square.grid.2x2' as never, web: 'grid' as never }} tintColor={iconColor} size={16} />}
+        {icon === 'category' && <CategoryGridIcon color={iconColor} size={16} />}
         <ThemedText style={[styles.tabLabel, { color: textColor }]}>{children}</ThemedText>
       </View>
     </Pressable>
