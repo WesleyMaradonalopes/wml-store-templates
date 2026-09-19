@@ -22,4 +22,8 @@ export default function CategoriesScreen() {
     {cmsPage?.sections.map((section, index) => <CmsSectionView key={`${section.name}-${index}`} section={section} />)}
   </ScrollView></SafeAreaView></ThemedView>;
 }
-const styles = StyleSheet.create({ container: { flex: 1 }, safeArea: { flex: 1, padding: Spacing.four }, content: { gap: Spacing.three, paddingVertical: Spacing.five } });
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.four },
+  content: { gap: Spacing.three, paddingTop: Spacing.two, paddingBottom: 20 },
+});

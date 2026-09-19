@@ -498,16 +498,14 @@ function categoryListItems(data: Record<string, unknown>) {
 
 function CategorySwipeRow({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
   const title = text(category.title) || 'Categoria';
-  const icon = text(category.icon) || text(category.imageUrl);
 
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.categorySwipeRow, pressed && styles.pressed]}>
-      {!!icon && <Image source={{ uri: icon }} style={styles.categorySwipeIcon} contentFit="contain" />}
       <ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
-      <ArrowRightAIcon color="#0a0a0a" size={16} />
+			<ArrowRightAIcon color="#0a0a0a" size={16} />
     </Pressable>
   );
 }
@@ -538,7 +536,7 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
     : '';
 
   return (
-    <ThemedView style={styles.section}>
+    <ThemedView style={styles.categoryMenuSection}>
       <ThemedText style={styles.sectionTitleCateg} type="subtitle">{sectionTitle || 'Todas categorias'}</ThemedText>
       <View style={styles.categorySwipePanel}>
         {categories.map((item, index) => (
@@ -576,7 +574,7 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
                 }}
                 style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
                 <ThemedText style={styles.categoryModalItemText}>Ver tudo em {selectedTitle}</ThemedText>
-                <ArrowRightAIcon color="#0a0a0a" size={18} />
+								<ArrowRightAIcon color="#0a0a0a" size={18} />
               </Pressable>
             )}
 
@@ -585,8 +583,6 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
               const fallbackTarget = selectedActionTarget
                 ? `${selectedActionTarget}/${slugPart(subcategoryTitle)}`
                 : subcategoryTitle;
-              const icon = text(subcategory.icon) || text(subcategory.imageUrl);
-
               return (
                 <Pressable
                   key={`${subcategoryTitle}-${index}`}
@@ -596,11 +592,8 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
                     openCmsAction(router, subcategory.action, fallbackTarget);
                   }}
                   style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
-                  <View style={styles.categoryModalItemContent}>
-                    {!!icon && <Image source={{ uri: icon }} style={styles.categoryModalIcon} contentFit="contain" />}
-                    <ThemedText style={styles.categoryModalItemText}>{subcategoryTitle}</ThemedText>
-                  </View>
-                  <ArrowRightAIcon color="#0a0a0a" size={18} />
+                  <ThemedText style={styles.categoryModalItemText}>{subcategoryTitle}</ThemedText>
+									<ArrowRightAIcon color="#0a0a0a" size={18} />
                 </Pressable>
               );
             })}
@@ -619,7 +612,7 @@ function CategoryRow({ category, router }: { category: Record<string, unknown>; 
       onPress={() => openCmsAction(router, category.action, title)}
       style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}>
       <ThemedText style={styles.categoryRowTitle}>{title}</ThemedText>
-      <ArrowRightAIcon color="#0a0a0a" size={20} />
+			<ArrowRightAIcon color="#0a0a0a" size={20} />
     </Pressable>
   );
 }
@@ -900,7 +893,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     const sectionHeading = !isDetailSection && section.name === 'CategoryTree' ? sectionTitle : '';
 
     return (
-      <ThemedView style={styles.section}>
+      <ThemedView style={styles.categoryMenuSection}>
         {!!sectionHeading && <ThemedText type="subtitle">{sectionHeading}</ThemedText>}
         <View style={[styles.categoryList, (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon') && styles.categoryGroupsList]}>
           {displayedCategories.map((category, index) => (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon')
@@ -921,6 +914,16 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
 const styles = StyleSheet.create({
   section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: '#ffffff' },
+  categoryMenuSection: {
+    gap: 12,
+    padding: 14,
+		margin: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#ffffff',
+		boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)',
+  },
   // O hero escapa do padding horizontal usado pelos demais blocos da home.
   heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#ffffff' },
   heroViewport: { position: 'relative', width: '100%', height: Dimensions.get('window').height },
@@ -943,31 +946,28 @@ const styles = StyleSheet.create({
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
-	sectionTitleCateg: { fontSize: 20, },
-  categorySwipePanel: { overflow: 'hidden', borderRadius: 16, borderWidth: 1, borderColor: '#eeeae5', backgroundColor: '#FFFFFF' },
-  categorySwipeRow: { minHeight: 60, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: 1, borderBottomColor: '#eeeae5', backgroundColor: '#FFFFFF' },
-  categorySwipeIcon: { width: 28, height: 28, borderRadius: 6 },
-  categorySwipeRowTitle: { flex: 1, fontSize: 14, lineHeight: 26, color: '#0a0a0a', fontWeight: '500', textTransform: 'uppercase' },
-  categoryModal: { flex: 1, padding: 16, backgroundColor: '#FFFFFF' },
-  categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
+  sectionTitleCateg: { marginHorizontal: 4, fontSize: 20, lineHeight: 26, color: '#101114', fontWeight: '700' },
+  categorySwipePanel: { overflow: 'hidden', borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
+  categorySwipeRow: { minHeight: 58, paddingHorizontal: 0, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 0, borderBottomColor: 'rgba(255, 255, 255, 0.82)', backgroundColor: 'transparent' },
+  categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#101114', fontWeight: '500', textTransform: 'none' },
+  categoryModal: { flex: 1, padding: 16, backgroundColor: '#f0f1f5' },
+  categoryModalHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.9)' },
   categoryModalBack: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
   categoryModalTitle: { flex: 1, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700', textAlign: 'center' },
   categoryModalList: { gap: 10, paddingVertical: 16 },
-  categoryModalItem: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
-  categoryModalItemContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  categoryModalIcon: { width: 28, height: 28, borderRadius: 6 },
+  categoryModalItem: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.82)' },
   categoryModalItemText: { flex: 1, fontSize: 16, lineHeight: 22, color: '#0a0a0a' },
-  categoryList: { gap: 0, overflow: 'hidden', borderRadius: 24, backgroundColor: '#FFFFFF' },
+  categoryList: { gap: 0, overflow: 'hidden', borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
   categoryGroupsList: { gap: 12, overflow: 'visible', backgroundColor: 'transparent' },
-  categoryRow: { minHeight: 72, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eeeae5' },
-  categoryRowTitle: { fontSize: 22, lineHeight: 28, color: '#0a0a0a', fontWeight: '500' },
-  categoryGroup: { gap: 14, padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF' },
+  categoryRow: { minHeight: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.82)' },
+  categoryRowTitle: { fontSize: 18, lineHeight: 26, color: '#101114', fontWeight: '500' },
+  categoryGroup: { gap: 14, paddingHorizontal: 0, paddingVertical: 18, borderRadius: 16, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: '#ffffff' },
   categoryGroupHeader: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   categoryGroupBack: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
   categoryGroupTitle: { flex: 1, fontSize: 24, lineHeight: 30, color: '#0a0a0a' },
   seeAllButton: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: '#6d6862', alignItems: 'center', justifyContent: 'center' },
   seeAllButtonText: { fontSize: 13, lineHeight: 18, color: '#0a0a0a' },
-  subcategoryBlock: { borderTopWidth: 1, borderTopColor: '#eeeae5' },
+  subcategoryBlock: { borderTopWidth: 1, borderTopColor: '#d4d4d4' },
   subcategoryHeader: { minHeight: 52, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   subcategoryHeading: { fontSize: 16, lineHeight: 22, color: '#0a0a0a', fontWeight: '700' },
   subcategoryChevron: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
