@@ -1093,7 +1093,7 @@ const styles = StyleSheet.create({
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
   sectionTitleCateg: { marginHorizontal: 14, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700' },
-  categorySwipePanel: { overflow: 'hidden', marginHorizontal: 14, paddingHorizontal: 14, borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: 'transparent' },
+  categorySwipePanel: { overflow: 'hidden', marginHorizontal: 14, paddingLeft: 14, paddingRight: 14, borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: 'transparent' },
   categorySwipeRow: { minHeight: 60, paddingHorizontal: 0, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 0, borderBottomColor: 'rgba(255, 255, 255, 0.82)', backgroundColor: 'transparent' },
   categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#0a0a0a', fontWeight: '500', textTransform: 'none' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: '#f0f1f5' },
