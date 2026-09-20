@@ -47,7 +47,7 @@ export default function HomeScreen() {
           {cmsLoading && <ThemedText themeColor="textSecondary">Carregando conteudo da loja...</ThemedText>}
           {cmsError && <ThemedText themeColor="textSecondary">Nao foi possivel consultar o CMS agora.</ThemedText>}
           {!cmsLoading && !cmsError && cmsPage?.sections.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>}
-          {cmsPage?.sections.map((section, index) => <CmsSectionView key={`${section.name}-${index}`} section={section} />)}
+          {cmsPage?.sections.map((section, index) => <CmsSectionView key={`${section.name}-${index}`} section={section} isHome />)}
         </ScrollView>
         <View style={[styles.header, { paddingTop: insets.top, minHeight: 48 + insets.top }, transparentHeader ? styles.heroHeader : styles.scrolledHeader]}>
           <Pressable accessibilityLabel="Voltar ao topo" onPress={() => { scrollRef.current?.scrollTo({ y: 0, animated: true }); setHidden(false); }} style={styles.brandButton}>

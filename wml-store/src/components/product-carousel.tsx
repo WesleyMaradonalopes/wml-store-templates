@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { FlatList, StyleSheet, useWindowDimensions } from 'react-native';
 
 import type { Product } from '@/services/catalog';
 
@@ -14,6 +14,7 @@ export function productCarouselCardWidth(screenWidth: number) {
 
 type ProductCarouselProps = {
   products: Product[];
+  variant?: 'default' | 'home';
   favoriteIds?: string[];
   onFavoriteChange?: (product: Product, favorite: boolean) => void;
   onAdded?: (product: Product) => void;
@@ -25,6 +26,7 @@ type ProductCarouselProps = {
 
 export function ProductCarousel({
   products,
+  variant = 'default',
   favoriteIds,
   onFavoriteChange,
   onAdded,
@@ -34,9 +36,16 @@ export function ProductCarousel({
   rightInset = 16,
 }: ProductCarouselProps) {
   const { width: screenWidth } = useWindowDimensions();
+  const isHome = variant === 'home';
   const [activeIndex, setActiveIndex] = useState(0);
   const cardWidth = productCarouselCardWidth(screenWidth);
-  const effectiveLeftInset = leftInset ?? rightInset;
+  const effectiveLeftInset = leftInset ?? (isHome ? 0 : rightInset);
+  const viewportStyle = isHome
+    ? [styles.viewport, styles.homeViewport]
+    : [styles.viewport, { marginLeft: -effectiveLeftInset, marginRight: -rightInset }];
+  const contentContainerStyle = isHome
+    ? [styles.list, styles.homeList]
+    : [styles.list, { paddingLeft: effectiveLeftInset, paddingRight: rightInset }];
   const productSignature = products.map((product) => product.id).join('|');
 
   useEffect(() => {
@@ -61,8 +70,8 @@ export function ProductCarousel({
         disableIntervalMomentum
         showsHorizontalScrollIndicator={false}
         keyExtractor={(product) => product.id}
-        style={[styles.viewport, { marginLeft: -effectiveLeftInset, marginRight: -rightInset }]}
-        contentContainerStyle={[styles.list, { paddingLeft: effectiveLeftInset, paddingRight: rightInset }]}
+        style={viewportStyle}
+        contentContainerStyle={contentContainerStyle}
         onMomentumScrollEnd={(event) => updateActiveIndex(event.nativeEvent.contentOffset.x)}
         renderItem={({ item }) => (
           <ProductCard
@@ -83,7 +92,7 @@ export function ProductCarousel({
           activeColor="#0a0a0a"
           inactiveColor="#b9b4ae"
           accessibilityLabel={`Produto ${Math.min(activeIndex + 1, products.length)} de ${products.length}`}
-          style={styles.pagination}
+          style={[styles.pagination, isHome && styles.homePagination]}
         />
       )}
     </>
@@ -93,5 +102,8 @@ export function ProductCarousel({
 const styles = StyleSheet.create({
   viewport: {},
   list: { gap: PRODUCT_CAROUSEL_GAP },
+  homeViewport: { marginLeft: 0, marginRight: 0, backgroundColor: '#fff' },
+  homeList: { paddingLeft: 10, paddingRight: 10 },
+  homePagination: { paddingTop: 2 },
   pagination: { minHeight: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: 2 },
 });

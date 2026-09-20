@@ -23,7 +23,7 @@ import { FilterGlyph, ProductFilterModal } from './product-filter-modal';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-type Props = { section: CmsSection; categoryPageSlug?: string };
+type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean };
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -277,13 +277,14 @@ function openCmsAction(router: ReturnType<typeof useRouter>, value: unknown, fal
 
 type ProductShelfProps = {
   data: Record<string, unknown>;
+  isHome?: boolean;
   titleStyle?: StyleProp<TextStyle>;
   onAdded?: (product: Product) => void;
   onFavoriteChange?: (product: Product, favorite: boolean) => void;
   showAddedModal?: boolean;
 };
 
-export function ProductShelf({ data, titleStyle, onAdded, onFavoriteChange, showAddedModal = true }: ProductShelfProps) {
+export function ProductShelf({ data, isHome = false, titleStyle, onAdded, onFavoriteChange, showAddedModal = true }: ProductShelfProps) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -341,9 +342,9 @@ export function ProductShelf({ data, titleStyle, onAdded, onFavoriteChange, show
   }, []);
 
   return (
-    <ThemedView style={styles.section}>
+    <ThemedView style={[styles.section, isHome ? styles.homeProductShelfSection : styles.productShelfSection]}>
       <View style={styles.sectionHeader}>
-        <ThemedText type="subtitle" style={titleStyle}>{text(data.title) || 'Produtos'}</ThemedText>
+        <ThemedText type="subtitle" style={[isHome && styles.homeShelfTitle, titleStyle]}>{text(data.title) || 'Produtos'}</ThemedText>
         {data.showSeeAll !== false && (
           <Pressable onPress={() => router.push(`/search?q=${encodeURIComponent(text(activeConfig.term) || text(activeConfig.query))}` as never)}>
             <ThemedText style={styles.seeAll}>Ver tudo</ThemedText>
@@ -356,9 +357,10 @@ export function ProductShelf({ data, titleStyle, onAdded, onFavoriteChange, show
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(_, index) => String(index)}
-          contentContainerStyle={styles.tabList}
+          style={isHome ? styles.homeTabViewport : undefined}
+          contentContainerStyle={[styles.tabList, isHome && styles.homeTabList]}
           renderItem={({ item: tab, index }) => (
-            <Pressable onPress={() => setSelectedTab(index)} style={[styles.tab, selectedTab === index && styles.selectedTab]}>
+            <Pressable onPress={() => setSelectedTab(index)} style={[styles.tab, isHome && styles.homeTab, selectedTab === index && styles.selectedTab]}>
               <ThemedText style={selectedTab === index ? styles.selectedTabText : undefined}>{text(tab.label) || `Opcao ${index + 1}`}</ThemedText>
             </Pressable>
           )}
@@ -370,6 +372,7 @@ export function ProductShelf({ data, titleStyle, onAdded, onFavoriteChange, show
       )}
       <ProductCarousel
         products={products}
+        variant={isHome ? 'home' : 'default'}
         favoriteIds={favoriteIds}
         onFavoriteChange={(product, favorite) => {
           setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id));
@@ -507,22 +510,22 @@ function ContentCard({ title, description, imageUrl, action }: { title?: string;
 
 function StreamShopBanner({ data }: { data: Record<string, unknown> }) {
   const content = Array.isArray(data.content) ? data.content : [];
-  return <ThemedView style={styles.section}><ThemedText type="subtitle">{text(data.title) || 'Ao vivo'}</ThemedText><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.contentRow}>{content.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title)} description={text(value.description)} imageUrl={text(value.imageUrl) || text(value.thumbnail) || text(value.image)} action={value.action as { type?: string; value?: string } | undefined} />; })}</ScrollView></ThemedView>;
+  return <ThemedView style={[styles.section, styles.streamShopSection]}><ThemedText type="subtitle">{text(data.title) || 'Ao vivo'}</ThemedText><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.contentRow}>{content.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title)} description={text(value.description)} imageUrl={text(value.imageUrl) || text(value.thumbnail) || text(value.image)} action={value.action as { type?: string; value?: string } | undefined} />; })}</ScrollView></ThemedView>;
 }
 
-function ProductTiles({ data }: { data: Record<string, unknown> }) {
+function ProductTiles({ data, isHome = false }: { data: Record<string, unknown>; isHome?: boolean }) {
   const shelves = Array.isArray(data.shelves) ? data.shelves.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')) : [];
-  return <View style={styles.tileStack}>{shelves.length ? shelves.map((shelf, index) => <ProductShelf key={index} data={shelf} />) : <ProductShelf data={data} />}</View>;
+  return <View style={styles.tileStack}>{shelves.length ? shelves.map((shelf, index) => <ProductShelf key={index} data={shelf} isHome={isHome} />) : <ProductShelf data={data} isHome={isHome} />}</View>;
 }
 
 function ScheduleCardShelf({ data }: { data: Record<string, unknown> }) {
   const shelves = Array.isArray(data.shelves) ? data.shelves : [];
-  return <ThemedView style={styles.section}><ThemedText type="subtitle">{text(data.title) || 'Agenda'}</ThemedText><View style={styles.contentRow}>{shelves.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ThemedView key={index} style={styles.scheduleCard}><ThemedText themeColor="textSecondary">{text(value.date)}</ThemedText><ThemedText type="smallBold">{text(value.title)}</ThemedText><ThemedText themeColor="textSecondary">{text(value.description)}</ThemedText></ThemedView>; })}</View></ThemedView>;
+  return <ThemedView style={[styles.section, styles.scheduleSection]}><ThemedText type="subtitle">{text(data.title) || 'Agenda'}</ThemedText><View style={styles.contentRow}>{shelves.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ThemedView key={index} style={styles.scheduleCard}><ThemedText themeColor="textSecondary">{text(value.date)}</ThemedText><ThemedText type="smallBold">{text(value.title)}</ThemedText><ThemedText themeColor="textSecondary">{text(value.description)}</ThemedText></ThemedView>; })}</View></ThemedView>;
 }
 
 function CouponsList({ data }: { data: Record<string, unknown> }) {
   const coupons = Array.isArray(data.coupons) ? data.coupons : [];
-  return <ThemedView style={styles.section}><ThemedText type="subtitle">Cupons</ThemedText>{coupons.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ThemedView key={index} style={styles.couponCard}><ThemedText type="smallBold">{text(value.title) || 'Cupom'}</ThemedText><ThemedText themeColor="textSecondary">{text(value.description)}</ThemedText><ThemedText style={styles.couponCode}>{text(value.code)}</ThemedText>{!!text(value.expiresAt) && <ThemedText themeColor="textSecondary">Válido até {text(value.expiresAt)}</ThemedText>}</ThemedView>; })}</ThemedView>;
+  return <ThemedView style={[styles.section, styles.couponsSection]}><ThemedText type="subtitle">Cupons</ThemedText>{coupons.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ThemedView key={index} style={styles.couponCard}><ThemedText type="smallBold">{text(value.title) || 'Cupom'}</ThemedText><ThemedText themeColor="textSecondary">{text(value.description)}</ThemedText><ThemedText style={styles.couponCode}>{text(value.code)}</ThemedText>{!!text(value.expiresAt) && <ThemedText themeColor="textSecondary">Válido até {text(value.expiresAt)}</ThemedText>}</ThemedView>; })}</ThemedView>;
 }
 
 function categoryListItems(data: Record<string, unknown>) {
@@ -737,7 +740,7 @@ function CategoryGroup({
   );
 }
 
-export function CmsSectionView({ section, categoryPageSlug }: Props) {
+export function CmsSectionView({ section, categoryPageSlug, isHome = false }: Props) {
   const router = useRouter();
   const [heroIndex, setHeroIndex] = useState(0);
   const heroRef = useRef<ScrollView | null>(null);
@@ -745,6 +748,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
   const bannerImages = section.name === 'MultipleImageBanner' && Array.isArray(data.images) ? data.images : [];
   const bannerMode = bannerDisplayMode(data.mode);
   const isHeroBanner = section.name === 'MultipleImageBanner' && bannerMode === 'SliderHero';
+  const isFullScreenHero = isHome && isHeroBanner;
   const [bannerAspectRatios, setBannerAspectRatios] = useState<Record<string, number>>({});
   const loopedBannerImages = bannerImages.length > 1 ? [bannerImages[bannerImages.length - 1], ...bannerImages, bannerImages[0]] : bannerImages;
   const bannerBlurTargets = useRef<Record<string, BannerBlurTargetRef>>({});
@@ -785,7 +789,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
   if (section.name === 'RichText') {
     return (
-      <ThemedView style={styles.section}>
+      <ThemedView style={[styles.section, styles.richTextSection]}>
         <CmsRichText data={data} />
       </ThemedView>
     );
@@ -795,10 +799,53 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     const images = bannerImages;
     if (images.length === 0) return null;
 
-    const isHero = isHeroBanner;
     const configuredAspectRatio = bannerRatio(data.aspectRatio, 4 / 3);
     const configuredBorderRadius = bannerDimension(data.borderRadius, 5);
     const ratioFor = (key: string, fallback: number) => bannerAspectRatios[key] ?? bannerRatio(data.aspectRatio, fallback);
+    const homeBannerSectionStyle = !isHome
+      ? undefined
+      : bannerMode === 'GridList'
+        ? styles.homeGridBannerSection
+        : bannerMode === 'RoundedBannerList'
+          ? styles.homeRoundedBannerSection
+          : bannerMode === 'BannerList'
+            ? styles.homeHorizontalBannerSection
+            : bannerMode === 'SingleBanner'
+              ? styles.homeSingleBannerSection
+              : styles.homeSliderBannerSection;
+    const homeBannerTitleStyle = !isHome
+      ? undefined
+      : bannerMode === 'GridList'
+        ? styles.homeGridBannerTitle
+        : bannerMode === 'RoundedBannerList'
+          ? styles.homeRoundedBannerTitle
+          : bannerMode === 'BannerList'
+            ? styles.homeHorizontalBannerTitle
+            : bannerMode === 'SingleBanner'
+              ? styles.homeSingleBannerTitle
+              : styles.homeSliderBannerTitle;
+    const homeBannerOverlayTitleStyle = !isHome
+      ? undefined
+      : bannerMode === 'GridList'
+        ? styles.homeGridBannerOverlayTitle
+        : bannerMode === 'RoundedBannerList'
+          ? styles.homeRoundedBannerOverlayTitle
+          : bannerMode === 'BannerList'
+            ? styles.homeHorizontalBannerOverlayTitle
+            : bannerMode === 'SingleBanner'
+              ? styles.homeSingleBannerOverlayTitle
+              : styles.homeSliderBannerOverlayTitle;
+    const homeBannerOverlaySubtitleStyle = !isHome
+      ? undefined
+      : bannerMode === 'GridList'
+        ? styles.homeGridBannerOverlaySubtitle
+        : bannerMode === 'RoundedBannerList'
+          ? styles.homeRoundedBannerOverlaySubtitle
+          : bannerMode === 'BannerList'
+            ? styles.homeHorizontalBannerOverlaySubtitle
+            : bannerMode === 'SingleBanner'
+              ? styles.homeSingleBannerOverlaySubtitle
+              : styles.homeSliderBannerOverlaySubtitle;
 
     const renderBanner = (item: unknown, index: number, options: BannerRenderOptions = {}) => {
       const image = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
@@ -810,21 +857,21 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
       const blurTarget = getBannerBlurTarget(bannerKey);
       const loadedAspectRatio = options.aspectRatioKey ? bannerAspectRatios[options.aspectRatioKey] : undefined;
       return (
-        <Pressable key={bannerKey} onPress={openBanner} style={[styles.banner, options.containerStyle, isHero && styles.heroBanner]}>
+        <Pressable key={bannerKey} onPress={openBanner} style={[styles.banner, options.containerStyle, isFullScreenHero && styles.heroBanner]}>
           <BlurTargetView ref={blurTarget} style={styles.bannerTarget}>
             <Image
               source={{ uri: imageUrl }}
               onLoad={options.aspectRatioKey ? (event) => rememberBannerAspectRatio(options.aspectRatioKey!, event) : undefined}
-              style={[styles.bannerImage, options.imageStyle, loadedAspectRatio ? { aspectRatio: loadedAspectRatio } : undefined, isHero && styles.heroImage]}
-              contentFit={options.contentFit ?? (isHero ? 'cover' : 'contain')}
+              style={[styles.bannerImage, options.imageStyle, loadedAspectRatio ? { aspectRatio: loadedAspectRatio } : undefined, isFullScreenHero && styles.heroImage]}
+              contentFit={options.contentFit ?? (isFullScreenHero ? 'cover' : 'contain')}
             />
             <View style={styles.overlay}>
-              {!!text(image.overlayTitle) && <ThemedText style={styles.overlayTitle}>{text(image.overlayTitle)}</ThemedText>}
-              {!!text(image.overlaySubtitle) && <ThemedText style={styles.overlaySubtitle}>{text(image.overlaySubtitle)}</ThemedText>}
+              {!!text(image.overlayTitle) && <ThemedText style={[styles.overlayTitle, isHome && homeBannerOverlayTitleStyle]}>{text(image.overlayTitle)}</ThemedText>}
+              {!!text(image.overlaySubtitle) && <ThemedText style={[styles.overlaySubtitle, isHome && homeBannerOverlaySubtitleStyle]}>{text(image.overlaySubtitle)}</ThemedText>}
             </View>
           </BlurTargetView>
           {button && (
-            <View pointerEvents="box-none" style={[styles.bannerButtonPosition, bannerButtonPositionStyle(button.position, isHero)]}>
+            <View pointerEvents="box-none" style={[styles.bannerButtonPosition, bannerButtonPositionStyle(button.position, isFullScreenHero)]}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={button.label}
@@ -864,13 +911,13 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     };
 
     const renderHeroContent = () => (
-      <View style={styles.heroViewport}>
+      <View style={isFullScreenHero ? styles.heroViewport : styles.bannerSliderViewport}>
         <ScrollView
           ref={heroRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          style={styles.heroCarousel}
+          style={isFullScreenHero ? styles.heroCarousel : styles.bannerCarousel}
           onMomentumScrollEnd={(event) => {
             const page = Math.round(event.nativeEvent.contentOffset.x / Dimensions.get('window').width);
             if (images.length > 1 && page === 0) {
@@ -881,7 +928,17 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
               setHeroIndex(0);
             } else setHeroIndex(Math.max(0, page - 1));
           }}>
-          {loopedBannerImages.map((item, index) => renderBanner(item, index))}
+          {loopedBannerImages.map((item, index) => {
+            if (isFullScreenHero) return renderBanner(item, index);
+            const image = record(item) ?? {};
+            const key = `${text(image.imageUrl)}-${index}`;
+            return renderBanner(item, index, {
+              containerStyle: { width: Dimensions.get('window').width, minHeight: 0 },
+              imageStyle: { width: '100%', aspectRatio: ratioFor(key, configuredAspectRatio) },
+              contentFit: 'contain',
+              aspectRatioKey: key,
+            });
+          })}
         </ScrollView>
         {images.length > 1 && (
           <AnimatedPaginationDots
@@ -918,7 +975,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
         const cardWidth = bannerDimension(size.maxWidth, 254);
         const cardHeight = Math.round(cardWidth / bannerRatio(data.aspectRatio, cardWidth / bannerDimension(size.maxHeight, 328)));
         return (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bannerListRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.bannerListRow, isHome && styles.homeHorizontalBannerListRow]}>
             {images.map((item, index) => renderBanner(item, index, {
               containerStyle: { width: cardWidth, height: cardHeight, minHeight: 0, borderRadius: configuredBorderRadius },
               imageStyle: { width: '100%', height: '100%' },
@@ -932,7 +989,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
         const size = record(data.size) ?? {};
         const diameter = Math.min(bannerDimension(size.maxWidth, 200), bannerDimension(size.maxHeight, 200));
         return (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bannerListRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.bannerListRow, isHome && styles.homeRoundedBannerListRow]}>
             {images.map((item, index) => renderBanner(item, index, {
               containerStyle: { width: diameter, height: diameter, minHeight: 0, borderRadius: diameter / 2 },
               imageStyle: { width: '100%', height: '100%' },
@@ -944,7 +1001,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 
       if (bannerMode === 'GridList') {
         return (
-          <View style={styles.bannerGrid}>
+          <View style={[styles.bannerGrid, isHome && styles.homeGridBanner]}>
             {images.map((item, index) => {
               const image = record(item) ?? {};
               const key = `${text(image.imageUrl)}-${index}`;
@@ -978,21 +1035,21 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
     };
 
     return (
-      <View style={isHero ? styles.heroSection : styles.bannerSection}>
-        {!!text(data.mainTitle) && <ThemedText type="subtitle" style={styles.bannerSectionTitle}>{text(data.mainTitle)}</ThemedText>}
+      <View style={isFullScreenHero ? styles.heroSection : [styles.bannerSection, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle]}>
+        {!!text(data.mainTitle) && <ThemedText type="subtitle" style={[styles.bannerSectionTitle, isHome && homeBannerTitleStyle]}>{text(data.mainTitle)}</ThemedText>}
         {renderModeContent()}
       </View>
     );
   }
 
   if (section.name === 'ProductShelf' || section.name === 'HighlightedProductShelf') {
-    return <ProductShelf data={data} />;
+    return <ProductShelf data={data} isHome={isHome} />;
   }
 
   if (section.name === 'ProductInfiniteScroll') return <ProductListingSection data={data} />;
-  if (section.name === 'LastSeenProducts') return <ProductShelf data={data} />;
+  if (section.name === 'LastSeenProducts') return <ProductShelf data={data} isHome={isHome} />;
 
-  if (section.name === 'ProductTiles') return <ProductTiles data={data} />;
+  if (section.name === 'ProductTiles') return <ProductTiles data={data} isHome={isHome} />;
   if (section.name === 'StreamShopBanner') return <StreamShopBanner data={data} />;
   if (section.name === 'ScheduleCardShelf') return <ScheduleCardShelf data={data} />;
   if (section.name === 'CouponsList') return <CouponsList data={data} />;
@@ -1000,7 +1057,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
   if (section.name === 'WordPressCardList') {
     const posts = Array.isArray(data.posts) ? data.posts : Array.isArray(data.content) ? data.content : [];
     const postUrl = text(data.postUrl);
-    return <ThemedView style={styles.section}><View style={styles.sectionHeader}><ThemedText type="subtitle">{text(data.title) || 'Confira nosso blog'}</ThemedText>{!!postUrl && <Pressable onPress={() => { const internalRoute = cmsInternalRoute(postUrl); if (internalRoute) router.push(internalRoute as never); else void openCmsExternalLink(postUrl); }}><ThemedText style={styles.seeAll}>Ver tudo</ThemedText></Pressable>}</View><View style={styles.contentRow}>{posts.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title) || text(value.name)} description={text(value.description) || text(value.excerpt)} imageUrl={text(value.imageUrl) || text(value.thumbnail)} action={{ type: 'link', value: text(value.link) }} />; })}</View>{posts.length === 0 && <ThemedText themeColor="textSecondary">Os conteúdos do blog aparecerão aqui.</ThemedText>}</ThemedView>;
+    return <ThemedView style={[styles.section, styles.blogSection]}><View style={styles.sectionHeader}><ThemedText type="subtitle">{text(data.title) || 'Confira nosso blog'}</ThemedText>{!!postUrl && <Pressable onPress={() => { const internalRoute = cmsInternalRoute(postUrl); if (internalRoute) router.push(internalRoute as never); else void openCmsExternalLink(postUrl); }}><ThemedText style={styles.seeAll}>Ver tudo</ThemedText></Pressable>}</View><View style={styles.contentRow}>{posts.map((item, index) => { const value = item && typeof item === 'object' ? item as Record<string, unknown> : {}; return <ContentCard key={index} title={text(value.title) || text(value.name)} description={text(value.description) || text(value.excerpt)} imageUrl={text(value.imageUrl) || text(value.thumbnail)} action={{ type: 'link', value: text(value.link) }} />; })}</View>{posts.length === 0 && <ThemedText themeColor="textSecondary">Os conteúdos do blog aparecerão aqui.</ThemedText>}</ThemedView>;
   }
 
   if (section.name === 'CategoryListSwipe') {
@@ -1049,7 +1106,7 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
   }
 
   return (
-    <ThemedView style={styles.section}>
+    <ThemedView style={[styles.section, styles.cmsFallbackSection]}>
       <ThemedText type="smallBold">{section.name}</ThemedText>
       <ThemedText themeColor="textSecondary">Seção recebida do Headless CMS.</ThemedText>
     </ThemedView>
@@ -1057,9 +1114,39 @@ export function CmsSectionView({ section, categoryPageSlug }: Props) {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 8, padding: 16, borderRadius: 16, backgroundColor: 'transparent' },
-  bannerSection: { gap: 6, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderRadius: 16, marginHorizontal: 14, backgroundColor: 'transparent' },
-  bannerSectionTitle: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', fontWeight: '600' },
+  section: { borderRadius: 16, backgroundColor: 'transparent' },
+  productShelfSection: { gap: 8, padding: 0, marginHorizontal: 0 },
+  homeProductShelfSection: { gap: 8, paddingHorizontal: 0 },
+  richTextSection: { gap: 8, padding: 16 },
+  streamShopSection: { gap: 8, padding: 16 },
+  scheduleSection: { gap: 8, padding: 16 },
+  couponsSection: { gap: 8, padding: 16 },
+  blogSection: { gap: 8, padding: 16 },
+  cmsFallbackSection: { gap: 8, padding: 16 },
+  bannerSection: { gap: 6, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderRadius: 0, marginHorizontal: 0, backgroundColor: 'transparent' },
+  homeBannerSection: { marginHorizontal: 0, backgroundColor: '#fff' },
+  bannerSectionTitle: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', paddingHorizontal: 10, fontWeight: '600' },
+  homeGridBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
+  homeRoundedBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
+  homeHorizontalBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
+  homeSingleBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
+  homeSliderBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
+  homeGridBanner: { width: '100%', marginHorizontal: 0, paddingHorizontal: 10 },
+  homeGridBannerTitle: { color: '#0a0a0a' },
+  homeRoundedBannerTitle: { color: '#0a0a0a' },
+  homeHorizontalBannerTitle: { color: '#0a0a0a' },
+  homeSingleBannerTitle: { color: '#0a0a0a' },
+  homeSliderBannerTitle: { color: '#0a0a0a' },
+  homeGridBannerOverlayTitle: { color: '#FFFFFF' },
+  homeRoundedBannerOverlayTitle: { color: '#FFFFFF' },
+  homeHorizontalBannerOverlayTitle: { color: '#FFFFFF' },
+  homeSingleBannerOverlayTitle: { color: '#FFFFFF' },
+  homeSliderBannerOverlayTitle: { color: '#FFFFFF' },
+  homeGridBannerOverlaySubtitle: { color: '#FFFFFF' },
+  homeRoundedBannerOverlaySubtitle: { color: '#FFFFFF' },
+  homeHorizontalBannerOverlaySubtitle: { color: '#FFFFFF' },
+  homeSingleBannerOverlaySubtitle: { color: '#FFFFFF' },
+  homeSliderBannerOverlaySubtitle: { color: '#FFFFFF' },
   categoryMenuSection: {
     gap: 12,
     padding: 0,
@@ -1073,13 +1160,19 @@ const styles = StyleSheet.create({
   // O hero escapa do padding horizontal usado pelos demais blocos da home.
   heroSection: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, backgroundColor: '#ffffff' },
   heroViewport: { position: 'relative', width: '100%', height: Dimensions.get('window').height },
+  bannerSliderViewport: { position: 'relative', width: '100%' },
   heroCarousel: { flex: 1 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  bannerCarousel: { width: '100%' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
   seeAll: { textDecorationLine: 'underline', fontSize: 13 },
   tabList: { gap: 8 },
-  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: '#0a0a0a' },
+  homeTabList: { paddingHorizontal: 10 },
+  tab: { paddingHorizontal: 16, paddingVertical: 4, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a' },
   selectedTab: { backgroundColor: '#0a0a0a' },
   selectedTabText: { color: '#FFFFFF' },
+  homeShelfTitle: { fontSize: 20, lineHeight: 20 },
+  homeTabViewport: { marginHorizontal: 0, paddingHorizontal: 0 },
+  homeTab: { borderRadius: 50 },
   plpSection: { gap: Spacing.three, backgroundColor: '#ffffff' },
   plpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   plpHeading: { flex: 1 },
@@ -1125,6 +1218,8 @@ const styles = StyleSheet.create({
   bannerTarget: { width: '100%' },
   bannerImage: { width: '100%' },
   bannerListRow: { flexDirection: 'row', gap: 12 },
+  homeHorizontalBannerListRow: { paddingLeft: 10, paddingRight: 10 },
+  homeRoundedBannerListRow: { paddingLeft: 10, paddingRight: 10 },
   bannerGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
   fitOnScreenRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },
