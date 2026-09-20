@@ -1,5 +1,6 @@
 import { CartIconButton } from '@/components/cart-icon-button';
 import { CmsSectionView } from '@/components/cms-section';
+import { HomeSkeleton } from '@/components/home-skeleton';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import { ThemedText } from '@/components/themed-text';
@@ -44,7 +45,7 @@ export default function HomeScreen() {
             else if (currentY < lastScrollY.current - 4) setHidden(false);
             lastScrollY.current = currentY;
           }}>
-          {cmsLoading && <ThemedText themeColor="textSecondary">Carregando conteudo da loja...</ThemedText>}
+          {cmsLoading && !cmsPage && <HomeSkeleton />}
           {cmsError && <ThemedText themeColor="textSecondary">Nao foi possivel consultar o CMS agora.</ThemedText>}
           {!cmsLoading && !cmsError && cmsPage?.sections.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>}
           {cmsPage?.sections.map((section, index) => <CmsSectionView key={`${section.name}-${index}`} section={section} isHome />)}

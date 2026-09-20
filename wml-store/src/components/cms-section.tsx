@@ -19,6 +19,8 @@ import ArrowRightAIcon from './icons/ArrowRightAicon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import { ProductCard } from './product-card';
 import { ProductCarousel } from './product-carousel';
+import { ProductCarouselSkeleton } from './product-carousel-skeleton';
+import { ProductGridSkeleton } from './product-grid-skeleton';
 import { FilterGlyph, ProductFilterModal } from './product-filter-modal';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -366,21 +368,23 @@ export function ProductShelf({ data, isHome = false, titleStyle, onAdded, onFavo
           )}
         />
       )}
-      {loading && <ActivityIndicator color="#0a0a0a" />}
+      {loading && <ProductCarouselSkeleton variant={isHome ? 'home' : 'default'} />}
       {!loading && products.length === 0 && (
         <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>
       )}
-      <ProductCarousel
-        products={products}
-        variant={isHome ? 'home' : 'default'}
-        favoriteIds={favoriteIds}
-        onFavoriteChange={(product, favorite) => {
-          setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id));
-          onFavoriteChange?.(product, favorite);
-        }}
-        onAdded={onAdded}
-        showAddedModal={showAddedModal}
-      />
+      {!loading && products.length > 0 && (
+        <ProductCarousel
+          products={products}
+          variant={isHome ? 'home' : 'default'}
+          favoriteIds={favoriteIds}
+          onFavoriteChange={(product, favorite) => {
+            setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id));
+            onFavoriteChange?.(product, favorite);
+          }}
+          onAdded={onAdded}
+          showAddedModal={showAddedModal}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -463,7 +467,8 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
         </View>
         <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
       </View>
-      {loading && <ActivityIndicator color="#0a0a0a" />}
+      {loading && products.length === 0 && <ProductGridSkeleton />}
+      {loading && products.length > 0 && <ActivityIndicator color="#0a0a0a" />}
       {!loading && products.length === 0 && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
       <View style={styles.productGrid}>
         {products.map((product) => (
@@ -1216,7 +1221,7 @@ const styles = StyleSheet.create({
   subcategoryText: { fontSize: 16, lineHeight: 22, color: '#625d57' },
   banner: { overflow: 'hidden', borderRadius: 16 },
   bannerTarget: { width: '100%' },
-  bannerImage: { width: '100%' },
+  bannerImage: { width: '100%', backgroundColor: '#e5e7eb' },
   bannerListRow: { flexDirection: 'row', gap: 12 },
   homeHorizontalBannerListRow: { paddingLeft: 10, paddingRight: 10 },
   homeRoundedBannerListRow: { paddingLeft: 10, paddingRight: 10 },
