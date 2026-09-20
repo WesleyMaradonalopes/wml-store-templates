@@ -1,10 +1,11 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProductShelf } from '@/components/cms-section';
 import { ProductCard } from '@/components/product-card';
+import { ProductGridSkeleton } from '@/components/product-grid-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -85,9 +86,9 @@ export default function FavoritesScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader back={false} title="Meus favoritos" titleAlign="left" showSearch={false} showShare={favorites.length > 0} shareLoading={sharingFavorites} onShare={shareFavorites} />
-        {loadingFavorites && <ActivityIndicator color="#0a0a0a" />}
+        {loadingFavorites && <ProductGridSkeleton />}
         <FlatList
-          data={favorites}
+          data={loadingFavorites ? [] : favorites}
           numColumns={2}
           onScroll={onScroll}
           scrollEventThrottle={16}

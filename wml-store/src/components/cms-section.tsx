@@ -2,7 +2,7 @@ import { BlurTargetView, BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { Fonts, Spacing } from '@/constants/theme';
 import { subscribeAccountSession } from '@/services/auth';
@@ -467,10 +467,9 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
         </View>
         <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
       </View>
-      {loading && products.length === 0 && <ProductGridSkeleton />}
-      {loading && products.length > 0 && <ActivityIndicator color="#0a0a0a" />}
+      {loading && <ProductGridSkeleton />}
       {!loading && products.length === 0 && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
-      <View style={styles.productGrid}>
+      {!loading && <View style={styles.productGrid}>
         {products.map((product) => (
           <ProductCard
             key={product.id}
@@ -480,8 +479,9 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
             onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id))}
           />
         ))}
-      </View>
-      {products.length < resultCount && <Pressable disabled={loadingMore} onPress={loadMore} style={styles.loadMoreButton}>{loadingMore ? <ActivityIndicator color="#FFFFFF" /> : <ThemedText style={styles.loadMoreText}>Ver mais produtos</ThemedText>}</Pressable>}
+      </View>}
+      {loadingMore && <ProductGridSkeleton />}
+      {products.length < resultCount && !loading && !loadingMore && <Pressable onPress={loadMore} style={styles.loadMoreButton}><ThemedText style={styles.loadMoreText}>Ver mais produtos</ThemedText></Pressable>}
       <ProductFilterModal
         visible={filtersVisible}
         query={query}

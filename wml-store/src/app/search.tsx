@@ -1,11 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import { ProductCard } from '@/components/product-card';
+import { ProductGridSkeleton } from '@/components/product-grid-skeleton';
 import { FilterGlyph, ProductFilterModal } from '@/components/product-filter-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -316,11 +317,11 @@ export default function SearchScreen() {
         )}
 
         {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
-        {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
+        {loading && <ProductGridSkeleton />}
         {!loading && (activeQuery || activeFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
 
         <FlatList
-          data={products}
+          data={loading ? [] : products}
           numColumns={2}
           keyExtractor={(item) => item.id}
           columnWrapperStyle={styles.columns}
@@ -330,7 +331,7 @@ export default function SearchScreen() {
           onEndReachedThreshold={0.4}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={loadingMore ? <ActivityIndicator color="#0a0a0a" style={styles.moreLoader} /> : null}
+          ListFooterComponent={loadingMore ? <ProductGridSkeleton /> : null}
           renderItem={({ item }) => (
             <ProductCard
               product={item}
@@ -396,8 +397,6 @@ const styles = StyleSheet.create({
   resultCount: { fontSize: 12 },
   filterButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
   filterText: { fontSize: 12 },
-  loader: { marginTop: Spacing.four },
-  moreLoader: { marginVertical: Spacing.four },
   list: { paddingBottom: 120, gap: Spacing.three },
   columns: { gap: Spacing.two },
   card: { width: '48.7%' },

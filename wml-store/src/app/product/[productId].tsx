@@ -22,6 +22,7 @@ import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRo
 import { emptyKitSelection, KitSelector, type KitSelection } from '@/components/kit-selector';
 import { LoginRequiredModal } from '@/components/login-required-modal';
 import { ProductCarousel } from '@/components/product-carousel';
+import { ProductCarouselSkeleton } from '@/components/product-carousel-skeleton';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { SizebayModal } from '@/components/sizebay-modal';
 import { ThemedText } from '@/components/themed-text';
@@ -594,7 +595,7 @@ export default function ProductScreen() {
 
               <View style={styles.similarSection}>
                 <ThemedText style={styles.similarProducts} type="subtitle">Quem viu isso, viu também</ThemedText>
-                {similarLoading && <ActivityIndicator color="#0a0a0a" />}
+                {similarLoading && <ProductCarouselSkeleton />}
                 {!similarLoading && similarProducts.length > 0 && <ProductCarousel products={similarProducts} nestedScrollEnabled leftInset={Spacing.four} rightInset={Spacing.four} />}
               </View>
             </View>

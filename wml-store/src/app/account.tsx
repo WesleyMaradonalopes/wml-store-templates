@@ -589,7 +589,7 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
       </View>
       <Pressable disabled={loading} onPress={onForgot} style={styles.forgotButton}><ThemedText type="smallBold" style={styles.linkText}>Esqueceu a senha?</ThemedText></Pressable>
       {!!message && <ThemedText themeColor="textSecondary" style={styles.linkTextAlert}>{message}</ThemedText>}
-      <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Entrar</ThemedText>}</Pressable>
+      <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.primaryText}>Entrar</ThemedText>}</Pressable>
       <Pressable onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable>
     </ThemedView>
   );
