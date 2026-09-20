@@ -26,7 +26,7 @@ export default function CategoriesScreen() {
 
   return (
 				<LinearGradient
-          colors={['#ede6f8cc', '#efd9e3cc', '#f0e8d4cc']}
+          colors={['#ffffff', '#ffffff', '#ffffff']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.container, styles.gradientFill]}>
@@ -36,11 +36,7 @@ export default function CategoriesScreen() {
 							<View style={styles.headerSurface}>
 								<ScreenHeader back={false} />
 							</View>
-
-							{/* BlurView mantido como container externo para arredondamento e efeito glass */}
 							<BlurView intensity={24} tint="light" style={styles.glassPanel}>
-								{/* LinearGradient preenche o fundo do BlurView com transparência (80% / CC) */}
-
 									<ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
 										{loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
 										{error && <ThemedText themeColor="textSecondary">Nao foi possivel carregar as categorias.</ThemedText>}
