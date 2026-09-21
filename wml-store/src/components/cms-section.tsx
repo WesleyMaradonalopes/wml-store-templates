@@ -17,11 +17,11 @@ import { CmsRichText } from './cms-rich-text';
 import ArrowLeftIAIcon from './icons/ArrowLeftIAicon';
 import ArrowRightAIcon from './icons/ArrowRightAicon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
-import { ProductCard } from './product-card';
 import { ProductCarousel } from './product-carousel';
 import { ProductCarouselSkeleton } from './product-carousel-skeleton';
-import { ProductGridSkeleton } from './product-grid-skeleton';
 import { FilterGlyph, ProductFilterModal } from './product-filter-modal';
+import { ProductGridSkeleton } from './product-grid-skeleton';
+import { ProductPlpGrid } from './product-plp-grid';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -363,7 +363,7 @@ export function ProductShelf({ data, isHome = false, titleStyle, onAdded, onFavo
           contentContainerStyle={[styles.tabList, isHome && styles.homeTabList]}
           renderItem={({ item: tab, index }) => (
             <Pressable onPress={() => setSelectedTab(index)} style={[styles.tab, isHome && styles.homeTab, selectedTab === index && styles.selectedTab]}>
-              <ThemedText style={selectedTab === index ? styles.selectedTabText : undefined}>{text(tab.label) || `Opcao ${index + 1}`}</ThemedText>
+              <ThemedText style={[isHome && styles.homeTabText, selectedTab === index && styles.selectedTabText]}>{text(tab.label) || `Opcao ${index + 1}`}</ThemedText>
             </Pressable>
           )}
         />
@@ -467,20 +467,14 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
         </View>
         <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
       </View>
-      {loading && <ProductGridSkeleton />}
+      {loading && <ProductGridSkeleton variant="plp" />}
       {!loading && products.length === 0 && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
-      {!loading && <View style={styles.productGrid}>
-        {products.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            style={styles.gridProductCard}
-            favorite={favoriteIds.includes(product.id)}
-            onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id))}
-          />
-        ))}
-      </View>}
-      {loadingMore && <ProductGridSkeleton />}
+      {!loading && <ProductPlpGrid
+        products={products}
+        favoriteIds={favoriteIds}
+        onFavoriteChange={(product, favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id))}
+      />}
+      {loadingMore && <ProductGridSkeleton variant="plp" />}
       {products.length < resultCount && !loading && !loadingMore && <Pressable onPress={loadMore} style={styles.loadMoreButton}><ThemedText style={styles.loadMoreText}>Ver mais produtos</ThemedText></Pressable>}
       <ProductFilterModal
         visible={filtersVisible}
@@ -1128,9 +1122,9 @@ const styles = StyleSheet.create({
   couponsSection: { gap: 8, padding: 16 },
   blogSection: { gap: 8, padding: 16 },
   cmsFallbackSection: { gap: 8, padding: 16 },
-  bannerSection: { gap: 6, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderRadius: 0, marginHorizontal: 0, backgroundColor: 'transparent' },
+  bannerSection: { gap: 6, paddingHorizontal: 10, paddingTop: 0, paddingBottom: 0, borderRadius: 0, marginHorizontal: 0, backgroundColor: 'transparent' },
   homeBannerSection: { marginHorizontal: 0, backgroundColor: '#fff' },
-  bannerSectionTitle: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', paddingHorizontal: 10, fontWeight: '600' },
+  bannerSectionTitle: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', paddingHorizontal: 0, fontWeight: '600' },
   homeGridBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
   homeRoundedBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
   homeHorizontalBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
@@ -1138,7 +1132,7 @@ const styles = StyleSheet.create({
   homeSliderBannerSection: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#fff' },
   homeGridBanner: { width: '100%', marginHorizontal: 0, paddingHorizontal: 10 },
   homeGridBannerTitle: { color: '#0a0a0a' },
-  homeRoundedBannerTitle: { color: '#0a0a0a' },
+  homeRoundedBannerTitle: { color: '#0a0a0a', marginHorizontal: 10 },
   homeHorizontalBannerTitle: { color: '#0a0a0a' },
   homeSingleBannerTitle: { color: '#0a0a0a' },
   homeSliderBannerTitle: { color: '#0a0a0a' },
@@ -1172,12 +1166,13 @@ const styles = StyleSheet.create({
   seeAll: { textDecorationLine: 'underline', fontSize: 13 },
   tabList: { gap: 8 },
   homeTabList: { paddingHorizontal: 10 },
-  tab: { paddingHorizontal: 16, paddingVertical: 4, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a' },
+  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a' },
   selectedTab: { backgroundColor: '#0a0a0a' },
   selectedTabText: { color: '#FFFFFF' },
   homeShelfTitle: { fontSize: 20, lineHeight: 20 },
   homeTabViewport: { marginHorizontal: 0, paddingHorizontal: 0 },
   homeTab: { borderRadius: 50 },
+  homeTabText: { fontSize: 14, lineHeight: 16 },
   plpSection: { gap: Spacing.three, backgroundColor: '#ffffff' },
   plpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   plpHeading: { flex: 1 },
@@ -1185,13 +1180,11 @@ const styles = StyleSheet.create({
   plpCount: { fontSize: 12 },
   filterButton: { minHeight: 42, paddingHorizontal: Spacing.three, borderRadius: 22, borderWidth: 1, borderColor: '#6d6862', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
   filterButtonText: { fontSize: 12 },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  gridProductCard: { width: '48.7%', marginBottom: Spacing.three },
   loadMoreButton: { minHeight: 48, marginTop: Spacing.two, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loadMoreText: { color: '#FFFFFF', fontWeight: '700' },
   pressed: { opacity: 0.7 },
-  sectionTitleCateg: { marginHorizontal: 14, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700' },
-  categorySwipePanel: { overflow: 'hidden', marginHorizontal: 14, paddingLeft: 14, paddingRight: 14, borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: 'transparent' },
+  sectionTitleCateg: { marginHorizontal: 10, fontSize: 20, lineHeight: 26, color: '#0a0a0a', fontWeight: '700' },
+  categorySwipePanel: { overflow: 'hidden', marginHorizontal: 0, paddingLeft: 25, paddingRight: 20, borderRadius: 8, borderWidth: 0, borderColor: 'rgba(255, 255, 255, 0.9)', backgroundColor: 'transparent' },
   categorySwipeRow: { minHeight: 60, paddingHorizontal: 0, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 0, borderBottomColor: 'rgba(255, 255, 255, 0.82)', backgroundColor: 'transparent' },
   categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#0a0a0a', fontWeight: '500', textTransform: 'none' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: '#f0f1f5' },

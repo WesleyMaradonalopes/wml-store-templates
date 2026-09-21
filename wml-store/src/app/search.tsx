@@ -1,13 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import SearchIcon from '@/components/icons/SearchIcon';
-import { ProductCard } from '@/components/product-card';
-import { ProductGridSkeleton } from '@/components/product-grid-skeleton';
 import { FilterGlyph, ProductFilterModal } from '@/components/product-filter-modal';
+import { ProductGridSkeleton } from '@/components/product-grid-skeleton';
+import { ProductGridRowView, buildProductGridRows, type ProductGridRow } from '@/components/product-plp-grid';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -83,6 +83,7 @@ export default function SearchScreen() {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const activeFacets = mergeFacets(contextFacets, selectedFacets);
   const facetSignature = JSON.stringify(selectedFacets);
+  const productRows = useMemo(() => buildProductGridRows(products), [products]);
 
   useEffect(() => {
     const unsubscribe = subscribeAccountSession((session) => {
@@ -317,27 +318,24 @@ export default function SearchScreen() {
         )}
 
         {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
-        {loading && <ProductGridSkeleton />}
+        {loading && <ProductGridSkeleton variant="plp" />}
         {!loading && (activeQuery || activeFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
 
-        <FlatList
-          data={loading ? [] : products}
-          numColumns={2}
-          keyExtractor={(item) => item.id}
-          columnWrapperStyle={styles.columns}
+        <FlatList<ProductGridRow>
+          data={loading ? [] : productRows}
+          keyExtractor={(item) => item.key}
           contentContainerStyle={styles.list}
           onScroll={onScroll}
           onEndReached={() => { void loadMore(); }}
           onEndReachedThreshold={0.4}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={loadingMore ? <ProductGridSkeleton /> : null}
+          ListFooterComponent={loadingMore ? <ProductGridSkeleton variant="plp" /> : null}
           renderItem={({ item }) => (
-            <ProductCard
-              product={item}
-              style={styles.card}
-              favorite={favoriteIds.includes(item.id)}
-              onFavoriteChange={(favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))}
+            <ProductGridRowView
+              row={item}
+              favoriteIds={favoriteIds}
+              onFavoriteChange={(product, favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id))}
             />
           )}
           />
@@ -398,8 +396,6 @@ const styles = StyleSheet.create({
   filterButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
   filterText: { fontSize: 12 },
   list: { paddingBottom: 120, gap: Spacing.three },
-  columns: { gap: Spacing.two },
-  card: { width: '48.7%' },
   successText: { color: '#26734d', fontWeight: '600' },
   messageText: { color: '#B42318' },
 });

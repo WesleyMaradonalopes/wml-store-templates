@@ -218,7 +218,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                 ) : variationNames.map((name) => (
                   <View key={name} style={styles.variationGroup}>
                     <ThemedText type="smallBold">
-                      {name}: <ThemedText>{selectedOptions[name] || `Escolha ${name.toLowerCase()}`}</ThemedText>
+                      {name}:{selectedOptions[name] ? <ThemedText> {selectedOptions[name]}</ThemedText> : null}
                     </ThemedText>
                     <View style={styles.options}>
                       {variationGroups[name].map((value) => {
