@@ -8,10 +8,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NewsletterOptIn } from '@/components/newsletter-opt-in';
 import { ScreenHeader } from '@/components/screen-header';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/theme-context';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
+import { useTheme } from '@/hooks/use-theme';
 import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
@@ -86,6 +89,8 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function AccountScreen() {
   const router = useRouter();
+  const theme = useTheme();
+	const SHOW_THEME_TOGGLE = false;
   const { view: requestedView } = useLocalSearchParams<{ view?: string }>();
   const [view, setView] = useState<AccountView>(requestedView === 'access' ? 'access' : 'home');
   const [loggedIn, setLoggedIn] = useState(false);
@@ -452,9 +457,12 @@ export default function AccountScreen() {
   }
 
   if (view === 'home') {
-    return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader back={false} showSearch={false} showCart={false} logoWidth={88} logoHeight={24} logoOffsetY={0} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-      {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} /> : <GuestAccount notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onEnter={() => setView('access')} onRegister={() => setView('register')} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} />}
-    </ScrollView></SafeAreaView></ThemedView>;
+    return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}><View style={styles.accountScreen}><ScrollView onScroll={onScroll} scrollEventThrottle={16} style={styles.accountScroll}>
+      <ScreenHeader back={false} showSearch={false} showCart={false} logoWidth={88} logoHeight={24} logoOffsetY={0} />
+      <View style={styles.content}>
+        {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} /> : <GuestAccount notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onEnter={() => setView('access')} onRegister={() => setView('register')} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} />}
+      </View>
+    </ScrollView><View style={styles.themeToggleAbove}>{SHOW_THEME_TOGGLE && <ThemeToggle />}</View></View></SafeAreaView></ThemedView>;
   }
 
   if (view === 'personal') return <PersonalData email={email} profile={profile} profileMessage={profileMessage} onSaved={setProfile} onBack={() => setView('home')} onPrivacyPress={() => router.push('/privacy-policy' as never)} />;
@@ -471,7 +479,7 @@ export default function AccountScreen() {
   };
 
   const headerTitle = view === 'register' || view === 'register-code' ? 'Registrar' : view === 'register-password' ? 'Criar senha' : view === 'recovery-email' || view === 'recovery-password' ? 'Alterar senha' : 'Acesse sua conta';
-  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={headerTitle} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
+  return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}><ScreenHeader title={headerTitle} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
     {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
     {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} onForgot={() => { setAuthMessage(null); setView('recovery-email'); }} />}
      {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} loading={accessCodeLoading} onRegister={() => setView('register')} onPrivacy={() => router.push('/privacy-policy' as never)} message={authMessage} />}
@@ -485,18 +493,22 @@ export default function AccountScreen() {
 }
 
 function GuestAccount({ onEnter, onRegister, onCoupons, onReturns, onPrivacy, notifications, onNotificationsChange, notificationsLoading, notificationsMessage }: { onEnter: () => void; onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null }) {
-  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={styles.primaryButton}><ThemedText style={styles.primaryText}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} onCoupons={onCoupons} onReturns={onReturns} onPrivacy={onPrivacy} /><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
+  const { colorScheme } = useAppTheme();
+  const theme = useTheme();
+  const dark = colorScheme === 'dark';
+  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={[styles.primaryButton, dark && { backgroundColor: theme.surface }]}><ThemedText style={[styles.primaryText, dark && { color: theme.text }]}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} onCoupons={onCoupons} onReturns={onReturns} onPrivacy={onPrivacy} /><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={[styles.helpButton, dark && { borderColor: theme.borderStrong }]}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
 }
 
 type AccountTileData = { label: string; icon: ReactNode; onPress?: () => void };
 
 function AccountTile({ label, icon, onPress }: AccountTileData) {
-  return <Pressable onPress={onPress} style={[styles.tile, styles.accountTile]}>
+  const theme = useTheme();
+  return <Pressable onPress={onPress} style={[styles.tile, styles.accountTile, { backgroundColor: theme.surface }]}>
     <View style={styles.tileHeader}>
       <View style={styles.tileIcon}>{icon}</View>
-      <ChevronRightIcon color="#0a0a0a" size={14} />
+      <ChevronRightIcon color={theme.text} size={14} />
     </View>
-    <ThemedText numberOfLines={2} style={styles.tileLabel}>{label}</ThemedText>
+    <ThemedText numberOfLines={2} style={[styles.tileLabel, { color: theme.text }]}>{label}</ThemedText>
   </Pressable>;
 }
 
@@ -505,27 +517,29 @@ function LoggedAccount({ email, notifications, setNotifications, onLogout, onPer
 }
 
 function UtilityGrid({ onRegister, onCoupons, onReturns, onPrivacy }: { onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void }) {
+  const theme = useTheme();
   const tiles: AccountTileData[] = [
-    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#0a0a0a" size={18} />, onPress: onCoupons },
-    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#0a0a0a" size={18} />, onPress: onReturns },
-    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#0a0a0a" size={18} />, onPress: onPrivacy },
-    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#0a0a0a" size={18} />, onPress: onRegister },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={18} />, onPress: onCoupons },
+    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color={theme.text} size={18} />, onPress: onReturns },
+    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color={theme.text} size={18} />, onPress: onPrivacy },
+    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={18} />, onPress: onRegister },
   ];
   return <View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View>;
 }
 function Preference({ value = false, onChange, disabled = false, message }: { value?: boolean; onChange?: (value: boolean) => void; disabled?: boolean; message?: string | null }) {
+  const theme = useTheme();
   return <View style={styles.preferenceBlock}>
     <View style={styles.preference}>
       <View style={styles.preferenceLabel}>
-        <HomeNotificationsIcon color="#0a0a0a" size={18} />
-        <ThemedText style={styles.preferenceText}>Notificações</ThemedText>
+        <HomeNotificationsIcon color={theme.text} size={18} />
+        <ThemedText style={[styles.preferenceText, { color: theme.text }]}>Notificações</ThemedText>
       </View>
       <Pressable
         accessibilityRole="switch"
         accessibilityState={{ checked: value, disabled }}
         disabled={disabled}
         onPress={() => onChange?.(!value)}
-        style={[styles.notificationSwitch, value ? styles.notificationSwitchOn : styles.notificationSwitchOff, disabled && styles.disabled]}
+        style={[styles.notificationSwitch, value ? [styles.notificationSwitchOn, { backgroundColor: theme.primary }] : [styles.notificationSwitchOff, { backgroundColor: theme.border }], disabled && styles.disabled]}
       >
         <View style={styles.notificationThumb} />
       </Pressable>
@@ -719,20 +733,24 @@ const logoutButtonStyles = StyleSheet.create({
 });
 
 function LoggedAccountV2({ email, notifications, onNotificationsChange, notificationsLoading, notificationsMessage, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset, onCoupons, onReturns, onPrivacy }: { email: string; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void; onCoupons?: () => void; onReturns?: () => void; onPrivacy?: () => void }) {
+  const theme = useTheme();
   const tiles: AccountTileData[] = [
-    { label: 'Meus pedidos', icon: <Box01Icon color="#0a0a0a" size={18} />, onPress: onOrders },
-    { label: 'Dados pessoais', icon: <UserIcon color="#0a0a0a" size={18} />, onPress: onPersonal },
-    { label: 'Favoritos', icon: <HeartIcon color="#0a0a0a" size={18} />, onPress: onFavorites },
-    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color="#0a0a0a" size={18} />, onPress: onReturns },
-    { label: 'Redefinição de senha', icon: <LockIcon color="#0a0a0a" size={18} />, onPress: onPasswordReset },
-    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color="#0a0a0a" size={18} />, onPress: onCoupons },
-    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color="#0a0a0a" size={18} /> },
-    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color="#0a0a0a" size={18} />, onPress: onPrivacy },
+    { label: 'Meus pedidos', icon: <Box01Icon color={theme.text} size={18} />, onPress: onOrders },
+    { label: 'Dados pessoais', icon: <UserIcon color={theme.text} size={18} />, onPress: onPersonal },
+    { label: 'Favoritos', icon: <HeartIcon color={theme.text} size={18} />, onPress: onFavorites },
+    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color={theme.text} size={18} />, onPress: onReturns },
+    { label: 'Redefinição de senha', icon: <LockIcon color={theme.text} size={18} />, onPress: onPasswordReset },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={18} />, onPress: onCoupons },
+    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={18} /> },
+    { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color={theme.text} size={18} />, onPress: onPrivacy },
   ];
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><View style={styles.logoutDivider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <><LogoutIcon color="#0a0a0a" size={16} /><ThemedText style={logoutButtonStyles.label}>Sair</ThemedText></>}</View></Pressable><View style={styles.logoutDivider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={styles.helpButton}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
+  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><View style={styles.logoutDivider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, { borderColor: theme.border }, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color={theme.text} /> : <><LogoutIcon color={theme.text} size={16} /><ThemedText style={[logoutButtonStyles.label, { color: theme.text }]}>Sair</ThemedText></>}</View></Pressable><View style={styles.logoutDivider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={[styles.helpButton, { borderColor: theme.borderStrong }]}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
 }
 
 function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPrivacyPress }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void; onPrivacyPress: () => void }) {
+  const { colorScheme } = useAppTheme();
+  const theme = useTheme();
+  const dark = colorScheme === 'dark';
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccessVisible, setSaveSuccessVisible] = useState(false);
@@ -797,16 +815,16 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
         <ScreenHeader title="Dados Pessoais" onBack={onBack} />
         <ScrollView contentContainerStyle={[styles.content, styles.personalDataContent]}>
-          <ThemedView style={[styles.card, styles.personalDataCard]}>
-            <ThemedText style={styles.personalDataTitle}>Dados Pessoais</ThemedText>
+          <ThemedView style={[styles.card, styles.personalDataCard, dark && { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <ThemedText style={[styles.personalDataTitle, { color: theme.text }]}>Dados Pessoais</ThemedText>
             <View style={styles.personalDataFields}>
               <View style={styles.personalDataField}>
                 <ThemedText style={styles.personalDataLabel}>E-mail</ThemedText>
                 {editing ? (
-                  <TextInput value={email} editable={false} style={[styles.personalDataInput, styles.personalDataReadonlyInput]} />
+                  <TextInput value={email} editable={false} style={[styles.personalDataInput, styles.personalDataReadonlyInput, dark && { backgroundColor: theme.surfaceMuted, color: theme.textSecondary, borderColor: theme.border }]} />
                 ) : (
                   <ThemedText style={styles.personalDataValue}>{email || 'Não informado'}</ThemedText>
                 )}
@@ -819,7 +837,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
                     <TextInput
                       value={field.label === 'Telefone com DDD' ? formatPhoneWithoutCountryCode(field.value) : field.value}
                       onChangeText={field.set}
-                      style={styles.personalDataInput}
+                      style={[styles.personalDataInput, dark && { backgroundColor: theme.inputBackground, color: theme.text, borderColor: theme.borderStrong }]}
                     />
                   ) : (
                     <ThemedText style={styles.personalDataValue}>{(field.displayValue ?? field.value) || 'Não informado'}</ThemedText>
@@ -831,13 +849,13 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
                 <ThemedText style={styles.personalDataLabel}>Gênero (opcional)</ThemedText>
                 {editing ? (
                   <>
-                    <Pressable onPress={() => setGenderOpen(!genderOpen)} style={styles.personalDataSelect}>
+                    <Pressable onPress={() => setGenderOpen(!genderOpen)} style={[styles.personalDataSelect, dark && { backgroundColor: theme.inputBackground, borderColor: theme.borderStrong }]}>
                       <ThemedText style={styles.personalDataSelectText}>{formatGenderLabel(gender) || 'Selecione'}</ThemedText>
                       <View style={[styles.genderDropdownIcon, genderOpen && styles.genderDropdownIconOpen]}>
-                        <ChevronRightIcon color="#625d57" size={16} />
+                        <ChevronRightIcon color={dark ? theme.textSecondary : '#625d57'} size={16} />
                       </View>
                     </Pressable>
-                    {genderOpen && <View style={styles.personalDataDropdown}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option}</ThemedText></Pressable>)}</View>}
+                    {genderOpen && <View style={[styles.personalDataDropdown, dark && { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option}</ThemedText></Pressable>)}</View>}
                   </>
                 ) : (
                   <ThemedText style={styles.personalDataValue}>{formatGenderLabel(gender) || 'Não informado'}</ThemedText>
@@ -851,8 +869,8 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
 
             <View style={styles.personalDataEditSection}>
               {editing ? (
-                <Pressable disabled={saving} onPress={save} style={[styles.primaryButton, styles.personalDataConfirmButton, saving && styles.disabled]}>
-                  {saving ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Confirmar</ThemedText>}
+                <Pressable disabled={saving} onPress={save} style={[styles.primaryButton, styles.personalDataConfirmButton, dark && { backgroundColor: theme.primary }, saving && styles.disabled]}>
+                  {saving ? <ActivityIndicator size="small" color={dark ? theme.onPrimary : '#ffffff'} /> : <ThemedText style={[styles.primaryText, dark && { color: theme.onPrimary }]}>Confirmar</ThemedText>}
                 </Pressable>
               ) : (
                 <Pressable onPress={() => setEditing(true)}>
@@ -875,7 +893,10 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
 const styles = StyleSheet.create({
   container: { flex: 1 },
 	safeArea: { flex: 1, padding: 30, backgroundColor: '#ffffff' },
-	content: { gap: Spacing.three, paddingTop: 20, paddingBottom: 20, },
+	accountScreen: { flex: 1, position: 'relative' },
+	accountScroll: { flex: 1 },
+	themeToggleAbove: { position: 'absolute', top: -15, right: 0, zIndex: 2 },
+	content: { gap: Spacing.three, paddingTop: 20, paddingBottom: 20 },
 	greeting: { textAlign: 'center', color: '#0a0a0a', fontWeight: '300' },
 	loggedGreeting: { fontSize: 22 }, email: { fontSize: 16 },
 	primaryButton: { marginBottom: 10, padding: Spacing.three, borderRadius: 8, alignItems: 'center', backgroundColor: '#e9e6df' },

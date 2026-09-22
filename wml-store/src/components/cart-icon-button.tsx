@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { getOrderForm, subscribeToCartChanges, type OrderForm } from '@/services/cart';
 
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
@@ -45,15 +46,17 @@ type CartCountBadgeProps = {
 };
 
 export function CartCountBadge({ count, variant = 'top', backgroundColor, textColor }: CartCountBadgeProps) {
+  const theme = useTheme();
   if (count <= 0) return null;
   const bottomTab = variant === 'bottomTab';
-  const defaultBackgroundColor = bottomTab ? '#FFFFFF' : '#0a0a0a';
-  const defaultTextColor = bottomTab ? '#0a0a0a' : '#FFFFFF';
+  const defaultBackgroundColor = bottomTab ? '#FFFFFF' : theme.primary;
+  const defaultTextColor = bottomTab ? '#0a0a0a' : theme.onPrimary;
   return <View style={[styles.topBadge, bottomTab && styles.bottomTabBadge, { backgroundColor: backgroundColor ?? defaultBackgroundColor }]}><Text style={[styles.topBadgeText, bottomTab && styles.bottomTabBadgeText, { color: textColor ?? defaultTextColor }]}>{count > 99 ? '99+' : count}</Text></View>;
 }
 
-export function CartIconButton({ onPress, color = '#0a0a0a', size = 20, style }: Props) {
+export function CartIconButton({ onPress, color, size = 20, style }: Props) {
   const router = useRouter();
+  const theme = useTheme();
   const count = useCartItemCount();
 
   return (
@@ -61,7 +64,7 @@ export function CartIconButton({ onPress, color = '#0a0a0a', size = 20, style }:
       accessibilityLabel={count > 0 ? `Sacola, ${count} ${count === 1 ? 'item' : 'itens'}` : 'Sacola'}
       onPress={onPress ?? (() => router.push('/checkout'))}
       style={[styles.button, style]}>
-      <ShoppingBagIcon size={size} color={color} />
+      <ShoppingBagIcon size={size} color={color ?? theme.text} />
       <CartCountBadge count={count} />
     </Pressable>
   );

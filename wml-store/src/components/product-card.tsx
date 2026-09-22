@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/theme-context';
+import { useTheme } from '@/hooks/use-theme';
 import { getAccountSession, subscribeAccountSession } from '@/services/auth';
 import { type Product } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, subscribeFavoriteChanges, toggleFavorite } from '@/services/favorites';
@@ -35,6 +37,9 @@ function discountPercentage(product: Product) {
 
 export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true }: Props) {
   const router = useRouter();
+  const { colorScheme } = useAppTheme();
+  const theme = useTheme();
+  const dark = colorScheme === 'dark';
   const [localFavorite, setLocalFavorite] = useState(Boolean(controlledFavorite));
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
@@ -142,10 +147,10 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
     <ThemedView style={[styles.card, style]}>
       <Pressable onPress={() => router.push(`/product/${product.id}`)} style={styles.productLink}>
         <View style={styles.imageArea}>
-          {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.image} contentFit="cover" />}
+          {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} style={[styles.image, dark && { backgroundColor: theme.surfaceMuted }]} contentFit="cover" />}
           {(product.isNewProduct || discount > 0) && (
             <View pointerEvents="none" style={styles.badges}>
-              {product.isNewProduct && <View style={[styles.badge, styles.newBadge]}><ThemedText style={styles.badgeText}>Novo</ThemedText></View>}
+              {product.isNewProduct && <View style={[styles.badge, styles.newBadge, dark && { backgroundColor: theme.primary }]}><ThemedText style={[styles.badgeText, dark && { color: theme.onPrimary }]}>Novo</ThemedText></View>}
               {discount > 0 && <View style={[styles.badge, styles.discountBadge]}><ThemedText style={styles.badgeText}>{discount}%</ThemedText></View>}
             </View>
           )}
@@ -155,14 +160,14 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
             disabled={favoriteLoading}
             onPress={(event) => { event.stopPropagation(); void changeFavorite(); }}
             style={styles.favoriteButton}>
-            <HeartIcon size={28} color={favorite ? '#C62828' : '#0a0a0a'} filled={favorite} />
+            <HeartIcon size={28} color={favorite ? '#C62828' : dark ? theme.text : '#0a0a0a'} filled={favorite} />
           </Pressable>
           <ProductQuickViewButton
             product={product}
-            icon={<ShoppingBagIcon size={20} color="#0a0a0a" />}
+            icon={<ShoppingBagIcon size={20} color={dark ? theme.text : '#0a0a0a'} />}
             accessibilityLabel="Adicionar à sacola"
             disabled={!product.itemId}
-            buttonStyle={styles.addButton}
+            buttonStyle={[styles.addButton, dark && { backgroundColor: theme.background, borderColor: theme.border }]}
             onAdded={() => onAdded?.(product)}
             showAddedModal={showAddedModal}
           />

@@ -6,7 +6,9 @@ import SearchIcon from '@/components/icons/SearchIcon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/theme-context';
 import { TabBarContext } from '@/context/tab-bar-context';
+import { useTheme } from '@/hooks/use-theme';
 import { CmsPage, getCmsPage } from '@/services/cms';
 import { useRouter } from 'expo-router';
 import { useContext, useEffect, useRef, useState } from 'react';
@@ -22,6 +24,9 @@ export default function HomeScreen() {
   const lastScrollY = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
+  const { colorScheme } = useAppTheme();
+  const theme = useTheme();
+  const dark = colorScheme === 'dark';
   const [scrollY, setScrollY] = useState(0);
   const firstSection = cmsPage?.sections[0];
   const firstSectionMode = typeof firstSection?.data?.mode === 'string' ? firstSection.data.mode : '';
@@ -50,12 +55,12 @@ export default function HomeScreen() {
           {!cmsLoading && !cmsError && cmsPage?.sections.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>}
           {cmsPage?.sections.map((section, index) => <CmsSectionView key={`${section.name}-${index}`} section={section} isHome />)}
         </ScrollView>
-        <View style={[styles.header, { paddingTop: insets.top, minHeight: 48 + insets.top }, transparentHeader ? styles.heroHeader : styles.scrolledHeader]}>
+        <View style={[styles.header, { paddingTop: insets.top, minHeight: 48 + insets.top }, transparentHeader ? styles.heroHeader : [styles.scrolledHeader, dark && { backgroundColor: theme.background, borderBottomColor: theme.border }]]}>
           <Pressable accessibilityLabel="Voltar ao topo" onPress={() => { scrollRef.current?.scrollTo({ y: 0, animated: true }); setHidden(false); }} style={styles.brandButton}>
-            <HopeLogoIcon color="#0a0a0a" width={76} height={20} />
+            <HopeLogoIcon color={theme.text} width={76} height={20} />
           </Pressable>
           <View style={styles.headerActions}>
-            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, transparentHeader && styles.heroHeaderAction]}><SearchIcon size={20} color="#0a0a0a" /></Pressable>
+            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && styles.heroHeaderAction]}><SearchIcon size={20} color={dark ? theme.text : '#0a0a0a'} /></Pressable>
             <CartIconButton style={[styles.headerAction, transparentHeader && styles.heroHeaderAction]} />
           </View>
         </View>

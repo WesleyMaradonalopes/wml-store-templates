@@ -2,6 +2,8 @@ import { CmsSectionView } from '@/components/cms-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/theme-context';
+import { useTheme } from '@/hooks/use-theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { CmsPage, getCmsPage } from '@/services/cms';
 import { BlurView } from 'expo-blur';
@@ -16,6 +18,9 @@ export default function CategoriesScreen() {
   const [error, setError] = useState(false);
   const onScroll = useTabBarScroll();
   const insets = useSafeAreaInsets();
+  const { colorScheme } = useAppTheme();
+  const theme = useTheme();
+  const dark = colorScheme === 'dark';
 
   useEffect(() => {
     getCmsPage('categories', 'categorias')
@@ -26,7 +31,7 @@ export default function CategoriesScreen() {
 
   return (
 				<LinearGradient
-          colors={['#ffffff', '#ffffff', '#ffffff']}
+          colors={dark ? [theme.background, theme.background, theme.background] : ['#ffffff', '#ffffff', '#ffffff']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.container, styles.gradientFill]}>
@@ -36,7 +41,7 @@ export default function CategoriesScreen() {
 							<View style={styles.headerSurface}>
 								<ScreenHeader back={false} />
 							</View>
-							<BlurView intensity={24} tint="light" style={styles.glassPanel}>
+							<BlurView intensity={24} tint={dark ? 'dark' : 'light'} style={[styles.glassPanel, dark && { borderColor: theme.border }]}>
 									<ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
 										{loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
 										{error && <ThemedText themeColor="textSecondary">Nao foi possivel carregar as categorias.</ThemedText>}

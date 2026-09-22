@@ -1,7 +1,9 @@
 import { Montserrat_300Light, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, useFonts } from '@expo-google-fonts/montserrat';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
-import { Linking, useColorScheme } from 'react-native';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as RouterThemeProvider, useRouter } from 'expo-router';
+import { Linking } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { DEFAULT_BOTTOM_TAB_SETTINGS } from '@/config/bottom-tab';
+import { ThemePreferenceProvider, useAppTheme } from '@/context/theme-context';
 import { TabBarContext } from '@/context/tab-bar-context';
 import { getAccountSession, getVtexUserToken } from '@/services/auth';
 import { getBottomTabSettings } from '@/services/bottom-tab-settings';
@@ -10,7 +12,11 @@ import GlobalTabBar from '@/components/global-tab-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  return <ThemePreferenceProvider><AppLayout /></ThemePreferenceProvider>;
+}
+
+function AppLayout() {
+  const { colorScheme } = useAppTheme();
   const [hidden, setHidden] = useState(false);
   const [showOnCheckout, setShowOnCheckout] = useState(false);
   const [bottomTabSettings, setBottomTabSettings] = useState(DEFAULT_BOTTOM_TAB_SETTINGS);
@@ -39,7 +45,8 @@ export default function TabLayout() {
 
   return (
     <TabBarContext.Provider value={{ hidden, setHidden, showOnCheckout, setShowOnCheckout, bottomTabSettings }}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <RouterThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <NotificationBootstrap />
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -57,7 +64,7 @@ export default function TabLayout() {
         <Stack.Screen name="orders/[id]" options={{ headerShown: false }} />
         </Stack>
         <GlobalTabBar />
-      </ThemeProvider>
+      </RouterThemeProvider>
     </TabBarContext.Provider>
   );
 }

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, useWindowDimensions } from 'react-native';
 
+import { useAppTheme } from '@/context/theme-context';
 import type { Product } from '@/services/catalog';
+import { useTheme } from '@/hooks/use-theme';
 
 import { AnimatedPaginationDots } from './animated-pagination-dots';
 import { ProductCard } from './product-card';
@@ -36,6 +38,9 @@ export function ProductCarousel({
   rightInset = 16,
 }: ProductCarouselProps) {
   const { width: screenWidth } = useWindowDimensions();
+  const { colorScheme } = useAppTheme();
+  const theme = useTheme();
+  const dark = colorScheme === 'dark';
   const isHome = variant === 'home';
   const [activeIndex, setActiveIndex] = useState(0);
   const cardWidth = productCarouselCardWidth(screenWidth);
@@ -89,8 +94,8 @@ export function ProductCarousel({
           count={products.length}
           activeIndex={activeIndex}
           activeWidth={18}
-          activeColor="#0a0a0a"
-          inactiveColor="#b9b4ae"
+          activeColor={dark ? theme.text : '#0a0a0a'}
+          inactiveColor={dark ? theme.border : '#b9b4ae'}
           accessibilityLabel={`Produto ${Math.min(activeIndex + 1, products.length)} de ${products.length}`}
           style={[styles.pagination, isHome && styles.homePagination]}
         />
