@@ -4,6 +4,7 @@ export type CmsAction = {
   type?: string;
   value?: string;
   title?: string;
+  collectionCatalogTitle?: string;
   sort?: string;
   banner?: string;
   facets?: unknown;
@@ -20,6 +21,7 @@ export function readCmsAction(value: unknown): CmsAction {
     type: text(action.type),
     value: text(action.value),
     title: text(action.title),
+    collectionCatalogTitle: text(action.collectionCatalogTitle),
     sort: text(action.sort),
     banner: text(action.banner),
     facets: action.facets,
@@ -84,6 +86,7 @@ function catalogRoute({
   if (facets.length > 0) routeParam('facets', JSON.stringify(facets), params);
   routeParam('sort', action.sort ?? '', params);
   routeParam('title', action.title ?? '', params);
+  routeParam('collectionCatalogTitle', action.type === 'collection' ? action.collectionCatalogTitle ?? '' : '', params);
   routeParam('banner', action.banner ?? '', params);
   return `/search${params.length > 0 ? `?${params.join('&')}` : ''}`;
 }

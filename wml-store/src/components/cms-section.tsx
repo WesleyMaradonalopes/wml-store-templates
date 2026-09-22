@@ -989,11 +989,20 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false }: Pr
         const diameter = Math.min(bannerDimension(size.maxWidth, 200), bannerDimension(size.maxHeight, 200));
         return (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.bannerListRow, isHome && styles.homeRoundedBannerListRow]}>
-            {images.map((item, index) => renderBanner(item, index, {
-              containerStyle: { width: diameter, height: diameter, minHeight: 0, borderRadius: diameter / 2 },
-              imageStyle: { width: '100%', height: '100%' },
-              contentFit: 'cover',
-            }))}
+            {images.map((item, index) => {
+              const image = record(item) ?? {};
+              const title = readCmsAction(image.action).title || text(image.title);
+              return (
+                <View key={`${text(image.imageUrl)}-${index}`} style={[styles.roundedBannerItem, { width: diameter }]}>
+                  {renderBanner(item, index, {
+                    containerStyle: { width: diameter, height: diameter, minHeight: 0, borderRadius: diameter / 2 },
+                    imageStyle: { width: '100%', height: '100%' },
+                    contentFit: 'cover',
+                  })}
+                  {!!title && <ThemedText numberOfLines={2} style={styles.roundedBannerItemTitle}>{title}</ThemedText>}
+                </View>
+              );
+            })}
           </ScrollView>
         );
       }
@@ -1213,6 +1222,8 @@ const styles = StyleSheet.create({
   subcategoryRow: { minHeight: 46, paddingHorizontal: 12, justifyContent: 'center', borderLeftWidth: 2, borderLeftColor: '#e2ded8' },
   subcategoryText: { fontSize: 16, lineHeight: 22, color: '#625d57' },
   banner: { overflow: 'hidden', borderRadius: 16 },
+  roundedBannerItem: { alignItems: 'center' },
+  roundedBannerItemTitle: { marginTop: 4, color: '#0a0a0a', fontSize: 11, lineHeight: 16, fontWeight: '700', textAlign: 'center' },
   bannerTarget: { width: '100%' },
   bannerImage: { width: '100%', backgroundColor: '#e5e7eb' },
   bannerListRow: { flexDirection: 'row', gap: 12 },

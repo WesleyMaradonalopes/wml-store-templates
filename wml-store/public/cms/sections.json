@@ -108,6 +108,11 @@
 										"title": "Título (opcional)",
 										"type": "string"
 									},
+									"collectionCatalogTitle": {
+										"title": "Título da coleção no catálogo (somente action=collection)",
+										"description": "Usado no título do catálogo quando o tipo de ação for coleção.",
+										"type": "string"
+									},
 									"banner": {
 										"title": "Banner na tela de destino (opcional)",
 										"type": "string",

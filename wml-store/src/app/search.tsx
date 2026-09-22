@@ -55,11 +55,11 @@ type ListingResolution = {
 export default function SearchScreen() {
   const router = useRouter();
   const onScroll = useTabBarScroll();
-  const { q, facets: facetsParam, sort: sortParam, title: titleParam } = useLocalSearchParams<{ q?: string; facets?: string; sort?: string; title?: string }>();
+  const { q, facets: facetsParam, sort: sortParam, title: titleParam, collectionCatalogTitle: collectionCatalogTitleParam } = useLocalSearchParams<{ q?: string; facets?: string; sort?: string; title?: string; collectionCatalogTitle?: string }>();
   const initialQuery = paramText(q).trim();
   const initialFacets = parseCmsRouteFacets(paramText(facetsParam));
   const initialSort = paramText(sortParam) || 'score:desc';
-  const initialTitle = paramText(titleParam);
+  const initialTitle = paramText(collectionCatalogTitleParam).trim() || paramText(titleParam).trim();
   const initialHasListingContext = Boolean(initialQuery || initialFacets.length > 0 || initialTitle);
   const [term, setTerm] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
@@ -95,7 +95,7 @@ export default function SearchScreen() {
   useEffect(() => {
     const nextQuery = paramText(q).trim();
     const nextFacets = parseCmsRouteFacets(paramText(facetsParam));
-    const nextTitle = paramText(titleParam);
+    const nextTitle = paramText(collectionCatalogTitleParam).trim() || paramText(titleParam).trim();
     setTerm(nextQuery);
     setActiveQuery(nextQuery);
     setSearchOpen(!(nextQuery || nextFacets.length > 0 || nextTitle));
@@ -105,7 +105,7 @@ export default function SearchScreen() {
     setListingTitle(nextTitle);
     setSuggestions([]);
     setListingResolution(null);
-  }, [facetsParam, q, sortParam, titleParam]);
+  }, [collectionCatalogTitleParam, facetsParam, q, sortParam, titleParam]);
 
   useEffect(() => {
     const value = term.trim();
