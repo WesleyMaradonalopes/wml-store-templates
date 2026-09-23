@@ -27,6 +27,7 @@ import { ProductQuickView } from '@/components/product-quick-view';
 import { SizebayModal } from '@/components/sizebay-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WiddeVideo } from '@/components/widde-video';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
@@ -453,6 +454,7 @@ export default function ProductScreen() {
                     </Pressable>
                   </View>
                 </View>
+                <WiddeVideo product={product} />
               </View>
             )}
 

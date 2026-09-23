@@ -90,7 +90,7 @@ WebBrowser.maybeCompleteAuthSession();
 export default function AccountScreen() {
   const router = useRouter();
   const theme = useTheme();
-	const SHOW_THEME_TOGGLE = false;
+	const SHOW_THEME_TOGGLE = true;
   const { view: requestedView } = useLocalSearchParams<{ view?: string }>();
   const [view, setView] = useState<AccountView>(requestedView === 'access' ? 'access' : 'home');
   const [loggedIn, setLoggedIn] = useState(false);

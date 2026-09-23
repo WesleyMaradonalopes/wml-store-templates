@@ -20,6 +20,7 @@ type QuickViewProps = {
   onClose: () => void;
   onAdded?: (product: Product) => void;
   showAddedModal?: boolean;
+  viewCartLabel?: string;
   kitSelection?: KitSelection;
   onKitSelectionChange?: (selection: KitSelection) => void;
 };
@@ -44,7 +45,7 @@ function matchesSelection(variant: ProductVariant, selected: Record<string, stri
   return Object.entries(selected).every(([name, value]) => name === ignoredName || variant.variations[name] === value);
 }
 
-export function ProductQuickView({ product, visible, onClose, onAdded, showAddedModal = true, kitSelection, onKitSelectionChange }: QuickViewProps) {
+export function ProductQuickView({ product, visible, onClose, onAdded, showAddedModal = true, viewCartLabel, kitSelection, onKitSelectionChange }: QuickViewProps) {
   const router = useRouter();
   const [details, setDetails] = useState(product);
   const [loading, setLoading] = useState(false);
@@ -254,6 +255,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
           item={addedItem}
           visible={Boolean(addedItem)}
           onClose={() => setAddedItem(null)}
+          viewCartLabel={viewCartLabel}
           onViewCart={() => {
             setAddedItem(null);
             router.push('/checkout');

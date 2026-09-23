@@ -21,6 +21,7 @@ type AddedToCartModalProps = {
   visible: boolean;
   onClose: () => void;
   onViewCart: () => void;
+  viewCartLabel?: string;
 };
 
 function money(value: number | null | undefined) {
@@ -34,7 +35,7 @@ function variationLabel(item: AddedProductInfo) {
   return Array.from(new Set([item.product.color, ...values].filter(Boolean))).join(' - ');
 }
 
-export function AddedToCartModal({ item, visible, onClose, onViewCart }: AddedToCartModalProps) {
+export function AddedToCartModal({ item, visible, onClose, onViewCart, viewCartLabel = 'Ver a sacola' }: AddedToCartModalProps) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [feedbackVisible, setFeedbackVisible] = useState(false);
@@ -89,7 +90,7 @@ export function AddedToCartModal({ item, visible, onClose, onViewCart }: AddedTo
                 accessibilityRole="button"
                 onPress={onViewCart}
                 style={({ pressed }) => [styles.actionButton, styles.secondaryButton, pressed && styles.pressed]}>
-                <ThemedText style={styles.secondaryButtonText}>Ver a sacola</ThemedText>
+                <ThemedText style={styles.secondaryButtonText}>{viewCartLabel}</ThemedText>
               </Pressable>
               <Pressable
                 accessibilityRole="button"

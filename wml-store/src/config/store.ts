@@ -8,6 +8,9 @@ const host = env.EXPO_PUBLIC_STORE_HOST || domain.replace(/^https?:\/\//, '');
 const publicStoreUrl = (env.EXPO_PUBLIC_PUBLIC_STORE_URL || 'https://www.hoperesort.com.br').replace(/\/$/, '');
 const sizebayDomain = (env.EXPO_PUBLIC_SIZEBAY_DOMAIN || publicStoreUrl).replace(/\/$/, '');
 const sizebayStoreId = (env.EXPO_PUBLIC_SIZEBAY_STORE_ID || '866').trim();
+const widdeEnabled = !['0', 'false', 'no', 'off'].includes((env.EXPO_PUBLIC_WIDDE_ENABLED || 'true').trim().toLowerCase());
+const widdeStoreUrl = (env.EXPO_PUBLIC_WIDDE_STORE_URL || publicStoreUrl).replace(/\/$/, '');
+const widdeEcommerceToken = (env.EXPO_PUBLIC_WIDDE_ECOMMERCE_TOKEN || 'BR').trim();
 
 export const storeConfig = {
   account,
@@ -21,4 +24,7 @@ export const storeConfig = {
   salesChannel: env.EXPO_PUBLIC_VTEX_SALES_CHANNEL || '1',
   backendUrl: env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:6001',
   publicStoreUrl,
+  widdeEnabled,
+  widdeStoreUrl,
+  widdeEcommerceToken,
 } as const;
