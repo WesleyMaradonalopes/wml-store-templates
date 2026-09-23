@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, PanResponder, Pressable, StyleProp, StyleSheet, useWindowDimensions, View, ViewStyle } from 'react-native';
+import { Modal, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, useWindowDimensions, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CloseCircleIcon from '@/components/icons/CloseCircleIcon';
@@ -12,7 +12,7 @@ import SpeakerIcon from '@/components/icons/SpeakerIcon';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import type { Product } from '@/services/catalog';
+import { getCompleteLookProducts, type Product } from '@/services/catalog';
 import { getWiddeStories, type WiddeStory } from '@/services/widde';
 
 type StoryPlaybackProps = {
@@ -91,6 +91,8 @@ export function WiddeVideo({ product }: { product: Product }) {
   const [progress, setProgress] = useState(0);
   const [muted, setMuted] = useState(true);
   const [quickViewVisible, setQuickViewVisible] = useState(false);
+  const [lookProducts, setLookProducts] = useState<Product[]>([product]);
+  const [selectedLookIndex, setSelectedLookIndex] = useState(0);
   const initialPreviewPosition = useMemo<PreviewPosition>(() => ({
     x: Math.max(PREVIEW_MARGIN, screenWidth - PREVIEW_WIDTH - Spacing.four),
     y: insets.top + 74,
@@ -177,6 +179,25 @@ export function WiddeVideo({ product }: { product: Product }) {
     };
   }, [product.id, product.linkText]);
 
+  useEffect(() => {
+    if (!fullscreen) return undefined;
+    let active = true;
+    setLookProducts([product]);
+    setSelectedLookIndex(0);
+
+    void getCompleteLookProducts(product, 4)
+      .then((items) => {
+        if (!active) return;
+        const products = [product, ...items.filter((item) => item.id !== product.id)];
+        setLookProducts(Array.from(new Map(products.map((item) => [item.id, item])).values()).slice(0, 5));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [fullscreen, product]);
+
   const openFullscreen = useCallback(() => {
     setActiveIndex(0);
     setProgress(0);
@@ -217,6 +238,13 @@ export function WiddeVideo({ product }: { product: Product }) {
 
   const firstStory = stories[0];
   const activeStory = stories[activeIndex] || firstStory;
+  const selectedLookProduct = lookProducts[selectedLookIndex] || product;
+  const hasCompleteLook = lookProducts.length > 1;
+  const storyCarouselCardWidth = Math.min(
+    screenWidth - Spacing.two * 2,
+    Math.max(260, screenWidth * 0.84),
+  );
+  const storyCarouselSnapInterval = storyCarouselCardWidth + Spacing.two;
   if (!firstStory || !activeStory) return null;
 
   return (
@@ -301,30 +329,79 @@ export function WiddeVideo({ product }: { product: Product }) {
               </Pressable>
             </View>
 
-            <View style={[styles.storyProductCard, { bottom: Math.max(insets.bottom + Spacing.two, Spacing.three) }]}>
-              <View style={styles.storyProductInfo}>
-                {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} contentFit="cover" style={styles.storyProductImage} />}
-                <View style={styles.storyProductCopy}>
-                  <ThemedText numberOfLines={2} style={styles.storyProductName}>{product.name}</ThemedText>
-                  {product.price !== null && <ThemedText style={styles.storyProductPrice}>{money(product.price)}</ThemedText>}
-                </View>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Adicionar produto à sacola"
-                onPress={() => setQuickViewVisible(true)}
-                style={({ pressed }) => [styles.storyAddButton, pressed && styles.pressed]}
-              >
-                <ShoppingBagIcon color="#FFFFFF" size={18} />
-                <ThemedText style={styles.storyAddButtonText}>Adicionar à sacola</ThemedText>
-              </Pressable>
+            <View style={[styles.storyProductCard, hasCompleteLook && styles.storyCarouselContainer, { bottom: Math.max(insets.bottom + Spacing.two, Spacing.three) }]}>
+              {hasCompleteLook ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={storyCarouselSnapInterval}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  disableIntervalMomentum
+                  onMomentumScrollEnd={(event) => {
+                    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / storyCarouselSnapInterval);
+                    setSelectedLookIndex(Math.min(lookProducts.length - 1, Math.max(0, nextIndex)));
+                  }}
+                  contentContainerStyle={styles.storyCarouselContent}
+                >
+                  {lookProducts.map((lookProduct, index) => (
+                    <View
+                      key={lookProduct.id}
+                      style={[
+                        styles.storyCarouselCard,
+                        { width: storyCarouselCardWidth },
+                        index < lookProducts.length - 1 && styles.storyCarouselCardGap,
+                      ]}
+                    >
+                      <View style={styles.storyProductInfo}>
+                        {!!lookProduct.imageUrl && <Image source={{ uri: lookProduct.imageUrl }} contentFit="cover" style={styles.storyProductImage} />}
+                        <View style={styles.storyProductCopy}>
+                          <ThemedText numberOfLines={2} style={styles.storyProductName}>{lookProduct.name}</ThemedText>
+                          {lookProduct.price !== null && <ThemedText style={styles.storyProductPrice}>{money(lookProduct.price)}</ThemedText>}
+                        </View>
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Adicionar produto à sacola"
+                        onPress={() => {
+                          setSelectedLookIndex(index);
+                          setQuickViewVisible(true);
+                        }}
+                        style={({ pressed }) => [styles.storyAddButton, styles.storyCarouselAddButton, pressed && styles.pressed]}
+                      >
+                        <ShoppingBagIcon color="#FFFFFF" size={18} />
+                        <ThemedText style={styles.storyAddButtonText}>Adicionar produto</ThemedText>
+                      </Pressable>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <>
+                  <View style={styles.storyProductInfo}>
+                    {!!selectedLookProduct.imageUrl && <Image source={{ uri: selectedLookProduct.imageUrl }} contentFit="cover" style={styles.storyProductImage} />}
+                    <View style={styles.storyProductCopy}>
+                      <ThemedText numberOfLines={2} style={styles.storyProductName}>{selectedLookProduct.name}</ThemedText>
+                      {selectedLookProduct.price !== null && <ThemedText style={styles.storyProductPrice}>{money(selectedLookProduct.price)}</ThemedText>}
+                    </View>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Adicionar produto à sacola"
+                    onPress={() => setQuickViewVisible(true)}
+                    style={({ pressed }) => [styles.storyAddButton, pressed && styles.pressed]}
+                  >
+                    <ShoppingBagIcon color="#FFFFFF" size={18} />
+                    <ThemedText style={styles.storyAddButtonText}>Adicionar produto</ThemedText>
+                  </Pressable>
+                </>
+              )}
             </View>
           </View>
           </View>
         </Modal>
       )}
       <ProductQuickView
-        product={product}
+        product={selectedLookProduct}
         visible={quickViewVisible}
         onClose={() => setQuickViewVisible(false)}
         viewCartLabel="Ver a sacola"
@@ -470,6 +547,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 6,
   },
+  storyCarouselContainer: {
+    padding: 0,
+    overflow: 'visible',
+    backgroundColor: 'transparent',
+  },
+  storyCarouselContent: {
+    alignItems: 'stretch',
+  },
+  storyCarouselCard: {
+    padding: Spacing.two,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  storyCarouselCardGap: {
+    marginRight: Spacing.two,
+  },
   storyProductInfo: {
     minHeight: 58,
     flexDirection: 'row',
@@ -507,6 +600,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     backgroundColor: '#0a0a0a',
+  },
+  storyCarouselAddButton: {
+    minHeight: 50,
+    marginTop: Spacing.two,
   },
   storyAddButtonText: {
     color: '#FFFFFF',

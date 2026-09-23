@@ -1214,21 +1214,52 @@ export async function getSimilarProducts(productOrId: Product | string, count = 
 }
 
 export async function getCompleteLookProducts(product: Product, count = 2): Promise<Product[]> {
-  const buildSpecFilter = (fieldId: number, value: string) => value.trim() ? `specificationFilter_${fieldId}:${value.trim()}` : '';
-  const collectionFilter = buildSpecFilter(269, product.collection);
-  const colorFilter = buildSpecFilter(261, product.colorFilter || product.color);
-  const genderFilter = buildSpecFilter(289, product.gender);
-  const strategies = [
-    [collectionFilter, colorFilter, genderFilter],
-    [collectionFilter, colorFilter],
-    [collectionFilter, genderFilter],
-    [colorFilter, genderFilter],
-    [collectionFilter],
-    [colorFilter],
-    [genderFilter],
-  ].map((filters) => filters.filter(Boolean)).filter((filters) => filters.length > 0);
+  const targetCount = Math.max(1, count);
+  const targetCollection = normalizedSearchText(product.collection);
+  const targetColor = normalizedSearchText(product.color || product.colorFilter);
+  const targetGender = normalizedSearchText(product.gender);
+  if (!targetCollection || !targetColor) return [];
 
-  const relationships = ['showtogether', 'buytogether', 'accessories', 'suggestions', 'similars'];
+  const facetAliases = {
+    collection: ['colecao', 'collection'],
+    color: ['cor em atributo de produto', 'cor-em-atributo-de-produto', 'color'],
+    gender: ['genero', 'gender'],
+  };
+
+  function findProductFacet(facets: CatalogFacet[], aliases: string[], values: string[]) {
+    const normalizedAliases = aliases.map(normalizedSearchText);
+    const normalizedValues = values.map(normalizedSearchText).filter(Boolean);
+    const facet = facets.find((candidate) => {
+      const names = [candidate.name, candidate.key].map(normalizedSearchText);
+      return names.some((name) => normalizedAliases.includes(name));
+    });
+    if (!facet) return null;
+
+    const value = facet.values.find((candidate) => {
+      const names = [candidate.name, candidate.value].map(normalizedSearchText);
+      return names.some((name) => normalizedValues.includes(name));
+    });
+    return value ? { key: value.key || facet.key, value: value.value } : null;
+  }
+
+  let strategies: SelectedFacet[][] = [];
+  try {
+    // A rota de facetas retorna o slug publicado pela VTEX (por exemplo,
+    // `colab-hr---mari-gonzalez`), que não pode ser reconstruído com
+    // segurança a partir do texto visível da especificação.
+    const facets = await getProductFacets({ query: product.name, hideUnavailableItems: false });
+    const collectionFacet = findProductFacet(facets, facetAliases.collection, [product.collection]);
+    const colorFacet = findProductFacet(facets, facetAliases.color, [product.color, product.colorFilter || '']);
+    const genderFacet = findProductFacet(facets, facetAliases.gender, [product.gender]);
+    if (!collectionFacet || !colorFacet) return [];
+    strategies = [
+      [collectionFacet, colorFacet, genderFacet],
+      [collectionFacet, colorFacet],
+    ].map((filters) => filters.filter((filter): filter is SelectedFacet => Boolean(filter)))
+      .filter((filters) => filters.length > 0);
+  } catch {
+    // Sem as facetas exatas, não exibe produtos potencialmente diferentes.
+  }
 
   async function hydrate(products: Product[]) {
     return Promise.all(products.map(async (item) => {
@@ -1246,10 +1277,20 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
       .map((item) => [item.id, item])).values());
   }
 
+  function matchesExactLook(candidate: Product) {
+    const candidateCollection = normalizedSearchText(candidate.collection);
+    const candidateColor = normalizedSearchText(candidate.color || candidate.colorFilter);
+    const candidateGender = normalizedSearchText(candidate.gender);
+    return candidateCollection === targetCollection
+      && candidateColor === targetColor
+      && (!targetGender || !candidateGender || candidateGender === targetGender);
+  }
+
   async function validate(products: Product[]) {
     const validated: Product[] = [];
-    for (const candidate of await hydrate(dedupe(products).slice(0, count * 4))) {
-      if (validated.length >= count) break;
+    for (const candidate of await hydrate(dedupe(products).slice(0, targetCount * 4))) {
+      if (validated.length >= targetCount) break;
+      if (!matchesExactLook(candidate)) continue;
       // Conjuntos devem completar o look com outro conjunto; não misture as
       // peças avulsas que a mesma coleção também costuma retornar.
       if (product.isKit && !candidate.isKit) continue;
@@ -1258,9 +1299,9 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
     return validated;
   }
 
-  for (const fq of strategies) {
+  for (const facets of strategies) {
     try {
-      const result = await searchProductListing({ fq, count: 24, hideUnavailableItems: true, sort: 'orders:desc' });
+      const result = await searchProductListing({ facets, count: 24, hideUnavailableItems: true, sort: 'orders:desc' });
       const validated = await validate(result.products);
       if (validated.length > 0) return validated;
     } catch {
@@ -1268,39 +1309,5 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
     }
   }
 
-  for (const relationship of relationships) {
-    try {
-      const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/crossselling/${relationship}/${encodeURIComponent(product.id)}`);
-      url.searchParams.set('sc', storeConfig.salesChannel);
-      const result = await getJson<ProductPayload[]>(url.toString());
-      const products = Array.from(new Map(result
-        .map(normalizeProduct)
-        .filter((item) => item.id && item.id !== product.id)
-        .map((item) => [item.id, item])).values());
-      if (products.length > 0) {
-        const validated = await validate(products);
-        if (validated.length > 0) return validated;
-      }
-    } catch {
-      // Continua tentando as demais relações configuradas no catálogo VTEX.
-    }
-  }
-
-  try {
-    const fallback = await getSimilarProducts(product, count + 1);
-    if (fallback.length > 0) {
-      const validated = await validate(fallback);
-      if (validated.length > 0) return validated;
-    }
-  } catch {
-    // A busca de fallback é opcional para a seção.
-  }
-
-  try {
-    const query = product.color || product.brand || product.name;
-    const fallback = await searchProducts({ query, count: count + 1 });
-    return validate(fallback);
-  } catch {
-    return [];
-  }
+  return [];
 }
