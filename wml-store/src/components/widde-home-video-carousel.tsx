@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CloseCircleIcon from '@/components/icons/CloseCircleIcon';
@@ -8,9 +8,8 @@ import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import SpeakerIcon from '@/components/icons/SpeakerIcon';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { Spacing } from '@/constants/theme';
-import { getProduct, type Product } from '@/services/catalog';
+import { getCompleteLookProducts, getProduct, type Product } from '@/services/catalog';
 import { getWiddeStories, type WiddeStory } from '@/services/widde';
-import { useTheme } from '@/hooks/use-theme';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -24,6 +23,15 @@ type HomeVideoItem = {
   product: Product;
   story: WiddeStory;
 };
+
+type CarouselVideoItem = {
+  key: string;
+  item: HomeVideoItem;
+};
+
+const LOOP_COPIES = 3;
+const ACTIVE_CARD_SCALE = 1.05;
+const CAROUSEL_GAP = 20;
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -67,30 +75,45 @@ function money(value: number | null) {
 }
 
 export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [items, setItems] = useState<HomeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [selectedItem, setSelectedItem] = useState<HomeVideoItem | null>(null);
+  const [lookProducts, setLookProducts] = useState<Product[]>([]);
+  const [selectedLookIndex, setSelectedLookIndex] = useState(0);
   const [quickViewVisible, setQuickViewVisible] = useState(false);
   const [muted, setMuted] = useState(true);
+  const listRef = useRef<FlatList<CarouselVideoItem>>(null);
   const productIds = useMemo(() => productIdsFromData(data), [data]);
   const productIdsSignature = productIds.join('|');
   const enabled = enabledFromData(data.enabled);
   const maxItems = Math.min(12, numberFromData(data.maxItems ?? data.numberOfItems, 8));
   const title = text(data.title).trim() || 'Vídeos dos produtos';
-  const cardWidth = Math.min(280, Math.max(220, Math.round(screenWidth * 0.72)));
-  const cardHeight = Math.round(cardWidth / 0.64);
-  const snapInterval = cardWidth + Spacing.two;
+  const cardWidth = Math.min(310, Math.max(210, Math.round(screenWidth * 0.68)));
+  const cardHeight = Math.round(cardWidth / 0.58);
+  const snapInterval = cardWidth + CAROUSEL_GAP;
+  const lookCardWidth = Math.min(
+    screenWidth - Spacing.two * 2,
+    Math.max(260, screenWidth * 0.84),
+  );
+  const lookSnapInterval = lookCardWidth + Spacing.two;
+  const carouselItems = useMemo<CarouselVideoItem[]>(() => {
+    const copies = items.length > 1 ? LOOP_COPIES : 1;
+    return Array.from({ length: copies }, (_, copyIndex) => items.map((item) => ({
+      key: `${copyIndex}-${item.product.id}`,
+      item,
+    }))).flat();
+  }, [items]);
+  const initialCarouselIndex = items.length > 1 ? items.length : 0;
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
 
     setItems([]);
-    setActiveIndex(0);
+    setActiveCarouselIndex(0);
     setSelectedItem(null);
     setQuickViewVisible(false);
 
@@ -120,10 +143,69 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
     };
   }, [enabled, maxItems, productIds, productIdsSignature]);
 
+  useEffect(() => {
+    let active = true;
+
+    if (!selectedItem) {
+      setLookProducts([]);
+      setSelectedLookIndex(0);
+      return () => {
+        active = false;
+      };
+    }
+
+    setLookProducts([selectedItem.product]);
+    setSelectedLookIndex(0);
+
+    void getCompleteLookProducts(selectedItem.product, 4)
+      .then((products) => {
+        if (!active) return;
+        const allProducts = [
+          selectedItem.product,
+          ...products.filter((product) => product.id !== selectedItem.product.id),
+        ];
+        setLookProducts(Array.from(new Map(allProducts.map((product) => [product.id, product])).values()).slice(0, 5));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [selectedItem]);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+
+    setActiveCarouselIndex(initialCarouselIndex);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index: initialCarouselIndex, animated: false });
+    });
+  }, [initialCarouselIndex, items.length]);
+
+  function handleCarouselScrollEnd(event: { nativeEvent: { contentOffset: { x: number } } }) {
+    if (items.length === 0) return;
+
+    const rawIndex = Math.max(0, Math.round(event.nativeEvent.contentOffset.x / snapInterval));
+    const logicalIndex = rawIndex % items.length;
+    const isLoopBoundary = items.length > 1 && (rawIndex < items.length || rawIndex >= items.length * 2);
+    const normalizedIndex = isLoopBoundary ? items.length + logicalIndex : rawIndex;
+
+    setActiveCarouselIndex(normalizedIndex);
+
+    if (isLoopBoundary) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({ index: normalizedIndex, animated: false });
+      });
+    }
+  }
+
   function closeVideo() {
     setQuickViewVisible(false);
     setSelectedItem(null);
   }
+
+  const selectedLookProduct = lookProducts[selectedLookIndex] || selectedItem?.product || null;
+  const hasCompleteLook = lookProducts.length > 1;
 
   if (!enabled || (!loading && items.length === 0)) return null;
   if (loading) return null;
@@ -133,55 +215,59 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
       {data.showTitle !== false && (
         <ThemedText type="subtitle" style={styles.sectionTitle}>{title}</ThemedText>
       )}
-      <ScrollView
+      <FlatList
+        ref={listRef}
+        data={carouselItems}
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={snapInterval}
         snapToAlignment="start"
         decelerationRate="fast"
         disableIntervalMomentum
-        onMomentumScrollEnd={(event) => {
-          const nextIndex = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
-          setActiveIndex(Math.max(0, Math.min(items.length - 1, nextIndex)));
-        }}
-        contentContainerStyle={styles.list}
-      >
-        {items.map((item, index) => (
-          <Pressable
-            key={item.product.id}
-            accessibilityRole="button"
-            accessibilityLabel={`Abrir vídeo de ${item.product.name}`}
-            onPress={() => {
-              setMuted(true);
-              setSelectedItem(item);
-            }}
-            style={({ pressed }) => [
-              styles.card,
-              { width: cardWidth },
-              index < items.length - 1 && styles.cardGap,
-              pressed && styles.pressed,
-            ]}
-          >
-            <View style={[styles.media, { height: cardHeight }]}>
-              {!!item.story.thumbnailUrl && <Image source={{ uri: item.story.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
-              <WiddeStoryPlayback
-                source={item.story.previewUrl}
-                active={!selectedItem && index === activeIndex}
-                loop
-                muted
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={styles.mediaBadge}>
-                <ThemedText style={styles.mediaBadgeText}>WIDDE</ThemedText>
+        initialScrollIndex={initialCarouselIndex}
+        getItemLayout={(_, index) => ({ length: snapInterval, offset: snapInterval * index, index })}
+        onMomentumScrollEnd={handleCarouselScrollEnd}
+        keyExtractor={(carouselItem) => carouselItem.key}
+        contentContainerStyle={[styles.list, {
+          paddingHorizontal: Math.max(0, (screenWidth - cardWidth) / 2),
+          paddingVertical: Math.round(cardHeight * (ACTIVE_CARD_SCALE - 1) / 2),
+        }]}
+        renderItem={({ item: carouselItem, index }) => {
+          const isActive = !selectedItem && index === activeCarouselIndex;
+
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir vídeo de ${carouselItem.item.product.name}`}
+              onPress={() => {
+                setMuted(true);
+                setSelectedItem(carouselItem.item);
+              }}
+              style={({ pressed }) => [
+                styles.card,
+                { width: cardWidth },
+                index < carouselItems.length - 1 && styles.cardGap,
+                isActive && styles.activeCard,
+                isActive && { transform: [{ scale: ACTIVE_CARD_SCALE }] },
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={[styles.media, { height: cardHeight }]}>
+                {!!carouselItem.item.story.thumbnailUrl && <Image source={{ uri: carouselItem.item.story.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
+                {isActive && (
+                  <WiddeStoryPlayback
+                    source={carouselItem.item.story.videoUrl}
+                    active
+                    loop
+                    muted
+                    style={StyleSheet.absoluteFill}
+                  />
+                )}
               </View>
-            </View>
-            <View style={[styles.productInfo, { backgroundColor: theme.backgroundElement }]}>
-              <ThemedText numberOfLines={2} style={styles.productName}>{item.product.name}</ThemedText>
-              {item.product.price !== null && <ThemedText style={styles.productPrice}>{money(item.product.price)}</ThemedText>}
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
+            </Pressable>
+          );
+        }}
+      />
 
       {selectedItem && (
         <Modal
@@ -209,18 +295,67 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
                   <SpeakerIcon color="#FFFFFF" muted={muted} size={28} />
                 </Pressable>
               </View>
-              <View style={[styles.fullscreenProduct, { bottom: Math.max(insets.bottom + Spacing.two, Spacing.three) }]}>
-                <View style={styles.fullscreenProductInfo}>
-                  {!!selectedItem.product.imageUrl && <Image source={{ uri: selectedItem.product.imageUrl }} contentFit="cover" style={styles.productImage} />}
-                  <View style={styles.productCopy}>
-                    <ThemedText numberOfLines={2} style={styles.fullscreenProductName}>{selectedItem.product.name}</ThemedText>
-                    {selectedItem.product.price !== null && <ThemedText style={styles.fullscreenProductPrice}>{money(selectedItem.product.price)}</ThemedText>}
-                  </View>
-                </View>
-                <Pressable accessibilityRole="button" onPress={() => setQuickViewVisible(true)} style={styles.addButton}>
-                  <ShoppingBagIcon color="#FFFFFF" size={18} />
-                  <ThemedText style={styles.addButtonText}>Adicionar produto</ThemedText>
-                </Pressable>
+              <View style={[styles.fullscreenProduct, hasCompleteLook && styles.fullscreenProductCarousel, { bottom: Math.max(insets.bottom + Spacing.two, Spacing.three) }]}>
+                {hasCompleteLook ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    snapToInterval={lookSnapInterval}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                    disableIntervalMomentum
+                    onMomentumScrollEnd={(event) => {
+                      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / lookSnapInterval);
+                      setSelectedLookIndex(Math.min(lookProducts.length - 1, Math.max(0, nextIndex)));
+                    }}
+                    contentContainerStyle={styles.lookCarouselContent}
+                  >
+                    {lookProducts.map((lookProduct, index) => (
+                      <View
+                        key={lookProduct.id}
+                        style={[
+                          styles.lookCard,
+                          { width: lookCardWidth },
+                          index < lookProducts.length - 1 && styles.lookCardGap,
+                        ]}
+                      >
+                        <View style={styles.fullscreenProductInfo}>
+                          {!!lookProduct.imageUrl && <Image source={{ uri: lookProduct.imageUrl }} contentFit="cover" style={styles.productImage} />}
+                          <View style={styles.productCopy}>
+                            <ThemedText numberOfLines={2} style={styles.fullscreenProductName}>{lookProduct.name}</ThemedText>
+                            {lookProduct.price !== null && <ThemedText style={styles.fullscreenProductPrice}>{money(lookProduct.price)}</ThemedText>}
+                          </View>
+                        </View>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Adicionar produto à sacola"
+                          onPress={() => {
+                            setSelectedLookIndex(index);
+                            setQuickViewVisible(true);
+                          }}
+                          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+                        >
+                          <ShoppingBagIcon color="#FFFFFF" size={18} />
+                          <ThemedText style={styles.addButtonText}>Adicionar produto</ThemedText>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : selectedLookProduct ? (
+                  <>
+                    <View style={styles.fullscreenProductInfo}>
+                      {!!selectedLookProduct.imageUrl && <Image source={{ uri: selectedLookProduct.imageUrl }} contentFit="cover" style={styles.productImage} />}
+                      <View style={styles.productCopy}>
+                        <ThemedText numberOfLines={2} style={styles.fullscreenProductName}>{selectedLookProduct.name}</ThemedText>
+                        {selectedLookProduct.price !== null && <ThemedText style={styles.fullscreenProductPrice}>{money(selectedLookProduct.price)}</ThemedText>}
+                      </View>
+                    </View>
+                    <Pressable accessibilityRole="button" onPress={() => setQuickViewVisible(true)} style={styles.addButton}>
+                      <ShoppingBagIcon color="#FFFFFF" size={18} />
+                      <ThemedText style={styles.addButtonText}>Adicionar produto</ThemedText>
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             </View>
           </View>
@@ -229,7 +364,7 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
 
       {selectedItem && (
         <ProductQuickView
-          product={selectedItem.product}
+          product={selectedLookProduct || selectedItem.product}
           visible={quickViewVisible}
           onClose={() => setQuickViewVisible(false)}
           viewCartLabel="Ver a sacola"
@@ -250,51 +385,23 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   list: {
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
+    alignItems: 'flex-start',
   },
   card: {
     overflow: 'hidden',
     borderRadius: 14,
-    backgroundColor: '#15110f',
+    backgroundColor: '#0a0a0a',
+  },
+  activeCard: {
+    zIndex: 2,
   },
   cardGap: {
-    marginRight: Spacing.two,
+    marginRight: CAROUSEL_GAP,
   },
   media: {
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#15110f',
-  },
-  mediaBadge: {
-    position: 'absolute',
-    top: Spacing.two,
-    left: Spacing.two,
-    paddingHorizontal: Spacing.one,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.32)',
-  },
-  mediaBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    lineHeight: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  productInfo: {
-    minHeight: 70,
-    gap: Spacing.one,
-    padding: Spacing.two,
-  },
-  productName: {
-    fontSize: 13,
-    lineHeight: 17,
-  },
-  productPrice: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '700',
+    backgroundColor: '#0a0a0a',
   },
   fullscreen: {
     flex: 1,
@@ -323,8 +430,24 @@ const styles = StyleSheet.create({
     right: Spacing.two,
     padding: Spacing.two,
     borderRadius: 8,
-    backgroundColor: 'rgba(91, 60, 40, 0.86)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 6,
+  },
+  fullscreenProductCarousel: {
+    padding: 0,
+    overflow: 'visible',
+    backgroundColor: 'transparent',
+  },
+  lookCarouselContent: {
+    alignItems: 'stretch',
+  },
+  lookCard: {
+    padding: Spacing.two,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  lookCardGap: {
+    marginRight: Spacing.two,
   },
   fullscreenProductInfo: {
     minHeight: 58,
