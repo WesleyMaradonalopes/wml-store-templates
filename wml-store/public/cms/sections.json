@@ -1493,6 +1493,65 @@
 		}
 	},
 	{
+		"name": "WiddeHomeVideoCarousel",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Carrossel de vídeos Widde",
+			"description": "Exibe vídeos Widde dos produtos informados manualmente.",
+			"type": "object",
+			"properties": {
+				"enabled": {
+					"title": "Ativar seção",
+					"type": "boolean",
+					"default": true,
+					"widget": {
+						"ui:widget": "checkboxes"
+					}
+				},
+				"title": {
+					"title": "Título da seção",
+					"type": "string",
+					"default": "Vídeos dos produtos"
+				},
+				"showTitle": {
+					"title": "Exibir título",
+					"type": "boolean",
+					"default": true,
+					"widget": {
+						"ui:widget": "checkboxes"
+					}
+				},
+				"maxItems": {
+					"title": "Quantidade máxima de produtos",
+					"description": "Limite de produtos consultados para esta seção.",
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 12,
+					"default": 8
+				},
+				"products": {
+					"title": "Produtos com vídeo",
+					"description": "Adicione os produtos na ordem em que devem aparecer. Produtos sem vídeo válido serão ignorados.",
+					"type": "array",
+					"items": {
+						"title": "Produto",
+						"type": "object",
+						"required": [
+							"productId"
+						],
+						"properties": {
+							"productId": {
+								"title": "ID do produto VTEX",
+								"description": "Informe o productId do catálogo VTEX, não o SKU.",
+								"type": "string"
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
 		"name": "CouponsList",
 		"requiredScopes": [],
 		"schema": {

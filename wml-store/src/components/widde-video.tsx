@@ -34,7 +34,7 @@ const PREVIEW_WIDTH = 94;
 const PREVIEW_HEIGHT = 140;
 const PREVIEW_MARGIN = 8;
 
-function StoryPlayback({ source, active, loop, muted, onEnded, onProgress, style }: StoryPlaybackProps) {
+export function WiddeStoryPlayback({ source, active, loop, muted, onEnded, onProgress, style }: StoryPlaybackProps) {
   const player = useVideoPlayer(source, (instance) => {
     instance.loop = loop;
     instance.muted = muted;
@@ -266,7 +266,7 @@ export function WiddeVideo({ product }: { product: Product }) {
           >
             <View style={styles.previewMedia}>
               {!!firstStory.thumbnailUrl && <Image source={{ uri: firstStory.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
-              <StoryPlayback source={firstStory.previewUrl} active={!fullscreen} loop muted style={StyleSheet.absoluteFill} />
+              <WiddeStoryPlayback source={firstStory.previewUrl} active={!fullscreen} loop muted style={StyleSheet.absoluteFill} />
               <Pressable
                 accessibilityLabel="Abrir vídeo do produto"
                 onPress={openFullscreen}
@@ -294,7 +294,7 @@ export function WiddeVideo({ product }: { product: Product }) {
         >
           <View style={styles.fullscreenContainer}>
           {!!activeStory.thumbnailUrl && <Image source={{ uri: activeStory.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
-          <StoryPlayback
+          <WiddeStoryPlayback
             key={activeStory.key}
             source={activeStory.videoUrl}
             active

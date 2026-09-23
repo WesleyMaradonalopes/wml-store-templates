@@ -4,6 +4,26 @@
 
 O app lê o conteúdo publicado do projeto definido por `EXPO_PUBLIC_VTEX_CMS_PROJECT_ID` no VTEX Headless CMS. Portanto, editar este arquivo local não publica nem altera o CMS; ele serve como contrato das seções que o app sabe renderizar.
 
+## Carrossel de vídeos Widde na Home
+
+Adicione a seção `WiddeHomeVideoCarousel` ao documento `home` para exibir os vídeos dos produtos escolhidos manualmente. A ordem dos itens no CMS é preservada e produtos sem vídeo válido são ignorados:
+
+```json
+{
+  "enabled": true,
+  "title": "Vídeos dos produtos",
+  "showTitle": true,
+  "maxItems": 8,
+  "products": [
+    { "productId": "7474" },
+    { "productId": "7445" },
+    { "productId": "7441" }
+  ]
+}
+```
+
+Use `enabled: false` para ocultar a seção sem removê-la do documento. Informe o `productId` VTEX, não o SKU.
+
 ## Botão individual dos banners
 
 Dentro de cada item de `images` da seção `MultipleImageBanner`, use `button` para exibir um botão independente naquele banner. O botão usa o mesmo destino configurado em `action`:

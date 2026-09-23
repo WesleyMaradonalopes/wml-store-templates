@@ -24,6 +24,7 @@ import { ProductGridSkeleton } from './product-grid-skeleton';
 import { ProductPlpGrid } from './product-plp-grid';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+import { WiddeHomeVideoCarousel } from './widde-home-video-carousel';
 
 type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean };
 
@@ -1058,6 +1059,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false }: Pr
   if (section.name === 'LastSeenProducts') return <ProductShelf data={data} isHome={isHome} />;
 
   if (section.name === 'ProductTiles') return <ProductTiles data={data} isHome={isHome} />;
+  if (section.name === 'WiddeHomeVideoCarousel') return isHome ? <WiddeHomeVideoCarousel data={data} /> : null;
   if (section.name === 'StreamShopBanner') return <StreamShopBanner data={data} />;
   if (section.name === 'ScheduleCardShelf') return <ScheduleCardShelf data={data} />;
   if (section.name === 'CouponsList') return <CouponsList data={data} />;
