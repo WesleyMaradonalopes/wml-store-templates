@@ -13,6 +13,7 @@ Adicione a seção `ProductCollectionCarousel` ao documento `home` para exibir o
   "enabled": true,
   "title": "Produtos em destaque",
   "showTitle": true,
+  "backgroundColor": "#F5F1EB",
   "maxItems": 6,
   "products": [
     { "productId": "7474" },
@@ -22,6 +23,8 @@ Adicione a seção `ProductCollectionCarousel` ao documento `home` para exibir o
 ```
 
 Use `enabled: false` para ocultar a seção sem removê-la do documento. Informe o `productId` VTEX, não o SKU. Se não houver outro produto com coleção e cor exatamente iguais, o app mantém apenas o produto principal nas miniaturas.
+
+`backgroundColor` preenche todo o bloco do componente e aceita cores em hexadecimal, `rgb(...)` ou `rgba(...)`. O texto exibido entre o produto principal e as miniaturas usa o nome da coleção retornado pelo catálogo; se o produto não tiver coleção, o nome do produto é usado como fallback.
 
 ## Carrossel de vídeos Widde na Home
 

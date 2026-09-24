@@ -1521,6 +1521,17 @@
 						"ui:widget": "checkboxes"
 					}
 				},
+				"backgroundColor": {
+					"title": "Cor de fundo do bloco",
+					"description": "Preenche todo o componente. Aceita #RGB, #RGBA, #RRGGBB, #RRGGBBAA, rgb(...) ou rgba(...).",
+					"type": "string",
+					"format": "color",
+					"default": "#FFFFFF",
+					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
+					"widget": {
+						"ui:widget": "color"
+					}
+				},
 				"maxItems": {
 					"title": "Quantidade máxima de produtos principais",
 					"description": "Limite de IDs consultados para o carrossel principal.",

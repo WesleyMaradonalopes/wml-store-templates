@@ -11,6 +11,7 @@ import { getProduct, type Product, type ProductKitGroup, type ProductVariant } f
 import { buildVariationGroups } from '@/utils/product-variations';
 
 import { AddedToCartModal, type AddedProductInfo } from './added-to-cart-modal';
+import { SkeletonBlock } from './skeleton';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -43,6 +44,27 @@ function money(value: number | null) {
 
 function matchesSelection(variant: ProductVariant, selected: Record<string, string>, ignoredName?: string) {
   return Object.entries(selected).every(([name, value]) => name === ignoredName || variant.variations[name] === value);
+}
+
+function ProductQuickViewSkeleton() {
+  return (
+    <View style={styles.skeletonContent}>
+      <View style={styles.skeletonGallery}>
+        <SkeletonBlock style={styles.skeletonGalleryImage} />
+        <SkeletonBlock style={styles.skeletonGalleryImage} />
+        <SkeletonBlock style={styles.skeletonGalleryImage} />
+      </View>
+      <SkeletonBlock style={styles.skeletonPrice} />
+      <SkeletonBlock style={styles.skeletonVariationLabel} />
+      <View style={styles.skeletonOptions}>
+        <SkeletonBlock style={styles.skeletonOption} />
+        <SkeletonBlock style={styles.skeletonOption} />
+        <SkeletonBlock style={styles.skeletonOption} />
+      </View>
+      <SkeletonBlock style={styles.skeletonButton} />
+      <SkeletonBlock style={styles.skeletonButton} />
+    </View>
+  );
 }
 
 export function ProductQuickView({ product, visible, onClose, onAdded, showAddedModal = true, viewCartLabel, kitSelection, onKitSelectionChange }: QuickViewProps) {
@@ -196,56 +218,59 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                 </Pressable>
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-                {loading && <ActivityIndicator color="#0a0a0a" />}
-                {gallery.length > 0 && (
-                  <FlatList
-                    data={gallery}
-                    horizontal
-                    nestedScrollEnabled
-                    showsHorizontalScrollIndicator={false}
-                    keyExtractor={(image, index) => `${image}-${index}`}
-                    contentContainerStyle={styles.gallery}
-                    snapToInterval={172}
-                    decelerationRate="fast"
-                    disableIntervalMomentum
-                    renderItem={({ item }) => <Image source={{ uri: item }} style={styles.image} contentFit="cover" />}
-                  />
+                {loading ? <ProductQuickViewSkeleton /> : (
+                  <>
+                    {gallery.length > 0 && (
+                      <FlatList
+                        data={gallery}
+                        horizontal
+                        nestedScrollEnabled
+                        showsHorizontalScrollIndicator={false}
+                        keyExtractor={(image, index) => `${image}-${index}`}
+                        contentContainerStyle={styles.gallery}
+                        snapToInterval={172}
+                        decelerationRate="fast"
+                        disableIntervalMomentum
+                        renderItem={({ item }) => <Image source={{ uri: item }} style={styles.image} contentFit="cover" />}
+                      />
+                    )}
+                    {!isKit && (selectedVariant?.price ?? details.price) !== null && (
+                      <ThemedText style={styles.priceQuickView} type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
+                    )}
+                    {isKit ? (
+                      <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
+                    ) : variationNames.map((name) => (
+                      <View key={name} style={styles.variationGroup}>
+                        <ThemedText type="smallBold">
+                          {name}:{selectedOptions[name] ? <ThemedText> {selectedOptions[name]}</ThemedText> : null}
+                        </ThemedText>
+                        <View style={styles.options}>
+                          {variationGroups[name].map((value) => {
+                            const available = optionAvailable(name, value);
+                            const selected = selectedOptions[name] === value;
+                            return (
+                              <Pressable
+                                key={value}
+                                disabled={!available}
+                                accessibilityState={{ disabled: !available, selected }}
+                                onPress={() => { setMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }}
+                                style={[styles.option, selected && styles.selectedOption, !available && styles.unavailableOption]}>
+                                <ThemedText style={[selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                    {!!message && !message.toLowerCase().includes('adicionad') && <ThemedText style={styles.messageText}>{message}</ThemedText>}
+                    {!isKit && <Pressable onPress={openProduct} style={styles.productButton}>
+                      <ThemedText type="smallBold">Ir para o produto</ThemedText>
+                    </Pressable>}
+                    <Pressable disabled={adding || (isKit && (loading || details.kitGroups.length === 0))} onPress={addSelectedProduct} style={styles.addButton}>
+                      {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>}
+                    </Pressable>
+                  </>
                 )}
-                {!isKit && (selectedVariant?.price ?? details.price) !== null && (
-                  <ThemedText style={styles.priceQuickView} type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
-                )}
-                {isKit ? (
-                  <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
-                ) : variationNames.map((name) => (
-                  <View key={name} style={styles.variationGroup}>
-                    <ThemedText type="smallBold">
-                      {name}:{selectedOptions[name] ? <ThemedText> {selectedOptions[name]}</ThemedText> : null}
-                    </ThemedText>
-                    <View style={styles.options}>
-                      {variationGroups[name].map((value) => {
-                        const available = optionAvailable(name, value);
-                        const selected = selectedOptions[name] === value;
-                        return (
-                          <Pressable
-                            key={value}
-                            disabled={!available}
-                            accessibilityState={{ disabled: !available, selected }}
-                            onPress={() => { setMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }}
-                            style={[styles.option, selected && styles.selectedOption, !available && styles.unavailableOption]}>
-                            <ThemedText style={[selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))}
-                {!!message && !message.toLowerCase().includes('adicionad') && <ThemedText style={styles.messageText}>{message}</ThemedText>}
-                {!isKit && <Pressable onPress={openProduct} style={styles.productButton}>
-                  <ThemedText type="smallBold">Ir para o produto</ThemedText>
-                </Pressable>}
-                <Pressable disabled={adding || (isKit && (loading || details.kitGroups.length === 0))} onPress={addSelectedProduct} style={styles.addButton}>
-                  {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>}
-                </Pressable>
               </ScrollView>
             </SafeAreaView>
           </ThemedView>
@@ -291,13 +316,21 @@ const styles = StyleSheet.create({
   closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
   content: { gap: 5, padding: Spacing.four, paddingBottom: Spacing.five },
+  skeletonContent: { gap: 12 },
+  skeletonGallery: { flexDirection: 'row', gap: 12, overflow: 'hidden' },
+  skeletonGalleryImage: { width: 160, height: 220, borderRadius: 8 },
+  skeletonPrice: { width: '42%', height: 24, borderRadius: 4 },
+  skeletonVariationLabel: { width: 90, height: 18, borderRadius: 4 },
+  skeletonOptions: { flexDirection: 'row', gap: Spacing.two },
+  skeletonOption: { width: 42, height: 42, borderRadius: 21 },
+  skeletonButton: { width: '100%', height: 50, borderRadius: 8 },
   gallery: { gap: 12, paddingRight: Spacing.four },
   image: { width: 160, height: 220, borderRadius: 8, backgroundColor: '#e8e8ea' },
 	nameQuickView: { fontSize: 14},
 	priceQuickView: { display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 16, height: 30, margin: 0 },
-  variationGroup: { gap: Spacing.two, },
-  options: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  option: { minWidth: 42, minHeight: 42, paddingHorizontal: Spacing.three, borderRadius: 21, borderWidth: 1, borderColor: '#d6d0c8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  variationGroup: { gap: Spacing.two},
+  options: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, paddingBottom: 5 },
+  option: { minWidth: 38, minHeight: 38, borderRadius: 21, borderWidth: 1, borderColor: '#d6d0c8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   selectedOption: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
   selectedOptionText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableOption: { opacity: 0.35, backgroundColor: '#eeeae4' },
