@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, FlatList, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CloseCircleIcon from '@/components/icons/CloseCircleIcon';
@@ -31,6 +31,7 @@ type CarouselVideoItem = {
 
 const LOOP_COPIES = 3;
 const ACTIVE_CARD_SCALE = 1.05;
+const INACTIVE_CARD_SCALE = 1;
 const CAROUSEL_GAP = 20;
 
 function text(value: unknown) {
@@ -86,6 +87,8 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
   const [quickViewVisible, setQuickViewVisible] = useState(false);
   const [muted, setMuted] = useState(true);
   const listRef = useRef<FlatList<CarouselVideoItem>>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const centeredIndexRef = useRef(0);
   const productIds = useMemo(() => productIdsFromData(data), [data]);
   const productIdsSignature = productIds.join('|');
   const enabled = enabledFromData(data.enabled);
@@ -176,11 +179,28 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
   useEffect(() => {
     if (items.length === 0) return;
 
+    centeredIndexRef.current = initialCarouselIndex;
+    scrollX.setValue(initialCarouselIndex * snapInterval);
     setActiveCarouselIndex(initialCarouselIndex);
     requestAnimationFrame(() => {
       listRef.current?.scrollToIndex({ index: initialCarouselIndex, animated: false });
     });
-  }, [initialCarouselIndex, items.length]);
+  }, [initialCarouselIndex, items.length, scrollX, snapInterval]);
+
+  const handleCarouselScroll = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
+    const offset = Math.max(0, event.nativeEvent.contentOffset.x);
+    scrollX.setValue(offset);
+
+    if (carouselItems.length === 0) return;
+    const nextIndex = Math.max(0, Math.min(
+      carouselItems.length - 1,
+      Math.round(offset / snapInterval),
+    ));
+    if (centeredIndexRef.current === nextIndex) return;
+
+    centeredIndexRef.current = nextIndex;
+    setActiveCarouselIndex(nextIndex);
+  }, [carouselItems.length, scrollX, snapInterval]);
 
   function handleCarouselScrollEnd(event: { nativeEvent: { contentOffset: { x: number } } }) {
     if (items.length === 0) return;
@@ -190,6 +210,8 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
     const isLoopBoundary = items.length > 1 && (rawIndex < items.length || rawIndex >= items.length * 2);
     const normalizedIndex = isLoopBoundary ? items.length + logicalIndex : rawIndex;
 
+    centeredIndexRef.current = normalizedIndex;
+    scrollX.setValue(normalizedIndex * snapInterval);
     setActiveCarouselIndex(normalizedIndex);
 
     if (isLoopBoundary) {
@@ -226,6 +248,8 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
         disableIntervalMomentum
         initialScrollIndex={initialCarouselIndex}
         getItemLayout={(_, index) => ({ length: snapInterval, offset: snapInterval * index, index })}
+        onScroll={handleCarouselScroll}
+        scrollEventThrottle={16}
         onMomentumScrollEnd={handleCarouselScrollEnd}
         keyExtractor={(carouselItem) => carouselItem.key}
         contentContainerStyle={[styles.list, {
@@ -234,37 +258,48 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
         }]}
         renderItem={({ item: carouselItem, index }) => {
           const isActive = !selectedItem && index === activeCarouselIndex;
+          const scale = scrollX.interpolate({
+            inputRange: [
+              (index - 1) * snapInterval,
+              index * snapInterval,
+              (index + 1) * snapInterval,
+            ],
+            outputRange: [INACTIVE_CARD_SCALE, ACTIVE_CARD_SCALE, INACTIVE_CARD_SCALE],
+            extrapolate: 'clamp',
+          });
 
           return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Abrir vídeo de ${carouselItem.item.product.name}`}
-              onPress={() => {
-                setMuted(true);
-                setSelectedItem(carouselItem.item);
-              }}
-              style={({ pressed }) => [
+            <Animated.View
+              style={[
                 styles.card,
-                { width: cardWidth },
+                { width: cardWidth, transform: [{ scale }] },
                 index < carouselItems.length - 1 && styles.cardGap,
                 isActive && styles.activeCard,
-                isActive && { transform: [{ scale: ACTIVE_CARD_SCALE }] },
-                pressed && styles.pressed,
               ]}
             >
-              <View style={[styles.media, { height: cardHeight }]}>
-                {!!carouselItem.item.story.thumbnailUrl && <Image source={{ uri: carouselItem.item.story.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
-                {isActive && (
-                  <WiddeStoryPlayback
-                    source={carouselItem.item.story.videoUrl}
-                    active
-                    loop
-                    muted
-                    style={StyleSheet.absoluteFill}
-                  />
-                )}
-              </View>
-            </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Abrir vídeo de ${carouselItem.item.product.name}`}
+                onPress={() => {
+                  setMuted(true);
+                  setSelectedItem(carouselItem.item);
+                }}
+                style={({ pressed }) => [styles.cardPressable, pressed && styles.pressed]}
+              >
+                <View style={[styles.media, { height: cardHeight }]}>
+                  {!!carouselItem.item.story.thumbnailUrl && <Image source={{ uri: carouselItem.item.story.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
+                  {isActive && (
+                    <WiddeStoryPlayback
+                      source={carouselItem.item.story.videoUrl}
+                      active
+                      loop
+                      muted
+                      style={StyleSheet.absoluteFill}
+                    />
+                  )}
+                </View>
+              </Pressable>
+            </Animated.View>
           );
         }}
       />
@@ -391,6 +426,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 14,
     backgroundColor: '#0a0a0a',
+  },
+  cardPressable: {
+    flex: 1,
   },
   activeCard: {
     zIndex: 2,

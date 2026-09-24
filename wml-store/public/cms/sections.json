@@ -1496,8 +1496,8 @@
 		"name": "WiddeHomeVideoCarousel",
 		"requiredScopes": [],
 		"schema": {
-			"title": "Carrossel de vídeos Widde",
-			"description": "Exibe vídeos Widde dos produtos informados manualmente.",
+			"title": "Carrossel de vídeos store",
+			"description": "Exibe vídeos store dos produtos informados manualmente.",
 			"type": "object",
 			"properties": {
 				"enabled": {
