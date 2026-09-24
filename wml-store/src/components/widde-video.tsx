@@ -362,7 +362,7 @@ export function WiddeVideo({ product }: { product: Product }) {
                       </View>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel="Adicionar produto à sacola"
+                        accessibilityLabel="Adicionar à sacola"
                         onPress={() => {
                           setSelectedLookIndex(index);
                           setQuickViewVisible(true);
@@ -370,7 +370,7 @@ export function WiddeVideo({ product }: { product: Product }) {
                         style={({ pressed }) => [styles.storyAddButton, styles.storyCarouselAddButton, pressed && styles.pressed]}
                       >
                         <ShoppingBagIcon color="#FFFFFF" size={18} />
-                        <ThemedText style={styles.storyAddButtonText}>Adicionar produto</ThemedText>
+                        <ThemedText style={styles.storyAddButtonText}>Adicionar à sacola</ThemedText>
                       </Pressable>
                     </View>
                   ))}
@@ -386,12 +386,12 @@ export function WiddeVideo({ product }: { product: Product }) {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Adicionar produto à sacola"
+                    accessibilityLabel="Adicionar à sacola"
                     onPress={() => setQuickViewVisible(true)}
                     style={({ pressed }) => [styles.storyAddButton, pressed && styles.pressed]}
                   >
                     <ShoppingBagIcon color="#FFFFFF" size={18} />
-                    <ThemedText style={styles.storyAddButtonText}>Adicionar produto</ThemedText>
+                    <ThemedText style={styles.storyAddButtonText}>Adicionar à sacola</ThemedText>
                   </Pressable>
                 </>
               )}

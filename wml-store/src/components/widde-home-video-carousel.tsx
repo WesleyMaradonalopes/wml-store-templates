@@ -363,7 +363,7 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
                         </View>
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel="Adicionar produto à sacola"
+                          accessibilityLabel="Adicionar à sacola"
                           onPress={() => {
                             setSelectedLookIndex(index);
                             setQuickViewVisible(true);
@@ -371,7 +371,7 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
                           style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
                         >
                           <ShoppingBagIcon color="#FFFFFF" size={18} />
-                          <ThemedText style={styles.addButtonText}>Adicionar produto</ThemedText>
+                          <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>
                         </Pressable>
                       </View>
                     ))}
@@ -387,7 +387,7 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
                     </View>
                     <Pressable accessibilityRole="button" onPress={() => setQuickViewVisible(true)} style={styles.addButton}>
                       <ShoppingBagIcon color="#FFFFFF" size={18} />
-                      <ThemedText style={styles.addButtonText}>Adicionar produto</ThemedText>
+                      <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>
                     </Pressable>
                   </>
                 ) : null}
