@@ -4,6 +4,25 @@
 
 O app lê o conteúdo publicado do projeto definido por `EXPO_PUBLIC_VTEX_CMS_PROJECT_ID` no VTEX Headless CMS. Portanto, editar este arquivo local não publica nem altera o CMS; ele serve como contrato das seções que o app sabe renderizar.
 
+## Carrossel de produtos por coleção e cor na Home
+
+Adicione a seção `ProductCollectionCarousel` ao documento `home` para exibir os produtos informados no carrossel principal. Ao trocar o produto principal, o app consulta a mesma coleção e a mesma cor exata para montar o carrossel de miniaturas abaixo:
+
+```json
+{
+  "enabled": true,
+  "title": "Produtos em destaque",
+  "showTitle": true,
+  "maxItems": 6,
+  "products": [
+    { "productId": "7474" },
+    { "productId": "7445" }
+  ]
+}
+```
+
+Use `enabled: false` para ocultar a seção sem removê-la do documento. Informe o `productId` VTEX, não o SKU. Se não houver outro produto com coleção e cor exatamente iguais, o app mantém apenas o produto principal nas miniaturas.
+
 ## Carrossel de vídeos Widde na Home
 
 Adicione a seção `WiddeHomeVideoCarousel` ao documento `home` para exibir os vídeos dos produtos escolhidos manualmente. A ordem dos itens no CMS é preservada e produtos sem vídeo válido são ignorados:
