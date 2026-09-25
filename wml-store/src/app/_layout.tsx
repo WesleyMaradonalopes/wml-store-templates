@@ -7,6 +7,7 @@ import { ThemePreferenceProvider, useAppTheme } from '@/context/theme-context';
 import { TabBarContext } from '@/context/tab-bar-context';
 import { getAccountSession, getVtexUserToken } from '@/services/auth';
 import { getBottomTabSettings } from '@/services/bottom-tab-settings';
+import { resolveDeepLink } from '@/services/deep-links';
 import { addNotificationResponseListener, configureNotificationPresentation, getLastNotificationResponse, initializeNotifications, type NotificationResponse } from '@/services/notifications';
 import GlobalTabBar from '@/components/global-tab-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -91,8 +92,14 @@ function NotificationBootstrap() {
     const target = getNotificationTarget(data);
     if (!target) return;
 
-    if (/^(https?:|lojahr:)/i.test(target)) {
-      void Linking.openURL(target);
+    const resolution = resolveDeepLink(target);
+    if (resolution.type === 'route') {
+      router.push(resolution.route as never);
+      return;
+    }
+
+    if (resolution.type === 'external' || /^(https?:|lojahr:)/i.test(target)) {
+      void Linking.openURL(resolution.type === 'external' ? resolution.url : target);
       return;
     }
 

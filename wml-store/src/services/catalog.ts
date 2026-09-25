@@ -655,13 +655,39 @@ async function hydrateKitGroups(product: ProductPayload): Promise<ProductKitGrou
     }));
 }
 
-async function loadProduct(productId: string): Promise<Product> {
+async function loadProductById(productId: string) {
   const url = new URL(`${storeConfig.vtexBaseUrl}/api/intelligent-search/v1/products`);
   url.searchParams.set('field', 'id');
   url.searchParams.set('value', productId);
   url.searchParams.set('sc', storeConfig.salesChannel);
 
-  const product = await getJson<ProductPayload>(url.toString());
+  return getJson<ProductPayload>(url.toString());
+}
+
+async function loadProductByLinkText(linkText: string) {
+  const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/search/${encodeURIComponent(linkText)}/p`);
+  url.searchParams.set('_from', '0');
+  url.searchParams.set('_to', '1');
+  url.searchParams.set('sc', storeConfig.salesChannel);
+
+  const products = await getJson<ProductPayload[]>(url.toString());
+  const normalizedLinkText = linkText.toLowerCase();
+  const product = products.find((item) => (item.linkText ?? '').toLowerCase() === normalizedLinkText) ?? products[0];
+  if (!product) throw new Error('Produto não encontrado.');
+  return product;
+}
+
+async function loadProduct(productKey: string): Promise<Product> {
+  let decodedKey = productKey;
+  try {
+    decodedKey = decodeURIComponent(productKey);
+  } catch {
+    // Keep the original route parameter when it is not percent-encoded safely.
+  }
+
+  const product = /^\d+$/.test(decodedKey.trim())
+    ? await loadProductById(decodedKey.trim())
+    : await loadProductByLinkText(decodedKey.trim());
   const normalized = normalizeProduct(product);
   if (!normalized.isKit) return normalized;
   return { ...normalized, kitGroups: await hydrateKitGroups(product) };

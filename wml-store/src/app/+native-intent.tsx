@@ -1,3 +1,5 @@
+import { resolveDeepLink } from '@/services/deep-links';
+
 type NativeIntentEvent = {
   path: string | null;
   initial: boolean;
@@ -21,5 +23,16 @@ function isInitialRootOrDevelopmentClientUrl(path: string | null) {
 
 export function redirectSystemPath({ path, initial }: NativeIntentEvent) {
   if (initial && isInitialRootOrDevelopmentClientUrl(path)) return null;
-  return path;
+
+  try {
+    const resolution = resolveDeepLink(path ?? '');
+    if (resolution.type === 'route') return resolution.route;
+    // Native intent cannot open an external browser itself. If an associated
+    // web link is not one of our supported routes, keep the app safe on Home.
+    if (resolution.type === 'external') return '/';
+    // Preserve unknown custom-scheme URLs, including auth-session callbacks.
+    return path;
+  } catch {
+    return '/';
+  }
 }
