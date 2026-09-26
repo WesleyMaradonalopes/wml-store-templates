@@ -93,6 +93,10 @@ const DESCRIPTION_LINE_HEIGHT = 20;
 // not render it or make its recommendation requests while it is disabled.
 const COMPLETE_LOOK_ENABLED = false;
 
+// Keep the inline add-to-cart action available for a future activation, while
+// using the floating action as the current PDP entry point.
+const INLINE_ADD_BUTTON_ENABLED = false;
+
 export default function ProductScreen() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -401,7 +405,7 @@ export default function ProductScreen() {
     void addProduct();
   }
 
-  const floatingButtonThreshold = galleryHeight * 0.85;
+  const floatingButtonThreshold = screenHeight * 0.3;
   const showFloatingButton = Boolean(product && scrollY > floatingButtonThreshold);
   const currentPrice = activeVariant?.price ?? product?.price ?? null;
   const currentListPrice = activeVariant?.listPrice ?? product?.listPrice ?? null;
@@ -554,7 +558,7 @@ export default function ProductScreen() {
               ))}
               {!!selectionMessage && <ThemedText style={styles.selectionMessage}>{selectionMessage}</ThemedText>}
 
-              <Pressable disabled={adding} onPress={addProduct} style={styles.mainAddButton}>
+              <Pressable disabled={adding} onPress={addProduct} style={[styles.mainAddButton, !INLINE_ADD_BUTTON_ENABLED && styles.hiddenMainAddButton]}>
                 {/*<ShoppingBagIcon size={18} color="#FFFFFF" />*/}
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
@@ -1138,6 +1142,7 @@ const styles = StyleSheet.create({
   unavailableVariant: { opacity: 0.35, backgroundColor: '#eeeae4' },
   unavailableVariantText: { textDecorationLine: 'line-through' },
   selectionMessage: { marginTop: -Spacing.two, color: '#B42318', fontWeight: '600' },
+  hiddenMainAddButton: { display: 'none' },
   mainAddButton: { minHeight: 50, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   mainAddText: { color: '#FFFFFF', fontWeight: '700' },
   disabled: { opacity: 0.45 },
