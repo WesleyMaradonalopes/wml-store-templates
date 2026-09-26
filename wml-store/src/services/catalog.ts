@@ -53,6 +53,18 @@ export type Product = {
   variants: ProductVariant[];
 };
 
+export type ProductLoadErrorKind = 'not-found' | 'unavailable';
+
+export class ProductLoadError extends Error {
+  readonly kind: ProductLoadErrorKind;
+
+  constructor(kind: ProductLoadErrorKind, message: string) {
+    super(message);
+    this.name = 'ProductLoadError';
+    this.kind = kind;
+  }
+}
+
 type SearchResponse = {
   products?: ProductPayload[];
   recordsFiltered?: number;
@@ -661,7 +673,15 @@ async function loadProductById(productId: string) {
   url.searchParams.set('value', productId);
   url.searchParams.set('sc', storeConfig.salesChannel);
 
-  return getJson<ProductPayload>(url.toString());
+  return assertProductPayload(await getJson<ProductPayload>(url.toString()));
+}
+
+function assertProductPayload(product: ProductPayload | undefined): ProductPayload {
+  if (!product?.productId || !product.productName || !Array.isArray(product.items) || product.items.length === 0) {
+    throw new ProductLoadError('not-found', 'Produto não encontrado.');
+  }
+
+  return product;
 }
 
 async function loadProductByLinkText(linkText: string) {
@@ -673,24 +693,31 @@ async function loadProductByLinkText(linkText: string) {
   const products = await getJson<ProductPayload[]>(url.toString());
   const normalizedLinkText = linkText.toLowerCase();
   const product = products.find((item) => (item.linkText ?? '').toLowerCase() === normalizedLinkText) ?? products[0];
-  if (!product) throw new Error('Produto não encontrado.');
-  return product;
+  return assertProductPayload(product);
 }
 
 async function loadProduct(productKey: string): Promise<Product> {
-  let decodedKey = productKey;
   try {
-    decodedKey = decodeURIComponent(productKey);
-  } catch {
-    // Keep the original route parameter when it is not percent-encoded safely.
-  }
+    let decodedKey = productKey;
+    try {
+      decodedKey = decodeURIComponent(productKey);
+    } catch {
+      // Keep the original route parameter when it is not percent-encoded safely.
+    }
 
-  const product = /^\d+$/.test(decodedKey.trim())
-    ? await loadProductById(decodedKey.trim())
-    : await loadProductByLinkText(decodedKey.trim());
-  const normalized = normalizeProduct(product);
-  if (!normalized.isKit) return normalized;
-  return { ...normalized, kitGroups: await hydrateKitGroups(product) };
+    const product = /^\d+$/.test(decodedKey.trim())
+      ? await loadProductById(decodedKey.trim())
+      : await loadProductByLinkText(decodedKey.trim());
+    const normalized = normalizeProduct(product);
+    if (!normalized.isKit) return normalized;
+    return { ...normalized, kitGroups: await hydrateKitGroups(product) };
+  } catch (error) {
+    if (error instanceof ProductLoadError) throw error;
+    if (error instanceof Error && /status\s+404\b/i.test(error.message)) {
+      throw new ProductLoadError('not-found', 'Produto não encontrado.');
+    }
+    throw new ProductLoadError('unavailable', 'Não foi possível carregar o produto.');
+  }
 }
 
 // Evita que cards, favoritos e recomendações baixem os mesmos detalhes de

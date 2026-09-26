@@ -951,7 +951,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false }: Pr
             dotSize={6}
             gap={6}
             accessibilityLabel={`Banner ${heroIndex + 1} de ${images.length}`}
-            style={styles.heroDots}
+            style={[styles.heroDots, isHome && styles.homeHeroDots]}
           />
         )}
       </View>
@@ -1238,6 +1238,7 @@ const styles = StyleSheet.create({
   heroBanner: { width: Dimensions.get('window').width, height: Dimensions.get('window').height, minHeight: Dimensions.get('window').height, borderRadius: 0 },
   heroImage: { width: '100%', height: Dimensions.get('window').height },
   heroDots: { position: 'absolute', left: 0, right: 0, bottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  homeHeroDots: { bottom: 80 },
   overlay: {
     position: 'absolute',
     left: 16,

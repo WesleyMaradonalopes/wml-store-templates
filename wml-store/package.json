@@ -42,7 +42,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
   },
   "scripts": {
     "start": "expo start --go",
@@ -54,7 +55,8 @@
     "android:native": "node ./scripts/run-android-ascii.cjs",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:deep-links": "vitest run"
   },
   "private": true
 }

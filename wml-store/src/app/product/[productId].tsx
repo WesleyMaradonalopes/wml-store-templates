@@ -31,7 +31,7 @@ import { WiddeVideo } from '@/components/widde-video';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
-import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, type Product, type ProductKitGroup, type ProductKitItem, type ProductVariant } from '@/services/catalog';
+import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductKitGroup, type ProductKitItem, type ProductVariant, type ProductLoadErrorKind } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 import { getProductInformation, type SizebayProductInformation } from '@/services/sizebay';
 import { htmlToPlainText } from '@/utils/html';
@@ -97,9 +97,9 @@ export default function ProductScreen() {
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // The SafeAreaView adds bottom padding, so include that inset in the hero
-  // height to keep the product image filling the viewport on every device.
-  const galleryHeight = screenHeight * 1.07;
+  // Keep the product hero filling the viewport while accounting for the
+  // bottom safe-area inset handled by the surrounding SafeAreaView.
+  const galleryHeight = Math.max(0, screenHeight - insets.bottom);
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [colorProducts, setColorProducts] = useState<Product[]>([]);
@@ -108,7 +108,8 @@ export default function ProductScreen() {
   const [lookProducts, setLookProducts] = useState<Product[]>([]);
   const [lookLoading, setLookLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<ProductLoadErrorKind | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [adding, setAdding] = useState(false);
   const [cartMessage, setCartMessage] = useState<string | null>(null);const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
   const [favorite, setFavorite] = useState(false);
@@ -161,7 +162,7 @@ export default function ProductScreen() {
     if (!productId) return;
     let active = true;
     setLoading(true);
-    setError(false);
+    setError(null);
     setProduct(null);
     setColorProducts([]);
     setSimilarProducts([]);
@@ -202,10 +203,13 @@ export default function ProductScreen() {
             .finally(() => { if (active) setLookLoading(false); });
         }
       })
-      .catch(() => { if (active) setError(true); })
+      .catch((loadError) => {
+        if (!active) return;
+        setError(loadError instanceof ProductLoadError ? loadError.kind : 'unavailable');
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [productId]);
+  }, [loadAttempt, productId]);
 
   useEffect(() => {
     if (!product?.linkText) {
@@ -397,7 +401,7 @@ export default function ProductScreen() {
     void addProduct();
   }
 
-  const floatingButtonThreshold = screenHeight * 0.4;
+  const floatingButtonThreshold = galleryHeight * 0.85;
   const showFloatingButton = Boolean(product && scrollY > floatingButtonThreshold);
   const currentPrice = activeVariant?.price ?? product?.price ?? null;
   const currentListPrice = activeVariant?.listPrice ?? product?.listPrice ?? null;
@@ -406,7 +410,37 @@ export default function ProductScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['bottom']} style={styles.safeArea}>
         {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
-        {error && <ThemedText style={styles.errorText}>Produto não encontrado.</ThemedText>}
+        {error && !loading && (
+          <View style={styles.errorState}>
+            <ThemedText style={styles.errorTitle}>{error === 'not-found' ? 'Produto não encontrado' : 'Não foi possível carregar o produto'}</ThemedText>
+            <ThemedText themeColor="textSecondary" style={styles.errorDescription}>
+              {error === 'not-found'
+                ? 'Este produto pode ter sido removido ou o link pode estar incorreto.'
+                : 'Verifique sua conexão e tente novamente.'}
+            </ThemedText>
+            <View style={styles.errorActions}>
+              {error === 'unavailable' ? (
+                <>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Tentar novamente" onPress={() => setLoadAttempt((value) => value + 1)} style={styles.errorPrimaryButton}>
+                    <ThemedText style={styles.errorPrimaryText}>Tentar novamente</ThemedText>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Ir para o início" onPress={() => router.replace('/')} style={styles.errorSecondaryButton}>
+                    <ThemedText style={styles.errorSecondaryText}>Ir para o início</ThemedText>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Ir para o início" onPress={() => router.replace('/')} style={styles.errorPrimaryButton}>
+                    <ThemedText style={styles.errorPrimaryText}>Ir para o início</ThemedText>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={() => router.back()} style={styles.errorSecondaryButton}>
+                    <ThemedText style={styles.errorSecondaryText}>Voltar</ThemedText>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </View>
+        )}
         {product && (
           <ScrollView
             contentContainerStyle={[styles.content, showFloatingButton && styles.contentWithFloating]}
@@ -449,8 +483,8 @@ export default function ProductScreen() {
                       <ThemedText numberOfLines={2} style={styles.heroProductName}>{product.name}</ThemedText>
                       {currentPrice !== null && <ThemedText style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
                     </View>
-                    <Pressable accessibilityLabel="Comprar" onPress={() => setQuickViewVisible(true)} style={styles.heroBuyButton}>
-                      <ThemedText type="smallBold" style={styles.heroBuyButtonText}>Comprar</ThemedText>
+                    <Pressable accessibilityLabel="Adicionar à sacola" disabled={adding} onPress={handleFloatingAdd} style={[styles.heroBuyButton, adding && styles.disabled]}>
+                      {adding ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold" style={styles.heroBuyButtonText}>Adicionar</ThemedText>}
                     </Pressable>
                   </View>
                 </View>
@@ -520,7 +554,7 @@ export default function ProductScreen() {
               ))}
               {!!selectionMessage && <ThemedText style={styles.selectionMessage}>{selectionMessage}</ThemedText>}
 
-              <Pressable disabled={adding} onPress={addProduct} style={[styles.mainAddButton, styles.mainAddButtonHidden]}>
+              <Pressable disabled={adding} onPress={addProduct} style={styles.mainAddButton}>
                 {/*<ShoppingBagIcon size={18} color="#FFFFFF" />*/}
                 {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.mainAddText}>Adicionar à sacola</ThemedText>}
               </Pressable>
@@ -1044,7 +1078,14 @@ const styles = StyleSheet.create({
   logoButton: { minWidth: 90, minHeight: 38, alignItems: 'center', justifyContent: 'center' },
   logoPlaceholder: { minWidth: 90, minHeight: 38 },
   loader: { marginTop: Spacing.five },
-  errorText: { padding: Spacing.four },
+  errorState: { flex: 1, alignItems: 'center', paddingHorizontal: Spacing.five, paddingTop: 132 },
+  errorTitle: { fontSize: 21, lineHeight: 28, fontFamily: Fonts.semibold, fontWeight: '600', textAlign: 'center' },
+  errorDescription: { maxWidth: 340, marginTop: Spacing.two, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  errorActions: { width: '100%', maxWidth: 340, gap: Spacing.two, marginTop: Spacing.five },
+  errorPrimaryButton: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
+  errorPrimaryText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 14, fontWeight: '700' },
+  errorSecondaryButton: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  errorSecondaryText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, fontWeight: '700' },
   content: { paddingBottom: Spacing.five },
   contentWithFloating: { paddingBottom: 120 },
   galleryArea: { position: 'relative', backgroundColor: '#e8e8ea' },
@@ -1055,9 +1096,9 @@ const styles = StyleSheet.create({
   heroProductInfo: { position: 'absolute', left: Spacing.four, right: Spacing.four, bottom: 18 },
   heroProductRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.three },
   heroProductCopy: { flex: 1, gap: 3 },
-  heroProductName: { width: 250, color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
+  heroProductName: { maxWidth: 250, color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
   heroProductPrice: { color: '#FFFFFF', fontSize: 12 },
-  heroBuyButton: { minWidth: 86, minHeight: 40, paddingHorizontal: Spacing.three, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  heroBuyButton: { minWidth: 96, minHeight: 40, paddingHorizontal: Spacing.three, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   heroBuyButtonText: { color: '#0a0a0a' },
 	provadorVirtual: { fontSize: 12, fontFamily: Fonts.medium, fontWeight: '500' },
   viewer: { flex: 1, backgroundColor: '#fff' },
@@ -1098,7 +1139,6 @@ const styles = StyleSheet.create({
   unavailableVariantText: { textDecorationLine: 'line-through' },
   selectionMessage: { marginTop: -Spacing.two, color: '#B42318', fontWeight: '600' },
   mainAddButton: { minHeight: 50, borderRadius: 8, flexDirection: 'row', gap: Spacing.two, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
-  mainAddButtonHidden: { display: 'none' },
   mainAddText: { color: '#FFFFFF', fontWeight: '700' },
   disabled: { opacity: 0.45 },
   messageText: { color: '#B42318' },
