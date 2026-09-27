@@ -12,6 +12,7 @@ import {
   uniqueGiftCardSearchEntries,
 } from './gift-card-context.js';
 import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
+import { createPersistentSessionStore } from './persistent-session-store.js';
 import { isSessionExpiryTestAuthorized, SESSION_EXPIRY_TEST_RESPONSE } from './session-expiry-test.js';
 
 const app = express();
@@ -31,6 +32,10 @@ const wishlistGraphqlContextProvider = String(process.env.VTEX_WISHLIST_CONTEXT_
 const customerVtexSessions = new Map();
 const checkoutOwnershipCookies = new Map();
 const wishlistIoStrategyByEmail = new Map();
+const sessionStore = createPersistentSessionStore({
+  sessions: customerVtexSessions,
+  ownershipCookies: checkoutOwnershipCookies,
+});
 const backendSourceDirectory = path.dirname(fileURLToPath(import.meta.url));
 const cmsDirectory = process.env.CMS_SCHEMAS_DIR
   ? path.resolve(process.env.CMS_SCHEMAS_DIR)
@@ -38,6 +43,30 @@ const cmsDirectory = process.env.CMS_SCHEMAS_DIR
 
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
 app.use(express.json({ limit: '1mb' }));
+
+function orderFormIdFromValue(value) {
+  const match = String(value || '').match(/\/order(?:-)?form\/([^/?#]+)/i);
+  if (!match?.[1]) return '';
+  try { return decodeURIComponent(match[1]); } catch { return match[1]; }
+}
+
+function orderFormIdFromRequest(request) {
+  return orderFormIdFromValue(request.originalUrl || request.url)
+    || String(request.body?.orderFormId || '').trim();
+}
+
+// Reidrata as credenciais privadas antes dos handlers síncronos que montam os
+// headers VTEX. Sem REDIS_URL, as chamadas retornam imediatamente e preservam
+// o comportamento local baseado em memória.
+app.use(async (request, response, next) => {
+  const userToken = String(request.headers.vtexidclientautcookie || '').trim();
+  const orderFormId = orderFormIdFromRequest(request);
+  await Promise.all([
+    sessionStore.hydrateCustomerSessionByToken(userToken),
+    sessionStore.hydrateOwnershipCookie(orderFormId),
+  ]);
+  next();
+});
 
 // Schemas usados pelo projeto Custom do Headless CMS. O diretório pode ser
 // sobrescrito com CMS_SCHEMAS_DIR quando o backend for publicado sozinho.
@@ -104,6 +133,10 @@ async function requestCheckout(url, {
   // O login é mantido somente no backend. Quando o token recebido do app
   // corresponde a uma sessão armazenada, encaminhamos o cookie completo nas
   // tentativas desta chamada sem expô-lo ao cliente.
+  await Promise.all([
+    sessionStore.hydrateCustomerSessionByToken(userToken),
+    sessionStore.hydrateOwnershipCookie(orderFormIdFromValue(url)),
+  ]);
   const requestCookie = mergeCookieHeaders(sessionCookieForToken(userToken), cookie);
   const init = {
     method,
@@ -368,7 +401,7 @@ function checkoutOwnershipCookieForOrderForm(orderFormId) {
   return stored.cookieHeader || '';
 }
 
-function rememberCheckoutOwnershipCookie(orderFormId, response) {
+async function rememberCheckoutOwnershipCookie(orderFormId, response) {
   const key = String(orderFormId || '').trim();
   if (!key) return;
   // A identidade do cliente é mantida em customerVtexSessions. Guardar o
@@ -377,7 +410,7 @@ function rememberCheckoutOwnershipCookie(orderFormId, response) {
   const received = checkoutOwnershipCookieHeader(extractSetCookie(response));
   if (!received) return;
   const merged = mergeCookieHeaders(checkoutOwnershipCookieForOrderForm(key), received);
-  checkoutOwnershipCookies.set(key, { cookieHeader: merged, updatedAt: Date.now() });
+  await sessionStore.saveOwnershipCookie(key, { cookieHeader: merged, updatedAt: Date.now() });
   const ownershipStored = merged.split(';').some((cookie) => /^\s*CheckoutOrderFormOwnership=/i.test(cookie));
   console.info(`[CHECKOUT] checkout cookies stored -> orderForm=${key} ownership=${ownershipStored}`);
 }
@@ -969,6 +1002,7 @@ function wishlistGraphqlItems(data) {
 }
 
 async function getWishlistGraphql(email, token = '') {
+  await sessionStore.hydrateCustomerSessionByEmail(email);
   const shopperId = wishlistShopperId(email, token);
   const context = wishlistGraphqlContext();
   const data = await requestWishlistGraphql(email, token, `
@@ -989,6 +1023,7 @@ async function getWishlistGraphql(email, token = '') {
 }
 
 async function addWishlistGraphql(email, token, productId, title, sku) {
+  await sessionStore.hydrateCustomerSessionByEmail(email);
   const shopperId = wishlistShopperId(email, token);
   const context = wishlistGraphqlContext();
   await requestWishlistGraphql(email, token, `
@@ -1007,6 +1042,7 @@ async function addWishlistGraphql(email, token, productId, title, sku) {
 }
 
 async function removeWishlistGraphql(email, token, itemId) {
+  await sessionStore.hydrateCustomerSessionByEmail(email);
   const shopperId = wishlistShopperId(email, token);
   const context = wishlistGraphqlContext();
   await requestWishlistGraphql(email, token, `
@@ -1162,6 +1198,7 @@ async function mutateVtexIoWishlist(productId, action, token, email) {
 }
 
 async function getWishlistByEmail(email, token = '') {
+  await sessionStore.hydrateCustomerSessionByEmail(email);
   const ioWishlist = await readVtexIoWishlist(email, token);
   const profile = await searchCustomerByEmail(email).catch(() => null);
   const identityValues = [...new Set([email, profile?.id, profile?.userId, profile?.profileId, profile?.shopperId].map((value) => String(value || '').trim()).filter(Boolean))];
@@ -1322,7 +1359,7 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
         body: JSON.stringify({ email }),
       },
     );
-    rememberCheckoutOwnershipCookie(orderFormId, attachmentResult);
+    await rememberCheckoutOwnershipCookie(orderFormId, attachmentResult);
     const attachmentBody = await readResponseBody(attachmentResult);
     if (!attachmentResult.ok) {
       return response.status(502).json({
@@ -1365,7 +1402,7 @@ async function loadGiftCardOrderForm(orderFormId, userToken = '') {
       fallbackWithoutUserToken: Boolean(userToken),
     },
   );
-  rememberCheckoutOwnershipCookie(orderFormId, result);
+  await rememberCheckoutOwnershipCookie(orderFormId, result);
   const body = await readResponseBody(result);
   if (!result.ok) {
     throw new Error(vtexErrorMessage(body, `A VTEX não conseguiu consultar o carrinho (HTTP ${result.status}).`));
@@ -1494,7 +1531,7 @@ app.post('/checkout/order-form/:orderFormId/client-profile', async (request, res
         body: JSON.stringify(profile),
       },
     );
-    rememberCheckoutOwnershipCookie(orderFormId, result);
+    await rememberCheckoutOwnershipCookie(orderFormId, result);
     console.info(`[CHECKOUT] clientProfile -> ownershipCookie=${Boolean(checkoutOwnershipCookieForOrderForm(orderFormId))}`);
     const body = await readResponseBody(result);
     if (!result.ok) {
@@ -1547,7 +1584,7 @@ app.post('/checkout/order-form/:orderFormId/payment-data', async (request, respo
         body: serializedPaymentData,
       },
     );
-    rememberCheckoutOwnershipCookie(orderFormId, result);
+    await rememberCheckoutOwnershipCookie(orderFormId, result);
     const body = await readResponseBody(result);
 
     const returnedGiftCards = Array.isArray(body?.paymentData?.giftCards) ? body.paymentData.giftCards : [];
@@ -1948,7 +1985,7 @@ app.post('/checkout/order-form/:orderFormId/items/remove-all', async (request, r
         fallbackToAppAuth: true,
       },
     );
-    rememberCheckoutOwnershipCookie(orderFormId, result);
+    await rememberCheckoutOwnershipCookie(orderFormId, result);
     const body = await readResponseBody(result);
     if (!result.ok) {
       return response.status(502).json({
@@ -1982,7 +2019,7 @@ async function updateCheckoutOffering(request, response, remove = false) {
       fallbackToAppAuth: true,
       body: JSON.stringify({ id: offeringId }),
     });
-    rememberCheckoutOwnershipCookie(orderFormId, result);
+    await rememberCheckoutOwnershipCookie(orderFormId, result);
     const body = await readResponseBody(result);
     if (!result.ok) {
       return response.status(502).json({
@@ -2118,7 +2155,7 @@ app.post('/auth/login', async (request, response) => {
     if (!result.ok || (!authToken && !cookieHeader)) throw new Error(body?.message || 'E-mail ou senha inválidos.');
     const shopperToken = [body?.authCookie?.Value, body?.accountAuthCookie?.Value, authToken]
       .find((candidate) => Boolean(decodeJwtPayload(candidate)?.sub)) || '';
-    customerVtexSessions.set(email, { authToken, shopperToken, cookieHeader, updatedAt: Date.now() });
+    await sessionStore.saveCustomerSession(email, { authToken, shopperToken, cookieHeader, updatedAt: Date.now() });
     console.log(`[AUTH] ${email} -> password session cookie=${Boolean(cookieHeader)} token=${Boolean(authToken)}`);
     return response.json({ ok: true, authCookie: { Value: authToken } });
   } catch (error) {
@@ -2142,7 +2179,7 @@ app.post('/auth/access-key/validate', async (request, response) => {
     if (!result.ok || (!authToken && !cookieHeader)) throw new Error('Código de acesso inválido.');
     const shopperToken = [body?.authCookie?.Value, body?.accountAuthCookie?.Value, authToken]
       .find((candidate) => Boolean(decodeJwtPayload(candidate)?.sub)) || '';
-    customerVtexSessions.set(email, { authToken, shopperToken, cookieHeader, updatedAt: Date.now() });
+    await sessionStore.saveCustomerSession(email, { authToken, shopperToken, cookieHeader, updatedAt: Date.now() });
     console.log(`[AUTH] ${email} -> access-key session cookie=${Boolean(cookieHeader)} token=${Boolean(authToken)}`);
     return response.json({ ok: true, authCookie: { Value: authToken } });
   } catch (error) {

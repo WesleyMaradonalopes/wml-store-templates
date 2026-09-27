@@ -26,6 +26,17 @@ npm run dev
 
 O serviço ficará em `http://localhost:6001`.
 
+## Persistência de sessão
+
+O backend mantém em memória apenas um cache local das sessões VTEX e dos
+cookies de propriedade do `orderForm`. Para homologação e produção, configure
+`REDIS_URL` com a URL privada de um Redis/Render Key Value e, opcionalmente,
+`SESSION_STORE_TTL_SECONDS` (padrão: 24 horas). Os valores sensíveis ficam no
+Redis e não são enviados ao app nem registrados nos logs.
+
+Sem `REDIS_URL`, o fallback em memória continua disponível para desenvolvimento
+local, mas os dados de sessão serão perdidos quando o processo reiniciar.
+
 ## Teste controlado de sessão expirada
 
 O backend possui uma rota exclusiva para homologação:
