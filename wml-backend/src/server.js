@@ -12,6 +12,7 @@ import {
   uniqueGiftCardSearchEntries,
 } from './gift-card-context.js';
 import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
+import { isSessionExpiryTestAuthorized, SESSION_EXPIRY_TEST_RESPONSE } from './session-expiry-test.js';
 
 const app = express();
 const port = Number(process.env.PORT || 6001);
@@ -1212,6 +1213,17 @@ async function saveWishlistByEmail(email, items, token = '', current = null) {
 }
 
 app.get('/health', (_request, response) => response.json({ ok: true, service: 'wml-backend' }));
+
+// Esta rota existe somente para homologação. Ela permanece inativa até que
+// APP_ENV seja um ambiente não produtivo, SESSION_EXPIRY_TEST_ENABLED seja
+// true e a chave enviada no header corresponda ao secret do ambiente.
+app.get('/qa/session-expired', (request, response) => {
+  if (!isSessionExpiryTestAuthorized(request)) {
+    return response.status(404).json({ ok: false, message: 'Rota não encontrada.' });
+  }
+
+  return response.status(401).json(SESSION_EXPIRY_TEST_RESPONSE);
+});
 
 function collectionSearchItems(body) {
   if (Array.isArray(body)) return body;

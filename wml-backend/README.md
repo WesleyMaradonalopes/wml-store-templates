@@ -26,6 +26,21 @@ npm run dev
 
 O serviço ficará em `http://localhost:6001`.
 
+## Teste controlado de sessão expirada
+
+O backend possui uma rota exclusiva para homologação:
+
+```text
+GET /qa/session-expired
+Header: X-Session-Expiry-Test-Key: <chave do ambiente>
+```
+
+Ela retorna `401` sem consultar a VTEX e sem criar pedido, mas só fica ativa
+quando `APP_ENV` é um ambiente não produtivo (`development`, `test`, `staging`
+ou `homolog`), `SESSION_EXPIRY_TEST_ENABLED=true` e a chave do header coincide
+com `SESSION_EXPIRY_TEST_KEY`. Em produção, a rota permanece indisponível por
+configuração.
+
 ## Schemas do Headless CMS
 
 O backend também disponibiliza os schemas do projeto Custom em:
