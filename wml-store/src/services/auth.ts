@@ -4,6 +4,7 @@ import { storeConfig } from '@/config/store';
 
 export type AccountSession = { email: string; loggedAt: string };
 type AccountSessionListener = (session: AccountSession | null) => void;
+type AccountSessionExpiredListener = () => void;
 
 const SESSION_KEY = 'lojahr:account-session';
 const AUTH_TOKEN_KEY = 'lojahr_vtex_user_token';
@@ -15,10 +16,17 @@ let vtexTokenCache: string | null | undefined;
 let vtexTokenRequest: Promise<string | null> | null = null;
 let vtexTokenRevision = 0;
 const accountSessionListeners = new Set<AccountSessionListener>();
+const accountSessionExpiredListeners = new Set<AccountSessionExpiredListener>();
+let accountSessionExpiryRequest: Promise<boolean> | null = null;
 
 export function subscribeAccountSession(listener: AccountSessionListener) {
   accountSessionListeners.add(listener);
   return () => { accountSessionListeners.delete(listener); };
+}
+
+export function subscribeAccountSessionExpired(listener: AccountSessionExpiredListener) {
+  accountSessionExpiredListeners.add(listener);
+  return () => { accountSessionExpiredListeners.delete(listener); };
 }
 
 function notifyAccountSessionChange(session: AccountSession | null) {
@@ -71,6 +79,48 @@ export function clearAccountSession() {
     removeStoredValue(SESSION_KEY),
     SecureStore.deleteItemAsync(AUTH_TOKEN_KEY).catch(() => undefined),
   ]).then(() => undefined);
+}
+
+/**
+ * Clears a session after an authenticated request is rejected by the server.
+ * The request is shared so concurrent 401 responses do not show several
+ * expiration prompts or race while deleting the same credentials.
+ */
+export function expireAccountSession() {
+  if (!accountSessionExpiryRequest) {
+    accountSessionExpiryRequest = Promise.all([getAccountSession(), getVtexUserToken()])
+      .then(async ([session, token]) => {
+        if (!session?.email && !token) return false;
+
+        await clearAccountSession();
+        if (session?.email && token) {
+          accountSessionExpiredListeners.forEach((listener) => {
+            try {
+              listener();
+            } catch {
+              // A listener cannot prevent the remaining listeners from running.
+            }
+          });
+        }
+        return true;
+      })
+      .finally(() => {
+        accountSessionExpiryRequest = null;
+      });
+  }
+
+  return accountSessionExpiryRequest;
+}
+
+/**
+ * Use this only for requests that include the authenticated VTEX token.
+ * Guest checkout requests can legitimately receive a 401 before retrying
+ * with the account token, so they must not call this helper on the first try.
+ */
+export async function fetchAuthenticated(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init);
+  if (response.status === 401) await expireAccountSession();
+  return response;
 }
 
 export function getCachedAccountSession() {

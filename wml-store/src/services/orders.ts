@@ -1,6 +1,6 @@
 import { storeConfig } from '@/config/store';
 
-import { getAccountSession, getVtexUserToken } from './auth';
+import { fetchAuthenticated, getAccountSession, getVtexUserToken } from './auth';
 
 export type CustomerOrderBundleItem = {
   id?: string | number;
@@ -81,7 +81,9 @@ export async function getCustomerOrders(): Promise<CustomerOrder[]> {
   for (let page = 1; page <= 20; page += 1) {
     const query = new URLSearchParams({ page: String(page), per_page: String(pageSize) });
     if (session?.email) query.set('email', session.email.trim().toLowerCase());
-    const response = await fetch(`${storeConfig.backendUrl}/customer/orders?${query.toString()}`, { headers });
+    const response = headers.VtexIdclientAutCookie
+      ? await fetchAuthenticated(`${storeConfig.backendUrl}/customer/orders?${query.toString()}`, { headers })
+      : await fetch(`${storeConfig.backendUrl}/customer/orders?${query.toString()}`, { headers });
     if (!response.ok) throw new Error(`Não foi possível carregar os pedidos: ${response.status}`);
     const payload = await response.json() as { orders?: CustomerOrder[] };
     const orders = Array.isArray(payload.orders) ? payload.orders : [];
@@ -97,7 +99,10 @@ export async function getCustomerOrders(): Promise<CustomerOrder[]> {
 export async function getCustomerOrder(orderId: string): Promise<CustomerOrder> {
   const session = await getAccountSession();
   const query = session?.email ? `?email=${encodeURIComponent(session.email.trim().toLowerCase())}` : '';
-  const response = await fetch(`${storeConfig.backendUrl}/customer/orders/${encodeURIComponent(orderId)}${query}`, { headers: await authHeaders() });
+  const headers = await authHeaders();
+  const response = headers.VtexIdclientAutCookie
+    ? await fetchAuthenticated(`${storeConfig.backendUrl}/customer/orders/${encodeURIComponent(orderId)}${query}`, { headers })
+    : await fetch(`${storeConfig.backendUrl}/customer/orders/${encodeURIComponent(orderId)}${query}`, { headers });
   if (!response.ok) throw new Error(`Não foi possível carregar o pedido: ${response.status}`);
   const payload = await response.json() as { order?: CustomerOrder };
   if (!payload.order) throw new Error('Pedido não encontrado.');
@@ -192,14 +197,21 @@ async function readJson(response: Response) {
 
 export async function placeOrder(input: PlaceOrderInput): Promise<CheckoutOrderResult> {
   const userToken = await getVtexUserToken();
-  const response = await fetch(`${storeConfig.backendUrl}/checkout/order`, {
+  const request = userToken
+    ? fetchAuthenticated(`${storeConfig.backendUrl}/checkout/order`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(userToken ? { VtexIdclientAutCookie: userToken } : {}),
     },
     body: JSON.stringify(input),
-  }).catch(() => null);
+    })
+    : fetch(`${storeConfig.backendUrl}/checkout/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  const response = await request.catch(() => null);
 
   if (!response) throw new CheckoutOrderError('Não foi possível conectar ao serviço de checkout.');
   const payload = await readJson(response);
@@ -219,10 +231,11 @@ export async function getTransactionStatus(transactionId: string, orderGroup: st
   const userToken = await getVtexUserToken();
   const query = new URLSearchParams({ orderGroup });
   if (paymentId) query.set('paymentId', paymentId);
-  const response = await fetch(
-    `${storeConfig.backendUrl}/checkout/transaction/${encodeURIComponent(transactionId)}/status?${query.toString()}`,
-    { headers: userToken ? { VtexIdclientAutCookie: userToken } : {} },
-  ).catch(() => null);
+  const transactionUrl = `${storeConfig.backendUrl}/checkout/transaction/${encodeURIComponent(transactionId)}/status?${query.toString()}`;
+  const request = userToken
+    ? fetchAuthenticated(transactionUrl, { headers: { VtexIdclientAutCookie: userToken } })
+    : fetch(transactionUrl);
+  const response = await request.catch(() => null);
 
   if (!response) throw new CheckoutOrderError('Não foi possível consultar o pagamento.');
   const payload = await readJson(response);

@@ -6,9 +6,9 @@ import { FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'reac
 import { Spacing } from '@/constants/theme';
 import { getCompleteLookProducts, getProduct, type Product } from '@/services/catalog';
 
-import { SkeletonBlock } from './skeleton';
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
 import { ProductQuickViewButton } from './product-quick-view';
+import { SkeletonBlock } from './skeleton';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -405,8 +405,8 @@ const styles = StyleSheet.create({
   },
   mainProductName: {
     marginTop: Spacing.two,
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 16,
+    lineHeight: 16,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
@@ -427,8 +427,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   thumbnailPrice: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     textAlign: 'center',
   },
   skeletonThumbnailImage: {

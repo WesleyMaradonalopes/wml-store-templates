@@ -1,11 +1,11 @@
 import { Montserrat_300Light, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, useFonts } from '@expo-google-fonts/montserrat';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as RouterThemeProvider, useRouter } from 'expo-router';
-import { Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { DEFAULT_BOTTOM_TAB_SETTINGS } from '@/config/bottom-tab';
 import { ThemePreferenceProvider, useAppTheme } from '@/context/theme-context';
 import { TabBarContext } from '@/context/tab-bar-context';
-import { getAccountSession, getVtexUserToken } from '@/services/auth';
+import { getAccountSession, getVtexUserToken, subscribeAccountSessionExpired } from '@/services/auth';
 import { getBottomTabSettings } from '@/services/bottom-tab-settings';
 import { resolveDeepLink } from '@/services/deep-links';
 import { addNotificationResponseListener, configureNotificationPresentation, getLastNotificationResponse, initializeNotifications, type NotificationResponse } from '@/services/notifications';
@@ -48,6 +48,7 @@ function AppLayout() {
     <TabBarContext.Provider value={{ hidden, setHidden, showOnCheckout, setShowOnCheckout, bottomTabSettings }}>
       <RouterThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <SessionExpiryBootstrap />
         <NotificationBootstrap />
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -68,6 +69,23 @@ function AppLayout() {
       </RouterThemeProvider>
     </TabBarContext.Provider>
   );
+}
+
+function SessionExpiryBootstrap() {
+  const router = useRouter();
+
+  useEffect(() => subscribeAccountSessionExpired(() => {
+    Alert.alert(
+      'Sessão expirada',
+      'Sua sessão expirou. Entre novamente para acessar os dados da sua conta.',
+      [
+        { text: 'Agora não', style: 'cancel' },
+        { text: 'Entrar', onPress: () => router.replace('/account?view=access' as never) },
+      ],
+    );
+  }), [router]);
+
+  return null;
 }
 
 function getNotificationTarget(data: Record<string, unknown>) {

@@ -1,5 +1,5 @@
 import { storeConfig } from '@/config/store';
-import { getVtexUserToken } from './auth';
+import { fetchAuthenticated, getVtexUserToken } from './auth';
 
 export type CustomerProfile = {
   id?: string;
@@ -56,7 +56,7 @@ export async function getCustomerProfileFromMasterData(email: string): Promise<C
 
   // Endpoint oficial para storefronts headless. O parâmetro permite perfis
   // incompletos, que também precisam aparecer na tela de dados pessoais.
-  const profileResponse = await fetch(
+  const profileResponse = await fetchAuthenticated(
     `${storeConfig.vtexBaseUrl}/api/checkout/pub/profiles?email=${encodeURIComponent(email)}&ensureComplete=false`,
     { headers: { VtexIdclientAutCookie: token } },
   );
@@ -67,7 +67,7 @@ export async function getCustomerProfileFromMasterData(email: string): Promise<C
   }
 
   // Compatibilidade com a rota personalizada que já era usada no projeto antigo.
-  const legacyResponse = await fetch(
+  const legacyResponse = await fetchAuthenticated(
     `${storeConfig.vtexBaseUrl}/_v/api/masterdata/user/email=${encodeURIComponent(email)}`,
     { headers: { VtexIdclientAutCookie: token } },
   );

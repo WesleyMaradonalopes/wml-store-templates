@@ -1,7 +1,7 @@
 import { storeConfig } from '@/config/store';
 
 import { getStoredJson, removeStoredValue, setStoredJson } from './storage';
-import { getAccountSession, getVtexUserToken } from './auth';
+import { fetchAuthenticated, getAccountSession, getVtexUserToken } from './auth';
 
 export type CartOffering = {
   id: string;
@@ -351,6 +351,12 @@ async function userTokenHeaders(): Promise<Record<string, string>> {
   return token ? { VtexIdclientAutCookie: token } : {};
 }
 
+function fetchWithOptionalSession(url: string, init: RequestInit, authHeaders: Record<string, string>) {
+  return Object.keys(authHeaders).length > 0
+    ? fetchAuthenticated(url, init)
+    : fetch(url, init);
+}
+
 async function paymentProfileHeaders(profileEmail = ''): Promise<{
   authHeaders: Record<string, string>;
   backendHeaders: Record<string, string>;
@@ -385,16 +391,18 @@ async function checkoutFetch(url: string, init: RequestInit = {}) {
   if (![401, 403].includes(response.status)) return response;
   const authHeaders = await userTokenHeaders();
   if (Object.keys(authHeaders).length === 0) return response;
-  return fetch(url, { ...init, cache: 'no-store', headers: { ...authHeaders, ...baseHeaders } });
+  return fetchAuthenticated(url, { ...init, cache: 'no-store', headers: { ...authHeaders, ...baseHeaders } });
 }
 
 async function paymentDataFetch(orderFormId: string, init: RequestInit = {}, profileEmail = '') {
   const baseHeaders = { 'Cache-Control': 'no-cache', Pragma: 'no-cache', ...(init.headers || {}) };
   const { authHeaders, backendHeaders } = await paymentProfileHeaders(profileEmail);
-  const backendResponse = await fetch(
+  const backendRequest = fetchWithOptionalSession(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/payment-data`,
     { ...init, cache: 'no-store', headers: { ...backendHeaders, ...baseHeaders } },
-  ).catch(() => null);
+    authHeaders,
+  );
+  const backendResponse = await backendRequest.catch(() => null);
   if (backendResponse) return backendResponse;
   if (profileEmail) {
     return fetch(
@@ -552,9 +560,10 @@ export async function updateClientProfile({
   // O backend evita que diferenças de cookies/SecureStore entre Expo Go e o
   // development build bloqueiem esta etapa. A chamada pública direta continua
   // como fallback para desenvolvimento sem o backend.
-  let response = await fetch(
+  let response = await fetchWithOptionalSession(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/client-profile`,
     requestInit,
+    authHeaders,
   ).catch(() => null);
   if (!response?.ok) {
     response = await checkoutFetch(
@@ -827,9 +836,11 @@ export async function clearCart(orderFormId?: string): Promise<OrderForm | null>
   const id = orderFormId ?? await getStoredJson<string>(ORDER_FORM_ID_KEY);
   if (!id) return null;
   const directPath = `${storeConfig.vtexBaseUrl}/api/checkout/pub/orderForm/${encodeURIComponent(id)}/items/removeAll`;
-  const backendResponse = await fetch(
+  const authHeaders = await userTokenHeaders();
+  const backendResponse = await fetchWithOptionalSession(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(id)}/items/remove-all`,
-    { method: 'POST', headers: await userTokenHeaders() },
+    { method: 'POST', headers: authHeaders },
+    authHeaders,
   ).catch(() => null);
   const response = backendResponse && backendResponse.status !== 404 && backendResponse.status < 500
     ? backendResponse
@@ -977,10 +988,11 @@ async function changeItemOffering({
     body: JSON.stringify({ id: normalizedOfferingId }),
   };
   const backendPath = `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/items/${itemIndex}/offerings${remove ? `/${encodeURIComponent(normalizedOfferingId)}/remove` : ''}`;
-  const backendResponse = await fetch(backendPath, {
+  const authHeaders = await userTokenHeaders();
+  const backendResponse = await fetchWithOptionalSession(backendPath, {
     ...requestInit,
-    headers: { ...(await userTokenHeaders()), 'Content-Type': 'application/json' },
-  }).catch(() => null);
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+  }, authHeaders).catch(() => null);
   const response = backendResponse && backendResponse.status !== 404
     ? backendResponse
     : await checkoutFetch(path, requestInit);
@@ -1106,13 +1118,14 @@ export async function identifyExistingCustomerByEmail(
   email: string,
 ): Promise<OrderForm | null> {
   const authHeaders = await userTokenHeaders();
-  const response = await fetch(
+  const response = await fetchWithOptionalSession(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/profile-by-email`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ email: email.trim().toLowerCase(), salesChannel: storeConfig.salesChannel }),
     },
+    authHeaders,
   ).catch(() => null);
 
   if (!response) throw new Error('Não foi possível identificar o cliente no Checkout VTEX.');
@@ -1130,13 +1143,14 @@ export async function identifyExistingCustomerByEmail(
 
 export async function checkGiftCardAvailability(orderFormId: string, email: string): Promise<boolean> {
   const authHeaders = await userTokenHeaders();
-  const response = await fetch(
+  const response = await fetchWithOptionalSession(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/gift-cards/availability`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     },
+    authHeaders,
   ).catch(() => null);
   if (!response) throw new Error('Não foi possível consultar os créditos do cliente.');
   const payload = await response.json().catch(() => ({})) as { available?: boolean; message?: string };
@@ -1146,13 +1160,14 @@ export async function checkGiftCardAvailability(orderFormId: string, email: stri
 
 export async function getCustomerGiftCards(orderFormId: string, email: string): Promise<GiftCard[]> {
   const authHeaders = await userTokenHeaders();
-  const response = await fetch(
+  const response = await fetchWithOptionalSession(
     `${storeConfig.backendUrl}/checkout/order-form/${encodeURIComponent(orderFormId)}/gift-cards`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     },
+    authHeaders,
   ).catch(() => null);
   if (!response) throw new Error('Não foi possível carregar os créditos do cliente.');
   const payload = await response.json().catch(() => ({})) as {

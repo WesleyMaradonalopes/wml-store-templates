@@ -1,5 +1,5 @@
 import { Product, getProduct } from './catalog';
-import { getAccountSession, getCachedAccountSession, getCachedVtexUserToken, getVtexUserToken } from './auth';
+import { fetchAuthenticated, getAccountSession, getCachedAccountSession, getCachedVtexUserToken, getVtexUserToken } from './auth';
 import { getStoredJson, setStoredJson } from './storage';
 import { storeConfig } from '@/config/store';
 
@@ -68,7 +68,7 @@ async function loadFavorites(): Promise<Product[]> {
   if (!session?.email || !token) return [];
   const cachedIds = await getCachedIds(session.email);
   try {
-    const response = await fetch(`${storeConfig.backendUrl}/customer/wishlist?email=${encodeURIComponent(session.email)}`, { headers: { VtexIdclientAutCookie: token } });
+    const response = await fetchAuthenticated(`${storeConfig.backendUrl}/customer/wishlist?email=${encodeURIComponent(session.email)}`, { headers: { VtexIdclientAutCookie: token } });
     if (response.ok) {
       const payload = await response.json() as { wishlist?: string[] };
       const serverIds = Array.from(new Set((payload.wishlist ?? []).map((id) => String(id).trim()).filter(Boolean)));
@@ -133,7 +133,7 @@ export async function toggleFavorite(product: Product, options: { hydrate?: bool
   const session = await getAccountSession();
   const token = await getVtexUserToken();
   if (!session?.email || !token) throw new Error('Entre na sua conta para salvar favoritos.');
-  const response = await fetch(`${storeConfig.backendUrl}/customer/wishlist/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json', VtexIdclientAutCookie: token }, body: JSON.stringify({ email: session.email, productId: product.id, title: product.name, sku: product.itemId }) });
+  const response = await fetchAuthenticated(`${storeConfig.backendUrl}/customer/wishlist/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json', VtexIdclientAutCookie: token }, body: JSON.stringify({ email: session.email, productId: product.id, title: product.name, sku: product.itemId }) });
   const payload = await response.json().catch(() => ({})) as { favorite?: boolean; wishlist?: string[]; message?: string };
   if (!response.ok) throw new Error(payload.message || `Não foi possível atualizar os favoritos (HTTP ${response.status}).`);
   const cachedIds = await getCachedIds(session.email);

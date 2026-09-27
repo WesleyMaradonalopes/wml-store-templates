@@ -15,7 +15,7 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/context/theme-context';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { useTheme } from '@/hooks/use-theme';
-import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, validateVtexAccessKey } from '@/services/auth';
+import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, subscribeAccountSession, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
 import { disableNotifications, enableNotifications, initializeNotifications, NotificationModuleUnavailableError, NotificationPermissionError } from '@/services/notifications';
@@ -154,6 +154,19 @@ export default function AccountScreen() {
   useEffect(() => {
     if (requestedView === 'access') setView('access');
   }, [requestedView]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAccountSession((session) => {
+      if (session?.email) return;
+      setLoggedIn(false);
+      setEmail('');
+      setPassword('');
+      setProfile({});
+      setProfileMessage(null);
+      setView('home');
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     let active = true;

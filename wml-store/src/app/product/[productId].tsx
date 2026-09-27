@@ -31,7 +31,7 @@ import { WiddeVideo } from '@/components/widde-video';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Fonts, Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
-import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductKitGroup, type ProductKitItem, type ProductVariant, type ProductLoadErrorKind } from '@/services/catalog';
+import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 import { getProductInformation, type SizebayProductInformation } from '@/services/sizebay';
 import { htmlToPlainText } from '@/utils/html';
@@ -115,7 +115,8 @@ export default function ProductScreen() {
   const [error, setError] = useState<ProductLoadErrorKind | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [adding, setAdding] = useState(false);
-  const [cartMessage, setCartMessage] = useState<string | null>(null);const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
+  const [cartMessage, setCartMessage] = useState<string | null>(null);
+	const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
