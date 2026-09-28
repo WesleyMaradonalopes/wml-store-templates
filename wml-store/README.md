@@ -83,6 +83,10 @@ npm run android:native
 npx expo run:ios
 ```
 
+A busca por voz usa o módulo nativo `expo-speech-recognition`. Depois de
+instalar essa dependência ou alterar sua configuração no `app.json`, gere um
+novo development build antes de testar o microfone no Android ou no iOS.
+
 Os `clientId`/site keys são públicos e podem ficar em `EXPO_PUBLIC_*`. O
 `clientSecret`, a Google API key e outras credenciais permanecem somente na
 configuração da VTEX/backend e nunca devem ser colocados em `EXPO_PUBLIC_*`.

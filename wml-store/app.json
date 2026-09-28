@@ -67,6 +67,13 @@
       "expo-secure-store",
       "expo-image",
       [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permita que o LoJahr use o microfone para pesquisar produtos por voz.",
+          "speechRecognitionPermission": "Permita que o LoJahr reconheça sua voz para pesquisar produtos."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {

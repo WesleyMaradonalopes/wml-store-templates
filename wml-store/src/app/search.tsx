@@ -4,6 +4,7 @@ import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
+import MicrophoneIcon from '@/components/icons/MicrophoneIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import { FilterGlyph, ProductFilterModal } from '@/components/product-filter-modal';
 import { ProductGridSkeleton } from '@/components/product-grid-skeleton';
@@ -17,6 +18,7 @@ import { subscribeAccountSession } from '@/services/auth';
 import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
 import { parseCmsRouteFacets } from '@/services/cms-actions';
 import { isFavorite } from '@/services/favorites';
+import { abortSpeechRecognition, isSpeechRecognitionAvailable, isSpeechRecognitionModuleInstalled, requestSpeechRecognitionPermissions, startSpeechRecognition, stopSpeechRecognition, subscribeSpeechRecognitionEvent, type VoiceRecognitionErrorEvent, type VoiceRecognitionResultEvent } from '@/services/speech-recognition';
 
 function paramText(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
@@ -81,6 +83,8 @@ export default function SearchScreen() {
   const [popularTerms, setPopularTerms] = useState<string[]>([]);
   const [listingResolution, setListingResolution] = useState<ListingResolution | null>(null);
   const [filtersVisible, setFiltersVisible] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isStartingVoiceSearch, setIsStartingVoiceSearch] = useState(false);
   const activeFacets = mergeFacets(contextFacets, selectedFacets);
   const facetSignature = JSON.stringify(selectedFacets);
   const productRows = useMemo(() => buildProductGridRows(products), [products]);
@@ -132,8 +136,46 @@ export default function SearchScreen() {
   }, []);
 
   useEffect(() => {
+    const startSubscription = subscribeSpeechRecognitionEvent('start', () => {
+      setIsListening(true);
+      setMessage(null);
+    });
+    const endSubscription = subscribeSpeechRecognitionEvent('end', () => {
+      setIsListening(false);
+    });
+    const resultSubscription = subscribeSpeechRecognitionEvent('result', (event: VoiceRecognitionResultEvent) => {
+      const value = event.results[0]?.transcript?.trim() ?? '';
+      if (!value) return;
+
+      setTerm(value);
+      if (event.isFinal) searchFor(value);
+    });
+    const errorSubscription = subscribeSpeechRecognitionEvent('error', (event: VoiceRecognitionErrorEvent) => {
+      setIsListening(false);
+      if (event.error === 'aborted') return;
+      if (event.error === 'no-speech') {
+        setMessage('Não identificamos sua voz. Tente falar novamente.');
+        return;
+      }
+      if (event.error === 'not-allowed') {
+        setMessage('Permita o acesso ao microfone para usar a busca por voz.');
+        return;
+      }
+      setMessage('A busca por voz não está disponível neste dispositivo.');
+    });
+
+    return () => {
+      startSubscription?.remove();
+      endSubscription?.remove();
+      resultSubscription?.remove();
+      errorSubscription?.remove();
+      abortSpeechRecognition();
+    };
+  }, []);
+
+  useEffect(() => {
     const value = term.trim();
-    if (value === activeQuery) return;
+    if (isListening || value === activeQuery) return;
     const timer = setTimeout(() => {
       setContextFacets([]);
       setSelectedFacets([]);
@@ -143,7 +185,7 @@ export default function SearchScreen() {
       setListingResolution(null);
     }, 250);
     return () => clearTimeout(timer);
-  }, [activeQuery, term]);
+  }, [activeQuery, isListening, term]);
 
   useEffect(() => {
     if (!activeQuery && activeFacets.length === 0) {
@@ -194,8 +236,8 @@ export default function SearchScreen() {
     return () => { active = false; };
   }, [activeQuery, contextFacets, facetSignature, sort]);
 
-  function search() {
-    const value = term.trim();
+  function searchFor(query: string) {
+    const value = query.trim();
     if (!value) {
       clearSearch();
       return;
@@ -209,7 +251,54 @@ export default function SearchScreen() {
     setListingResolution(null);
   }
 
+  function search() {
+    searchFor(term);
+  }
+
+  async function toggleVoiceSearch() {
+    if (isListening) {
+      stopSpeechRecognition();
+      return;
+    }
+    if (isStartingVoiceSearch) return;
+
+    setIsStartingVoiceSearch(true);
+    setMessage(null);
+    try {
+      if (!isSpeechRecognitionModuleInstalled()) {
+        setMessage('A busca por voz precisa de uma nova versão do aplicativo. Gere uma nova development build.');
+        return;
+      }
+      if (!isSpeechRecognitionAvailable()) {
+        setMessage('A busca por voz não está disponível neste dispositivo.');
+        return;
+      }
+
+      const permission = await requestSpeechRecognitionPermissions();
+      if (!permission?.granted) {
+        setMessage('Permita o acesso ao microfone para usar a busca por voz.');
+        return;
+      }
+
+      startSpeechRecognition({
+        lang: 'pt-BR',
+        interimResults: true,
+        continuous: false,
+        maxAlternatives: 1,
+        contextualStrings: ['biquíni', 'maiô', 'top', 'legging', 'jaqueta', 'short', 'macacão', 'calça', 'bermuda', 'adapt'],
+      });
+    } catch {
+      setIsListening(false);
+      setMessage('Não foi possível iniciar a busca por voz.');
+    } finally {
+      setIsStartingVoiceSearch(false);
+    }
+  }
+
   function clearSearch() {
+    if (isListening) {
+      abortSpeechRecognition();
+    }
     setTerm('');
     setSelectedFacets([]);
     setSort('score:desc');
@@ -270,9 +359,21 @@ export default function SearchScreen() {
             </Pressable>
             <View style={styles.searchInputWrap}>
               <SearchIcon size={17} color="#8b8782" />
-              <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder="O que você procura?" returnKeyType="search" style={styles.searchInput} />
+              <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder={isListening ? 'Ouvindo...' : 'O que você procura?'} returnKeyType="search" style={styles.searchInput} />
               {!!term && <Pressable accessibilityLabel="Limpar busca" onPress={clearSearch} style={styles.clearButton}><ThemedText style={styles.clearText}>✕</ThemedText></Pressable>}
             </View>
+            <Pressable
+              accessibilityLabel={isListening ? 'Parar busca por voz' : 'Buscar por voz'}
+              accessibilityHint={isListening ? 'Toque para finalizar a busca por voz' : 'Toque e fale o nome do produto'}
+              accessibilityRole="button"
+              accessibilityState={{ busy: isListening || isStartingVoiceSearch }}
+              disabled={isStartingVoiceSearch}
+              onPress={() => { void toggleVoiceSearch(); }}
+              style={[styles.voiceButton, isListening && styles.voiceButtonActive]}
+              testID="voice-search-button"
+            >
+              <MicrophoneIcon size={20} color={isListening ? '#b42318' : '#4b4743'} />
+            </Pressable>
             <Pressable accessibilityLabel="Fechar busca" onPress={() => router.back()} style={styles.closeButton}>
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </Pressable>
@@ -377,6 +478,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#3c3936', fontFamily: Fonts.sans },
   clearButton: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   clearText: { fontSize: 14, lineHeight: 18, color: '#625d57', fontWeight: '500' },
+  voiceButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  voiceButtonActive: { backgroundColor: '#fff1f0' },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
   suggestionsPanel: { marginHorizontal: Spacing.three, borderBottomLeftRadius: 14, borderBottomRightRadius: 14, borderWidth: 1, borderTopWidth: 0, borderColor: '#e7e3de', backgroundColor: '#FFFFFF', overflow: 'hidden' },
