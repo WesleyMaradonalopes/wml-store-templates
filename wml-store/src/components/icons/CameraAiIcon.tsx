@@ -6,7 +6,7 @@ type CameraAiIconProps = {
 };
 
 /** Camera glyph adapted from the web assistant image-search control. */
-export default function CameraAiIcon({ color = '#2f2e26', size = 24 }: CameraAiIconProps) {
+export default function CameraAiIcon({ color = '#0a0a0a', size = 24 }: CameraAiIconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 192 192" fill="none">
       <Circle cx="144.07" cy="144" r="16" fill={color} />

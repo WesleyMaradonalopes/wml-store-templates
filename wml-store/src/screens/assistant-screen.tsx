@@ -1,20 +1,21 @@
 import { Image } from 'expo-image';
+import type { ImagePickerAsset } from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
+	Alert,
+	Keyboard,
+	KeyboardAvoidingView,
+	Platform,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	TextInput,
+	View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { ImagePickerAsset } from 'expo-image-picker';
 
+import { AssistantInitialShowcase } from '@/components/assistant-initial-showcase';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import CameraAiIcon from '@/components/icons/CameraAiIcon';
 import CloseIcon from '@/components/icons/CloseIcon';
@@ -28,26 +29,26 @@ import { ThemedView } from '@/components/themed-view';
 import { TabBarContext } from '@/context/tab-bar-context';
 import { useAppTheme } from '@/context/theme-context';
 import { useTheme } from '@/hooks/use-theme';
-import { getProduct, type Product } from '@/services/catalog';
 import {
-  analyzeAssistantImage,
-  sendAssistantMessage,
-  type AssistantHistoryItem,
-  type AssistantProductRecommendation,
+	analyzeAssistantImage,
+	sendAssistantMessage,
+	type AssistantHistoryItem,
+	type AssistantProductRecommendation,
 } from '@/services/assistant';
+import { getProduct, getRecentProducts, type Product } from '@/services/catalog';
 import {
-  abortSpeechRecognition,
-  isSpeechRecognitionAvailable,
-  isSpeechRecognitionModuleInstalled,
-  requestSpeechRecognitionPermissions,
-  startSpeechRecognition,
-  stopSpeechRecognition,
-  subscribeSpeechRecognitionEvent,
-  type VoiceRecognitionErrorEvent,
-  type VoiceRecognitionResultEvent,
+	abortSpeechRecognition,
+	isSpeechRecognitionAvailable,
+	isSpeechRecognitionModuleInstalled,
+	requestSpeechRecognitionPermissions,
+	startSpeechRecognition,
+	stopSpeechRecognition,
+	subscribeSpeechRecognitionEvent,
+	type VoiceRecognitionErrorEvent,
+	type VoiceRecognitionResultEvent,
 } from '@/services/speech-recognition';
 
-const AI_COLOR = '#2f2e26';
+const AI_COLOR = '#0a0a0a';
 const MAX_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']);
 type ImagePickerModule = typeof import('expo-image-picker');
 let imagePickerModule: ImagePickerModule | null | undefined;
@@ -75,12 +76,6 @@ type AssistantMessage = {
   imageUri?: string;
   products?: AssistantProductView[];
 };
-
-const SUGGESTIONS = [
-  'Quero um look para a praia',
-  'Me mostre peças para academia',
-  'Procuro um presente',
-];
 
 function previewProduct(item: AssistantProductRecommendation): Product {
   return {
@@ -129,6 +124,9 @@ export default function AssistantScreen() {
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
+  const [initialProducts, setInitialProducts] = useState<Product[]>([]);
+  const [loadingInitialProducts, setLoadingInitialProducts] = useState(true);
+  const [initialProductsError, setInitialProductsError] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isStartingVoice, setIsStartingVoice] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -137,11 +135,28 @@ export default function AssistantScreen() {
   const chatBackground = colorScheme === 'dark' ? '#252b30' : '#eaeef2';
   const assistantBubbleBackground = colorScheme === 'dark' ? theme.backgroundElement : '#FFFFFF';
   const assistantTextColor = colorScheme === 'dark' ? theme.text : AI_COLOR;
+  const initialState = messages.length === 0;
+
+  const loadInitialProducts = useCallback(async () => {
+    setLoadingInitialProducts(true);
+    setInitialProductsError('');
+    try {
+      setInitialProducts(await getRecentProducts(10));
+    } catch {
+      setInitialProductsError('Não foi possível carregar as novidades agora.');
+    } finally {
+      setLoadingInitialProducts(false);
+    }
+  }, []);
 
   useEffect(() => {
     setHidden(true);
     return () => setHidden(false);
   }, [setHidden]);
+
+  useEffect(() => {
+    void loadInitialProducts();
+  }, [loadInitialProducts]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -395,11 +410,11 @@ export default function AssistantScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.content}>
           <ScrollView
             ref={scrollRef}
-            style={[styles.chatArea, { backgroundColor: chatBackground }]}
+            style={[styles.chatArea, { backgroundColor: initialState ? theme.background : chatBackground }]}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[styles.messages, messages.length === 0 && styles.emptyMessages]}
+            contentContainerStyle={[styles.messages, initialState && styles.emptyMessages]}
             showsVerticalScrollIndicator={false}>
-            {messages.length === 0 && !loading && (
+            {initialState && (
               <View style={styles.welcome}>
                 <View style={styles.welcomeLogo}>
                   <SmartAiIcon color="#FFFFFF" size={34} />
@@ -408,13 +423,13 @@ export default function AssistantScreen() {
                 <ThemedText style={[styles.welcomeSubtitle, { color: colorScheme === 'dark' ? theme.textSecondary : '#68697b' }]}>
                   Posso recomendar produtos, montar looks e ajudar você a encontrar exatamente o que procura.
                 </ThemedText>
-                <View style={styles.suggestions}>
-                  {SUGGESTIONS.map((suggestion) => (
-                    <Pressable key={suggestion} onPress={() => void sendMessage(suggestion)} style={[styles.suggestion, { borderColor: theme.border, backgroundColor: assistantBubbleBackground }]}>
-                      <ThemedText style={{ color: assistantTextColor }} type="small">{suggestion}</ThemedText>
-                    </Pressable>
-                  ))}
-                </View>
+                <AssistantInitialShowcase
+                  products={initialProducts}
+                  loading={loadingInitialProducts}
+                  error={initialProductsError}
+                  onRetry={() => void loadInitialProducts()}
+                  onSuggestion={(query) => void sendMessage(query)}
+                />
               </View>
             )}
 
@@ -519,13 +534,11 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   chatArea: { flex: 1 },
   messages: { flexGrow: 1, gap: 10, paddingHorizontal: 14, paddingTop: 16, paddingBottom: 14 },
-  emptyMessages: { paddingTop: 28 },
-  welcome: { alignItems: 'center', width: '100%', paddingHorizontal: 16 },
-  welcomeLogo: { width: 64, height: 64, borderRadius: 32, backgroundColor: AI_COLOR, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  welcomeTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
-  welcomeSubtitle: { maxWidth: 310, fontSize: 14, lineHeight: 21, textAlign: 'center' },
-  suggestions: { alignSelf: 'stretch', alignItems: 'flex-start', gap: 8, marginTop: 22 },
-  suggestion: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
+  emptyMessages: { paddingTop: 20 },
+  welcome: { alignItems: 'center', width: '100%', paddingTop: 4 },
+  welcomeLogo: { width: 50, height: 50, borderRadius: 32, backgroundColor: AI_COLOR, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  welcomeTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 5 },
+  welcomeSubtitle: { maxWidth: 310, fontSize: 14, lineHeight: 21, textAlign: 'center', paddingBottom: 15 },
   assistantRow: { alignItems: 'flex-start', gap: 8 },
   userRow: { alignItems: 'flex-end', gap: 8 },
   bubble: { maxWidth: '88%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
@@ -542,11 +555,11 @@ const styles = StyleSheet.create({
   typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: AI_COLOR },
   statusArea: { paddingHorizontal: 14, paddingTop: 2 },
   status: { fontSize: 12, paddingBottom: 5 },
-  composerBar: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 5 },
-  composer: { minHeight: 48, maxHeight: 116, borderWidth: 1, borderRadius: 25, paddingLeft: 5, paddingRight: 5, flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  composerBar: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 },
+  composer: { borderWidth: 1, borderRadius: 25, paddingVertical: 0, paddingHorizontal: 5, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 2 },
   composerIconButton: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
   listeningButton: { backgroundColor: '#F4D8D8', borderRadius: 20 },
-  input: { flex: 1, minHeight: 40, maxHeight: 92, paddingHorizontal: 5, paddingTop: 10, paddingBottom: 9, fontSize: 14 },
-  sendButton: { width: 36, height: 36, borderRadius: 18, marginBottom: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: AI_COLOR },
+  input: { flex: 1, maxHeight: 50, paddingHorizontal: 5, paddingTop: 10, paddingBottom: 9, fontSize: 14 },
+  sendButton: { width: 32, height: 32, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: AI_COLOR },
   disabledButton: { opacity: 0.45 },
 });

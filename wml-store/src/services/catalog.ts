@@ -806,6 +806,32 @@ export async function searchCatalogProductListing({
   return { products, recordsFiltered: products.length };
 }
 
+/**
+ * Loads the newest available products for the assistant's initial showcase.
+ * This uses the same public catalog endpoint as the web assistant, while
+ * keeping the app's existing product normalization and availability rules.
+ */
+export async function getRecentProducts(count = 10): Promise<Product[]> {
+  const safeCount = Math.min(24, Math.max(1, Math.trunc(count)));
+  const url = new URL(`${storeConfig.vtexBaseUrl}/api/catalog_system/pub/products/search/`);
+  url.searchParams.set('O', 'OrderByReleaseDateDESC');
+  url.searchParams.set('_from', '0');
+  url.searchParams.set('_to', String(safeCount - 1));
+  url.searchParams.set('sc', storeConfig.salesChannel);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const payload = await getJson<ProductPayload[]>(url.toString(), { signal: controller.signal });
+    return filterAvailableProducts(
+      (payload ?? []).map(normalizeProduct).filter((product) => product.id),
+      true,
+    ).slice(0, safeCount);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function exactSearchFacet(query: string, facets: CatalogFacet[]) {
   const target = normalizedSearchText(query);
   if (target.length < 3) return null;

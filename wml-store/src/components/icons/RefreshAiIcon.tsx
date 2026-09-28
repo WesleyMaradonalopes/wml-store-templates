@@ -6,7 +6,7 @@ type RefreshAiIconProps = {
 };
 
 /** Clear/refresh glyph used by the web assistant header. */
-export default function RefreshAiIcon({ color = '#2f2e26', size = 18 }: RefreshAiIconProps) {
+export default function RefreshAiIcon({ color = '#0a0a0a', size = 18 }: RefreshAiIconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 14 16" fill="none">
       <Path

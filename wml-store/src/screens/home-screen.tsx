@@ -62,7 +62,7 @@ export default function HomeScreen() {
           </Pressable>
           <View style={styles.headerActions}>
             <Pressable accessibilityLabel="Abrir assistente de compras" onPress={() => router.push('/assistant' as never)} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && styles.heroHeaderAction]}>
-              <SmartAiIcon color={dark ? theme.text : '#2f2e26'} size={30} />
+              <SmartAiIcon color={dark ? theme.text : '#0a0a0a'} size={30} />
             </Pressable>
             <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && styles.heroHeaderAction]}><SearchIcon size={20} color={dark ? theme.text : '#0a0a0a'} /></Pressable>
             <CartIconButton style={[styles.headerAction, transparentHeader && styles.heroHeaderAction]} />
