@@ -3,11 +3,12 @@ import { CmsSectionView } from '@/components/cms-section';
 import { HomeSkeleton } from '@/components/home-skeleton';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
+import SmartAiIcon from '@/components/icons/SmartAiIcon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/context/theme-context';
 import { TabBarContext } from '@/context/tab-bar-context';
+import { useAppTheme } from '@/context/theme-context';
 import { useTheme } from '@/hooks/use-theme';
 import { CmsPage, getCmsPage } from '@/services/cms';
 import { useRouter } from 'expo-router';
@@ -60,6 +61,9 @@ export default function HomeScreen() {
             <HopeLogoIcon color={theme.text} width={76} height={20} />
           </Pressable>
           <View style={styles.headerActions}>
+            <Pressable accessibilityLabel="Abrir assistente de compras" onPress={() => router.push('/assistant' as never)} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && styles.heroHeaderAction]}>
+              <SmartAiIcon color={dark ? theme.text : '#2f2e26'} size={30} />
+            </Pressable>
             <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && styles.heroHeaderAction]}><SearchIcon size={20} color={dark ? theme.text : '#0a0a0a'} /></Pressable>
             <CartIconButton style={[styles.headerAction, transparentHeader && styles.heroHeaderAction]} />
           </View>

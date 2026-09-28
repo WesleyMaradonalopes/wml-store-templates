@@ -21,7 +21,12 @@ export default function GlobalTabBar() {
   const { hidden, setHidden, showOnCheckout, bottomTabSettings } = useTabBar();
   const items = getBottomTabItems(bottomTabSettings);
   const cartCount = useCartItemCount();
-  const excluded = (pathname.startsWith('/checkout') && !showOnCheckout) || pathname.startsWith('/product/');
+  // The assistant owns the full bottom area for its composer. Rendering the
+  // global bar there would overlap the input even when the screen requests it
+  // to be hidden through TabBarContext.
+  const excluded = (pathname.startsWith('/checkout') && !showOnCheckout)
+    || pathname.startsWith('/product/')
+    || pathname.startsWith('/assistant');
 
   useEffect(() => setHidden(false), [pathname, setHidden]);
   if (excluded) return null;
