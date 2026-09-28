@@ -14,6 +14,7 @@ import {
 import { extractCookieValue, normalizeCookieHeader } from './http-cookies.js';
 import { createPersistentSessionStore } from './persistent-session-store.js';
 import { isSessionExpiryTestAuthorized, SESSION_EXPIRY_TEST_RESPONSE } from './session-expiry-test.js';
+import { registerAssistantRoutes } from './assistant.js';
 
 const app = express();
 const port = Number(process.env.PORT || 6001);
@@ -42,6 +43,9 @@ const cmsDirectory = process.env.CMS_SCHEMAS_DIR
   : path.resolve(backendSourceDirectory, '../../wml-store/public/cms');
 
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
+// A busca por imagem envia uma data URL base64. O limite maior fica restrito
+// às rotas do assistente; as demais APIs continuam com o limite original.
+app.use('/assistant', express.json({ limit: '9mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 function orderFormIdFromValue(value) {
@@ -77,6 +81,10 @@ app.use('/cms', express.static(cmsDirectory, {
     response.setHeader('Cache-Control', 'public, max-age=300');
   },
 }));
+
+// O assistente do aplicativo fica neste backend para manter a chave da IA e
+// as credenciais privadas da VTEX fora do bundle mobile.
+registerAssistantRoutes(app);
 
 function vtexHeaders() {
   const headers = { Accept: 'application/json' };

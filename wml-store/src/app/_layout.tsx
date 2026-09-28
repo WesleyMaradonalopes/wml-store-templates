@@ -53,6 +53,7 @@ function AppLayout() {
         <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="search" options={{ headerShown: false }} />
+        <Stack.Screen name="assistant" options={{ headerShown: false }} />
         <Stack.Screen name="favorites" options={{ headerShown: false }} />
         <Stack.Screen name="account" options={{ headerShown: false }} />
         <Stack.Screen name="product/[productId]" options={{ headerShown: false }} />

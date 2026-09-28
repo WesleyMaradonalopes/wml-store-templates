@@ -15,6 +15,13 @@ O envio de pagamentos usa o endpoint atual do VTEX Vault:
 `https://{account}.vtexvault.com/api/payments/transactions/{transactionId}/payments`.
 Não é necessário configurar uma variável de gateway para esse fluxo.
 
+O assistente de vendas do aplicativo usa `OPENAI_API_KEY` e, opcionalmente,
+`OPENAI_MODEL`. Essas variáveis ficam somente no backend; o app nunca recebe a
+chave. As APIs ficam disponíveis em `POST /assistant/chat` e
+`POST /assistant/image`; a segunda recebe `{ "imageDataUrl": "data:image/jpeg;base64,..." }`,
+analisa a peça no servidor e consulta o catálogo VTEX antes de devolver as
+recomendações. Imagens de JPG, PNG, WEBP ou GIF podem ter até 6 MB.
+
 As credenciais ficam somente no backend. Nunca coloque esses valores em `wml-store`, em `EXPO_PUBLIC_*` ou em arquivos enviados ao GitHub.
 
 ## Como iniciar futuramente
