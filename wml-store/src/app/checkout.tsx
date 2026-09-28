@@ -7,6 +7,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, Sc
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
+import { BottomSheetHandle } from '@/components/bottom-sheet-handle';
 import { ProductShelf } from '@/components/cms-section';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
@@ -1909,7 +1910,7 @@ export default function CheckoutScreen() {
         {slas.length === 0 && <ThemedText style={styles.bodyText} themeColor="textSecondary">Nenhuma forma de entrega disponível.</ThemedText>}
         {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
       </ThemedView>
-    </ScrollView><Modal visible={pickupSelectionOpen} animationType="slide" onRequestClose={() => setPickupSelectionOpen(false)}><ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Retirar em loja" onBack={() => setPickupSelectionOpen(false)} showSearch={false} showCart={false} /><ScrollView contentContainerStyle={styles.content}><ThemedText style={styles.pageTitle}>Escolha a loja para retirada</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Selecione onde deseja retirar seu pedido.</ThemedText>{pickupOptions.map((option) => <PickupStoreCard key={shippingOptionKey(option)} option={option} selected={shippingOptionId(option) === selectedShippingId} disabled={saving} onPress={() => choosePickupStore(option)} />)}</ScrollView></SafeAreaView></ThemedView></Modal><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithShipping} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
+    </ScrollView><Modal visible={pickupSelectionOpen} animationType="slide" onRequestClose={() => setPickupSelectionOpen(false)}><ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><BottomSheetHandle /><ScreenHeader title="Retirar em loja" onBack={() => setPickupSelectionOpen(false)} showSearch={false} showCart={false} /><ScrollView contentContainerStyle={styles.content}><ThemedText style={styles.pageTitle}>Escolha a loja para retirada</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Selecione onde deseja retirar seu pedido.</ThemedText>{pickupOptions.map((option) => <PickupStoreCard key={shippingOptionKey(option)} option={option} selected={shippingOptionId(option) === selectedShippingId} disabled={saving} onPress={() => choosePickupStore(option)} />)}</ScrollView></SafeAreaView></ThemedView></Modal><View style={styles.fixedFooter}><Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={continueWithShipping} /><Secondary title="Alterar endereço de entrega" onPress={openAddressSelection} /></View></SafeAreaView></ThemedView>;
   }
 
   if (step === 'address' && addressSaved && !editingAddress) {

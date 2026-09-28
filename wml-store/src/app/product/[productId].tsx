@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { AddedToCartModal, type AddedProductInfo } from '@/components/added-to-cart-modal';
 import { AnimatedPaginationDots } from '@/components/animated-pagination-dots';
+import { BottomSheetHandle } from '@/components/bottom-sheet-handle';
 import { CartIconButton } from '@/components/cart-icon-button';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
@@ -1042,6 +1043,7 @@ function ColorOptionsModal({ products, visible, selectedProductId, onClose, onSe
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <ThemedView style={styles.colorModal}>
         <SafeAreaView style={styles.colorModalSafeArea}>
+          <BottomSheetHandle />
           <View style={styles.colorModalHeader}>
             <ThemedText style={styles.titleColorModal} type="subtitle">Ver cores ({products.length})</ThemedText>
             <Pressable accessibilityLabel="Fechar cores" onPress={onClose} style={styles.colorModalClose}>

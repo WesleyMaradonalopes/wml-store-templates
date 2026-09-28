@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spacing } from '@/constants/theme';
 import { searchSmartProductListing, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 
+import { BottomSheetHandle } from './bottom-sheet-handle';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import ChevronRightIcon from './icons/ChevronRightIcon';
@@ -86,6 +87,7 @@ export function ProductFilterModal({ visible, query, facets, baseFacets = [], se
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
+          <BottomSheetHandle />
           <View style={styles.header}>
             <ThemedText style={styles.headerTitle}>Filtros</ThemedText>
             <Pressable accessibilityLabel="Fechar filtros" onPress={onClose} style={styles.closeButton}>

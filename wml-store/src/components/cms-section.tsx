@@ -13,6 +13,7 @@ import { cmsInternalRoute, openCmsExternalLink } from '@/services/cms-links';
 import { isFavorite } from '@/services/favorites';
 
 import { AnimatedPaginationDots } from './animated-pagination-dots';
+import { BottomSheetHandle } from './bottom-sheet-handle';
 import { CmsRichText } from './cms-rich-text';
 import ArrowLeftIAIcon from './icons/ArrowLeftIAicon';
 import ArrowRightAIcon from './icons/ArrowRightAicon';
@@ -598,6 +599,7 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
         animationType="slide"
         onRequestClose={() => setSelectedCategory(null)}>
         <View style={styles.categoryModal}>
+          <BottomSheetHandle />
           <View style={styles.categoryModalHeader}>
             <Pressable
               accessibilityLabel="Voltar para categorias"

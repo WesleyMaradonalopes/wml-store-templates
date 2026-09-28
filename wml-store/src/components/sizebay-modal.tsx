@@ -5,6 +5,7 @@ import { WebView } from 'react-native-webview';
 
 import { Fonts, Spacing } from '@/constants/theme';
 
+import { BottomSheetHandle } from './bottom-sheet-handle';
 import CloseIcon from './icons/CloseIcon';
 import { ThemedText } from './themed-text';
 
@@ -28,6 +29,7 @@ export function SizebayModal({ visible, frameUrl, title, onClose }: SizebayModal
       <View style={styles.container}>
         <StatusBar style="dark" />
         <SafeAreaView style={styles.safeArea}>
+          <BottomSheetHandle />
           <View style={styles.header}>
             <ThemedText style={styles.title}>{title}</ThemedText>
             <Pressable accessibilityLabel={`Fechar ${title}`} onPress={onClose} style={styles.closeButton}>

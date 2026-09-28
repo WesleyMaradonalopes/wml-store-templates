@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Fonts, Spacing } from '@/constants/theme';
 import type { Product, ProductVariant } from '@/services/catalog';
 
+import { BottomSheetHandle } from './bottom-sheet-handle';
 import CloseIcon from './icons/CloseIcon';
 import { ThemedText } from './themed-text';
 
@@ -69,6 +70,7 @@ export function AddedToCartModal({ item, visible, onClose, onViewCart, viewCartL
             </View>
           )}
           <View style={[styles.sheet, { paddingHorizontal: horizontalPadding }]}>
+            <BottomSheetHandle />
             <View style={styles.header}>
               <ThemedText style={styles.title}>Adicionado à sacola</ThemedText>
               <Pressable accessibilityLabel="Fechar confirmação de adição" onPress={onClose} style={styles.closeButton}>
@@ -139,7 +141,7 @@ const styles = StyleSheet.create({
   feedbackText: { color: '#FFFFFF', textAlign: 'center', fontSize: 12, lineHeight: 16, fontWeight: '600' },
   sheet: {
     width: '100%',
-    paddingTop: 24,
+    paddingTop: 4,
     paddingBottom: 22,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

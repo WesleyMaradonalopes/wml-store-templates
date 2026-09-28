@@ -11,6 +11,7 @@ import { getProduct, type Product, type ProductKitGroup, type ProductVariant } f
 import { buildVariationGroups } from '@/utils/product-variations';
 
 import { AddedToCartModal, type AddedProductInfo } from './added-to-cart-modal';
+import { BottomSheetHandle } from './bottom-sheet-handle';
 import { SkeletonBlock } from './skeleton';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -208,6 +209,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
         <View style={styles.backdrop}>
           <Pressable accessibilityLabel="Fechar visualização rápida" onPress={onClose} style={styles.dismissArea} />
           <ThemedView style={styles.sheet}>
+            <BottomSheetHandle />
             <SafeAreaView edges={['bottom']} style={styles.safeArea}>
               <View style={styles.header}>
                 <ThemedText numberOfLines={2} style={styles.title}>
