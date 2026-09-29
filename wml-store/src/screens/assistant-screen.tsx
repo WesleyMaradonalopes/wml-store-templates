@@ -11,6 +11,7 @@ import {
 	ScrollView,
 	StyleSheet,
 	TextInput,
+	useWindowDimensions,
 	View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,10 +33,11 @@ import { useTheme } from '@/hooks/use-theme';
 import {
 	analyzeAssistantImage,
 	sendAssistantMessage,
+	type AssistantChatResponse,
 	type AssistantHistoryItem,
 	type AssistantProductRecommendation,
 } from '@/services/assistant';
-import { getProduct, getRecentProducts, type Product } from '@/services/catalog';
+import { getProduct, getRecentProducts, getSimilarProducts, type Product } from '@/services/catalog';
 import {
 	abortSpeechRecognition,
 	isSpeechRecognitionAvailable,
@@ -49,6 +51,9 @@ import {
 } from '@/services/speech-recognition';
 
 const AI_COLOR = '#0a0a0a';
+const PRODUCTS_PER_VITRINE = 10;
+const MAX_VITRINES = 3;
+const MAX_RECOMMENDED_PRODUCTS = PRODUCTS_PER_VITRINE * MAX_VITRINES;
 const MAX_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']);
 type ImagePickerModule = typeof import('expo-image-picker');
 let imagePickerModule: ImagePickerModule | null | undefined;
@@ -73,9 +78,18 @@ type AssistantMessage = {
   id: string;
   role: 'user' | 'assistant';
   text: string;
+  timestamp: string;
+  status: 'sent' | 'read';
   imageUri?: string;
   products?: AssistantProductView[];
 };
+
+function getTimestamp() {
+  return new Date().toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 function previewProduct(item: AssistantProductRecommendation): Product {
   return {
@@ -106,6 +120,35 @@ function productViews(items: AssistantProductRecommendation[]): AssistantProduct
   return items.map((item) => ({ ...item, product: previewProduct(item) }));
 }
 
+function productViewsFromProducts(items: Product[]): AssistantProductView[] {
+  return items.map((product) => ({
+    id: product.id,
+    name: product.name,
+    linkText: product.linkText,
+    imageUrl: product.imageUrl,
+    price: product.price,
+    listPrice: product.listPrice,
+    product,
+  }));
+}
+
+function splitIntoVitrines<T>(items: T[]) {
+  const limitedItems = items.slice(0, MAX_RECOMMENDED_PRODUCTS);
+  const vitrines: T[][] = [];
+
+  for (let index = 0; index < limitedItems.length; index += PRODUCTS_PER_VITRINE) {
+    vitrines.push(limitedItems.slice(index, index + PRODUCTS_PER_VITRINE));
+  }
+
+  return vitrines;
+}
+
+function textForVitrine(index: number, firstMessage: string) {
+  if (index === 0) return firstMessage;
+  if (index === 1) return 'Também encontrei esses outros modelos interessantes: ✨';
+  return 'E aqui mais algumas alternativas adicionais:';
+}
+
 function historyFromMessages(messages: AssistantMessage[]): AssistantHistoryItem[] {
   return messages
     .slice(-8)
@@ -116,11 +159,21 @@ function historyFromMessages(messages: AssistantMessage[]): AssistantHistoryItem
     .filter((message) => message.content);
 }
 
+function MessageMeta({ timestamp, user = false, product = false }: { timestamp: string; user?: boolean; product?: boolean }) {
+  return (
+    <View style={product ? styles.productMeta : styles.messageMeta}>
+      <ThemedText style={[styles.messageTime, user && styles.userMessageTime]}>{timestamp}</ThemedText>
+      <ThemedText style={styles.messageStatus}>✓✓</ThemedText>
+    </View>
+  );
+}
+
 export default function AssistantScreen() {
   const router = useRouter();
   const { colorScheme } = useAppTheme();
   const theme = useTheme();
   const { setHidden } = useContext(TabBarContext);
+  const { width: screenWidth } = useWindowDimensions();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
@@ -136,6 +189,7 @@ export default function AssistantScreen() {
   const assistantBubbleBackground = colorScheme === 'dark' ? theme.backgroundElement : '#FFFFFF';
   const assistantTextColor = colorScheme === 'dark' ? theme.text : AI_COLOR;
   const initialState = messages.length === 0;
+  const recommendationCardWidth = Math.max(124, Math.floor((Math.min(screenWidth, 420) - 90) / 2));
 
   const loadInitialProducts = useCallback(async () => {
     setLoadingInitialProducts(true);
@@ -159,6 +213,10 @@ export default function AssistantScreen() {
   }, [loadInitialProducts]);
 
   useEffect(() => {
+    if (messages.length === 0) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return;
+    }
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages, loading]);
 
@@ -211,6 +269,97 @@ export default function AssistantScreen() {
     }));
   }
 
+  function appendAssistantResponse(response: AssistantChatResponse, idPrefix: string) {
+    const vitrines = splitIntoVitrines(response.products);
+    const timestamp = getTimestamp();
+
+    if (vitrines.length === 0) {
+      setMessages((current) => [...current, {
+        id: `${idPrefix}-${Date.now()}`,
+        role: 'assistant',
+        text: response.message,
+        timestamp,
+        status: 'read',
+      }]);
+      return;
+    }
+
+    const assistantMessages = vitrines.map((vitrine, index) => ({
+      id: `${idPrefix}-${Date.now()}-${index}`,
+      role: 'assistant' as const,
+      text: textForVitrine(index, response.message),
+      timestamp,
+      status: 'read' as const,
+      products: productViews(vitrine),
+    }));
+
+    setMessages((current) => [...current, ...assistantMessages]);
+    assistantMessages.forEach((message, index) => {
+      void hydrateProducts(message.id, vitrines[index]);
+    });
+  }
+
+  function replaceSimilarResponse(messageId: string, products: Product[]) {
+    const vitrines = splitIntoVitrines(products);
+    const timestamp = getTimestamp();
+
+    setMessages((current) => {
+      const messageIndex = current.findIndex((message) => message.id === messageId);
+      if (messageIndex < 0) return current;
+
+      const replacement = vitrines.length > 0
+        ? vitrines.map((vitrine, index) => ({
+          id: index === 0 ? messageId : `${messageId}-${index}`,
+          role: 'assistant' as const,
+          text: textForVitrine(index, 'Encontrei produtos semelhantes a este ✨'),
+          timestamp,
+          status: 'read' as const,
+          products: productViewsFromProducts(vitrine),
+        }))
+        : [{
+          id: messageId,
+          role: 'assistant' as const,
+          text: 'Não encontrei produtos semelhantes no momento. 😔',
+          timestamp,
+          status: 'read' as const,
+        }];
+
+      return [
+        ...current.slice(0, messageIndex),
+        ...replacement,
+        ...current.slice(messageIndex + 1),
+      ];
+    });
+  }
+
+  async function loadSimilarProducts(product: Product) {
+    if (loading) return;
+
+    Keyboard.dismiss();
+    setDraft('');
+    setStatusMessage('');
+    const assistantMessageId = `assistant-similar-${Date.now()}`;
+    setMessages((current) => [...current, {
+      id: assistantMessageId,
+      role: 'assistant',
+      text: '',
+      timestamp: getTimestamp(),
+      status: 'read',
+    }]);
+    setLoading(true);
+
+    try {
+      const similarProducts = await getSimilarProducts(product, MAX_RECOMMENDED_PRODUCTS);
+      replaceSimilarResponse(assistantMessageId, similarProducts);
+    } catch {
+      setMessages((current) => current.map((message) => message.id === assistantMessageId
+        ? { ...message, text: 'Não consegui carregar produtos semelhantes agora. Tente novamente em instantes 💛' }
+        : message));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function sendMessage(value: string) {
     const message = value.trim();
     if (!message || loading) return;
@@ -218,26 +367,27 @@ export default function AssistantScreen() {
     Keyboard.dismiss();
     setDraft('');
     setStatusMessage('');
-    const userMessage: AssistantMessage = { id: `user-${Date.now()}`, role: 'user', text: message };
+    const userMessage: AssistantMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      text: message,
+      timestamp: getTimestamp(),
+      status: 'read',
+    };
     const requestHistory = historyFromMessages(messages);
     setMessages((current) => [...current, userMessage]);
     setLoading(true);
 
     try {
       const response = await sendAssistantMessage(message, requestHistory);
-      const assistantMessageId = `assistant-${Date.now()}`;
-      setMessages((current) => [...current, {
-        id: assistantMessageId,
-        role: 'assistant',
-        text: response.message,
-        products: productViews(response.products),
-      }]);
-      if (response.products.length > 0) void hydrateProducts(assistantMessageId, response.products);
+      appendAssistantResponse(response, 'assistant');
     } catch (error) {
       setMessages((current) => [...current, {
         id: `assistant-error-${Date.now()}`,
         role: 'assistant',
         text: error instanceof Error ? error.message : 'Não consegui buscar agora. Tente novamente em instantes 💛',
+        timestamp: getTimestamp(),
+        status: 'read',
       }]);
     } finally {
       setLoading(false);
@@ -305,25 +455,22 @@ export default function AssistantScreen() {
       id: `image-${Date.now()}`,
       role: 'user',
       text: '',
+      timestamp: getTimestamp(),
+      status: 'read',
       imageUri: asset.uri,
     }]);
     setLoading(true);
 
     try {
       const response = await analyzeAssistantImage(`data:${mimeType};base64,${base64}`);
-      const assistantMessageId = `assistant-image-${Date.now()}`;
-      setMessages((current) => [...current, {
-        id: assistantMessageId,
-        role: 'assistant',
-        text: response.message,
-        products: productViews(response.products),
-      }]);
-      if (response.products.length > 0) void hydrateProducts(assistantMessageId, response.products);
+      appendAssistantResponse(response, 'assistant-image');
     } catch (error) {
       setMessages((current) => [...current, {
         id: `assistant-image-error-${Date.now()}`,
         role: 'assistant',
         text: error instanceof Error ? error.message : 'Não consegui analisar essa imagem agora. Tente novamente em instantes 💛',
+        timestamp: getTimestamp(),
+        status: 'read',
       }]);
     } finally {
       setLoading(false);
@@ -398,9 +545,11 @@ export default function AssistantScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
-            <Pressable accessibilityLabel="Limpar conversa" onPress={clearConversation} style={styles.headerIconButton}>
-              <RefreshAiIcon color={theme.text} size={18} />
-            </Pressable>
+            {messages.length > 0 && (
+              <Pressable accessibilityLabel="Limpar conversa" onPress={clearConversation} style={styles.headerIconButton}>
+                <RefreshAiIcon color={theme.text} size={18} />
+              </Pressable>
+            )}
             <Pressable accessibilityLabel="Fechar assistente" onPress={() => router.back()} style={styles.headerIconButton}>
               <CloseIcon color={theme.text} size={22} />
             </Pressable>
@@ -429,6 +578,8 @@ export default function AssistantScreen() {
                   error={initialProductsError}
                   onRetry={() => void loadInitialProducts()}
                   onSuggestion={(query) => void sendMessage(query)}
+                  onSimilar={(product) => void loadSimilarProducts(product)}
+                  similarLoading={loading}
                 />
               </View>
             )}
@@ -445,16 +596,25 @@ export default function AssistantScreen() {
                   ]}>
                     {message.imageUri && <Image source={{ uri: message.imageUri }} contentFit="cover" style={styles.userImage} />}
                     {!!message.text && <ThemedText style={message.role === 'user' ? styles.userText : { color: assistantTextColor }}>{message.text}</ThemedText>}
+                    <MessageMeta timestamp={message.timestamp} user={message.role === 'user'} />
                   </View>
                 )}
                 {message.products && message.products.length > 0 && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productsRow}>
-                    {message.products.map((item) => (
-                      <View key={`${message.id}-${item.id}`} style={styles.productCard}>
-                        <ProductCard product={item.product} showAddedModal />
-                      </View>
-                    ))}
-                  </ScrollView>
+                  <View style={[styles.productsBubble, { backgroundColor: assistantBubbleBackground }]}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productsRow}>
+                      {message.products.map((item) => (
+                        <View key={`${message.id}-${item.id}`} style={[styles.productCard, { width: recommendationCardWidth }]}>
+                          <ProductCard
+                            product={item.product}
+                            showAddedModal
+                            onSimilar={() => void loadSimilarProducts(item.product)}
+                            similarLoading={loading}
+                          />
+                        </View>
+                      ))}
+                    </ScrollView>
+                    <MessageMeta timestamp={message.timestamp} product />
+                  </View>
                 )}
               </View>
             ))}
@@ -539,15 +699,21 @@ const styles = StyleSheet.create({
   welcomeLogo: { width: 50, height: 50, borderRadius: 32, backgroundColor: AI_COLOR, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   welcomeTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 5 },
   welcomeSubtitle: { maxWidth: 310, fontSize: 14, lineHeight: 21, textAlign: 'center', paddingBottom: 15 },
-  assistantRow: { alignItems: 'flex-start', gap: 8 },
-  userRow: { alignItems: 'flex-end', gap: 8 },
+  assistantRow: { alignItems: 'flex-start', gap: 8, width: '100%' },
+  userRow: { alignItems: 'flex-end', gap: 8, width: '100%' },
   bubble: { maxWidth: '88%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
   assistantBubble: { borderBottomLeftRadius: 3 },
   userBubble: { backgroundColor: AI_COLOR, borderBottomRightRadius: 3 },
   imageBubble: { padding: 4, overflow: 'hidden' },
   userImage: { width: 184, height: 184, borderRadius: 12 },
   userText: { color: '#FFFFFF' },
-  productsRow: { gap: 12, paddingRight: 14 },
+  messageMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 6, minHeight: 12 },
+  productMeta: { position: 'absolute', right: 12, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  messageTime: { color: '#777777', fontSize: 11, lineHeight: 12 },
+  userMessageTime: { color: '#c9c9c9' },
+  messageStatus: { color: '#53bdeb', fontSize: 12, lineHeight: 12, letterSpacing: -2 },
+  productsBubble: { width: '100%', minHeight: 170, borderRadius: 16, borderBottomLeftRadius: 0, padding: 10, paddingBottom: 30, position: 'relative' },
+  productsRow: { gap: 12, paddingRight: 2 },
   productCard: { width: 170 },
   typingBubble: { alignSelf: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 16, borderBottomLeftRadius: 3, paddingHorizontal: 10, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 9 },
   typingLogo: { width: 26, height: 26, borderRadius: 13, backgroundColor: AI_COLOR, alignItems: 'center', justifyContent: 'center' },

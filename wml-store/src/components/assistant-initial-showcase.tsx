@@ -1,5 +1,5 @@
 import { Fragment, useMemo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { useAppTheme } from '@/context/theme-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -7,6 +7,7 @@ import { type Product } from '@/services/catalog';
 
 import SmartAiIcon from './icons/SmartAiIcon';
 import { ProductCard } from './product-card';
+import { ProductCardSkeleton } from './product-card-skeleton';
 import { ThemedText } from './themed-text';
 
 const AI_COLOR = '#0a0a0a';
@@ -25,6 +26,8 @@ type AssistantInitialShowcaseProps = {
   error?: string;
   onRetry: () => void;
   onSuggestion: (query: string) => void;
+  onSimilar: (product: Product) => void;
+  similarLoading?: boolean;
 };
 
 function shouldShowSuggestionAfter(index: number) {
@@ -39,6 +42,8 @@ export function AssistantInitialShowcase({
   error,
   onRetry,
   onSuggestion,
+  onSimilar,
+  similarLoading = false,
 }: AssistantInitialShowcaseProps) {
   const { width } = useWindowDimensions();
   const { colorScheme } = useAppTheme();
@@ -49,9 +54,12 @@ export function AssistantInitialShowcase({
 
   if (loading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="small" color={dark ? theme.text : AI_COLOR} />
-        <ThemedText themeColor="textSecondary" style={styles.loadingText}>Carregando novidades...</ThemedText>
+      <View style={styles.container}>
+        <View style={styles.grid}>
+          {[0, 1, 2, 3].map((item) => (
+            <ProductCardSkeleton key={item} style={{ width: cardWidth }} />
+          ))}
+        </View>
       </View>
     );
   }
@@ -80,7 +88,12 @@ export function AssistantInitialShowcase({
           return (
             <Fragment key={product.id}>
               <View style={{ width: cardWidth }}>
-                <ProductCard product={product} showAddedModal />
+                <ProductCard
+                  product={product}
+                  showAddedModal
+                  onSimilar={() => onSimilar(product)}
+                  similarLoading={similarLoading}
+                />
               </View>
               {suggestion && (
                 <Pressable
@@ -114,8 +127,6 @@ export function AssistantInitialShowcase({
 const styles = StyleSheet.create({
   container: { paddingBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 14, alignItems: 'flex-start' },
-  loading: { minHeight: 120, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  loadingText: { fontSize: 13 },
   empty: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 32 },
   emptyText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   retryButton: { minHeight: 38, paddingHorizontal: 16, borderWidth: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },

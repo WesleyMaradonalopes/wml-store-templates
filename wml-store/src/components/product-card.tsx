@@ -11,6 +11,7 @@ import { type Product } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, subscribeFavoriteChanges, toggleFavorite } from '@/services/favorites';
 
 import HeartIcon from './icons/HeartIcon';
+import SimilarAiIcon from './icons/SimilarAiIcon';
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
 import { LoginRequiredModal } from './login-required-modal';
 import { ProductQuickViewButton } from './product-quick-view';
@@ -24,6 +25,8 @@ type Props = {
   onFavoriteChange?: (favorite: boolean) => void;
   onAdded?: (product: Product) => void;
   showAddedModal?: boolean;
+  onSimilar?: () => void;
+  similarLoading?: boolean;
 };
 
 function money(value: number) {
@@ -35,7 +38,7 @@ function discountPercentage(product: Product) {
   return Math.round((1 - product.price / product.listPrice) * 100);
 }
 
-export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true }: Props) {
+export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true, onSimilar, similarLoading = false }: Props) {
   const router = useRouter();
   const { colorScheme } = useAppTheme();
   const theme = useTheme();
@@ -162,6 +165,15 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
             style={styles.favoriteButton}>
             <HeartIcon size={28} color={favorite ? '#C62828' : dark ? theme.text : '#0a0a0a'} filled={favorite} />
           </Pressable>
+          {onSimilar && (
+            <Pressable
+              accessibilityLabel="Ver produtos similares"
+              disabled={similarLoading}
+              onPress={(event) => { event.stopPropagation(); onSimilar(); }}
+              style={[styles.similarButton, dark && { backgroundColor: theme.background, borderColor: theme.border }, similarLoading && styles.disabledButton]}>
+              <SimilarAiIcon color={dark ? theme.text : '#0a0a0a'} size={21} />
+            </Pressable>
+          )}
           <ProductQuickViewButton
             product={product}
             icon={<ShoppingBagIcon size={20} color={dark ? theme.text : '#0a0a0a'} />}
@@ -203,9 +215,11 @@ const styles = StyleSheet.create({
   discountBadge: { backgroundColor: '#cf242c' },
   badgeText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
   favoriteButton: { position: 'absolute', right: 5, top: 5, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  similarButton: { position: 'absolute', right: 8, bottom: 52, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
   name: { minHeight: 38, fontSize: 13, lineHeight: 18 },
   priceArea: { minHeight: 22, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   listPrice: { color: '#8a857f', fontSize: 11, textDecorationLine: 'line-through' },
   price: { fontSize: 14 },
   addButton: { position: 'absolute', right: 8, bottom: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
+  disabledButton: { opacity: 0.5 },
 });
