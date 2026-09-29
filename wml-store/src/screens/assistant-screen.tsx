@@ -3,9 +3,9 @@ import type { ImagePickerAsset } from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
-	Alert,
 	Keyboard,
 	KeyboardAvoidingView,
+	Modal,
 	Platform,
 	Pressable,
 	ScrollView,
@@ -183,6 +183,7 @@ export default function AssistantScreen() {
   const [isListening, setIsListening] = useState(false);
   const [isStartingVoice, setIsStartingVoice] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const [imagePickerVisible, setImagePickerVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const sendMessageRef = useRef<(value: string) => void>(() => undefined);
   const chatBackground = colorScheme === 'dark' ? '#252b30' : '#eaeef2';
@@ -512,11 +513,12 @@ export default function AssistantScreen() {
       return;
     }
 
-    Alert.alert('Buscar por imagem', 'Escolha de onde deseja enviar a imagem.', [
-      { text: 'Câmera', onPress: () => void pickImage('camera') },
-      { text: 'Galeria', onPress: () => void pickImage('library') },
-      { text: 'Cancelar', style: 'cancel' },
-    ]);
+    setImagePickerVisible(true);
+  }
+
+  function selectImageSource(source: 'camera' | 'library') {
+    setImagePickerVisible(false);
+    void pickImage(source);
   }
 
   function clearConversation() {
@@ -677,6 +679,49 @@ export default function AssistantScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      <Modal
+        visible={imagePickerVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setImagePickerVisible(false)}>
+        <View style={styles.imagePickerBackdrop}>
+          <Pressable
+            accessibilityLabel="Fechar busca por imagem"
+            onPress={() => setImagePickerVisible(false)}
+            style={StyleSheet.absoluteFill} />
+          <View style={[styles.imagePickerCard, { backgroundColor: theme.backgroundElement }]}>
+            <ThemedText style={[styles.imagePickerTitle, { color: theme.text }]}>Buscar por imagem</ThemedText>
+            <ThemedText style={[styles.imagePickerMessage, { color: theme.textSecondary }]}>
+              Escolha de onde deseja enviar a imagem.
+            </ThemedText>
+            <View style={styles.imagePickerActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Abrir câmera"
+                onPress={() => selectImageSource('camera')}
+                style={styles.imagePickerButton}>
+                <ThemedText style={styles.imagePickerButtonText}>Tirar foto</ThemedText>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Abrir galeria"
+                onPress={() => selectImageSource('library')}
+                style={styles.imagePickerButton}>
+                <ThemedText style={styles.imagePickerButtonText}>Selecionar foto</ThemedText>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancelar busca por imagem"
+                onPress={() => setImagePickerVisible(false)}
+                style={styles.imagePickerButton}>
+                <ThemedText style={styles.imagePickerButtonText}>Cancelar</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -728,4 +773,11 @@ const styles = StyleSheet.create({
   input: { flex: 1, maxHeight: 50, paddingHorizontal: 5, paddingTop: 10, paddingBottom: 9, fontSize: 14 },
   sendButton: { width: 32, height: 32, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: AI_COLOR },
   disabledButton: { opacity: 0.45 },
+  imagePickerBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'rgba(0, 0, 0, 0.52)' },
+  imagePickerCard: { width: '100%', maxWidth: 380, padding: 30, borderRadius: 16, shadowColor: '#0a0a0a', shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  imagePickerTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  imagePickerMessage: { fontSize: 14, lineHeight: 21, marginBottom: 18 },
+  imagePickerActions: { flexDirection: 'column', gap: 8 },
+  imagePickerButton: { flex: 1, minHeight: 44, paddingHorizontal: 8, borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  imagePickerButtonText: { color: '#0a0a0a', fontSize: 12, fontWeight: '600', textAlign: 'center' },
 });

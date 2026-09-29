@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { AddedToCartModal, type AddedProductInfo } from '@/components/added-to-cart-modal';
 import { AnimatedPaginationDots } from '@/components/animated-pagination-dots';
+import { AssistantHeaderButton } from '@/components/assistant-header-button';
 import { BottomSheetHandle } from '@/components/bottom-sheet-handle';
 import { CartIconButton } from '@/components/cart-icon-button';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
@@ -1021,6 +1022,7 @@ function PdpHeader({ scrolled, onBack, onLogo, onSearch, onCart }: { scrolled: b
       </View>
       {heroMode ? <View style={styles.logoPlaceholder} /> : <Pressable accessibilityLabel="Ir para o início" onPress={onLogo} style={styles.logoButton}><HopeLogoIcon color="#0a0a0a" width={76} height={20} /></Pressable>}
       <View style={[styles.headerSide, styles.headerActions]}>
+        <AssistantHeaderButton color="#0a0a0a" size={22} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
         <Pressable accessibilityLabel="Buscar" onPress={onSearch} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
           <SearchIcon size={21} color="#0a0a0a" />
         </Pressable>
@@ -1078,9 +1080,9 @@ const styles = StyleSheet.create({
   header: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 20, elevation: 0 },
   heroHeader: { borderBottomWidth: 0, backgroundColor: 'transparent' },
   scrolledHeader: { borderBottomWidth: 1, borderBottomColor: '#ece8e2', backgroundColor: '#ffffff' },
-  headerSide: { width: 80, flexDirection: 'row', alignItems: 'center' },
-  headerActions: { justifyContent: 'flex-end', gap: Spacing.one },
-  headerButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  headerSide: { width: 102, flexDirection: 'row', alignItems: 'center' },
+  headerActions: { justifyContent: 'flex-end', gap: 0 },
+  headerButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   heroHeaderButton: { borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.62)' },
   logoButton: { minWidth: 90, minHeight: 38, alignItems: 'center', justifyContent: 'center' },
   logoPlaceholder: { minWidth: 90, minHeight: 38 },
