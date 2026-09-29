@@ -3,7 +3,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NewsletterOptIn } from '@/components/newsletter-opt-in';
@@ -15,7 +15,7 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/context/theme-context';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { useTheme } from '@/hooks/use-theme';
-import { clearAccountSession, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, subscribeAccountSession, validateVtexAccessKey } from '@/services/auth';
+import { clearAccountSession, clearRememberedLogin, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getRememberedLogin, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, saveRememberedLogin, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, subscribeAccountSession, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
 import { disableNotifications, enableNotifications, initializeNotifications, NotificationModuleUnavailableError, NotificationPermissionError } from '@/services/notifications';
@@ -24,6 +24,7 @@ import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabe
 import AppleLogoIcon from '@/components/icons/AppleLogoIcon';
 import Box01Icon from '@/components/icons/Box01Icon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
+import CloseIcon from '@/components/icons/CloseIcon';
 import EyeIcon from '@/components/icons/EyeIcon';
 import GoogleGIcon from '@/components/icons/GoogleGIcon';
 import HeartIcon from '@/components/icons/HeartIcon';
@@ -112,6 +113,8 @@ export default function AccountScreen() {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [profile, setProfile] = useState<CustomerProfile>({});
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [rememberAccess, setRememberAccess] = useState(false);
+  const [rememberHelpVisible, setRememberHelpVisible] = useState(false);
   const configuredGoogleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
   const configuredGoogleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
   const configuredGoogleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
@@ -137,6 +140,20 @@ export default function AccountScreen() {
     selectAccount: true,
   });
   const onScroll = useTabBarScroll();
+
+  useEffect(() => {
+    if (view !== 'password') return undefined;
+
+    let active = true;
+    void getRememberedLogin().then((saved) => {
+      if (!active || !saved) return;
+      setEmail((current) => current || saved.email);
+      setPassword((current) => current || saved.password);
+      setRememberAccess(true);
+    });
+
+    return () => { active = false; };
+  }, [view]);
 
   useEffect(() => {
     if (configuredGoogleWebClientId || Platform.OS !== 'web') return;
@@ -249,17 +266,35 @@ export default function AccountScreen() {
       setAuthMessage('Informe seu e-mail e sua senha.');
       return;
     }
+    const normalizedEmail = email.trim().toLowerCase();
     try {
       setAuthMessage(null);
       setLoginLoading(true);
-      await loginVtexPassword(email.trim(), password);
-      await saveAccountSession(email.trim());
+      await loginVtexPassword(normalizedEmail, password);
+      try {
+        if (rememberAccess) await saveRememberedLogin(normalizedEmail, password);
+        else await clearRememberedLogin();
+      } catch {
+        // A preferência de lembrar o acesso não deve impedir um login válido.
+      }
+      await saveAccountSession(normalizedEmail);
+      setEmail(normalizedEmail);
+      setPassword('');
       setLoggedIn(true);
       setView('home');
     } catch (error) {
       setAuthMessage(error instanceof Error ? error.message : 'Não foi possível entrar.');
     } finally {
       setLoginLoading(false);
+    }
+  }
+
+  function changeRememberAccess(value: boolean) {
+    setRememberAccess(value);
+    if (!value) {
+      setEmail('');
+      setPassword('');
+      void clearRememberedLogin().catch(() => undefined);
     }
   }
 
@@ -494,7 +529,7 @@ export default function AccountScreen() {
   const headerTitle = view === 'register' || view === 'register-code' ? 'Registrar' : view === 'register-password' ? 'Criar senha' : view === 'recovery-email' || view === 'recovery-password' ? 'Alterar senha' : 'Acesse sua conta';
   return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}><ScreenHeader title={headerTitle} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
     {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
-    {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} onForgot={() => { setAuthMessage(null); setView('recovery-email'); }} />}
+    {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} onForgot={() => { setAuthMessage(null); setView('recovery-email'); }} rememberAccess={rememberAccess} onRememberAccessChange={changeRememberAccess} rememberHelpVisible={rememberHelpVisible} onRememberHelp={() => setRememberHelpVisible(true)} onCloseRememberHelp={() => setRememberHelpVisible(false)} />}
     {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} loading={accessCodeLoading} onRegister={() => setView('register')} onPrivacy={() => router.push('/privacy-policy' as never)} message={authMessage} />}
     {view === 'code' && <CodeView email={email} code={accessCode} setCode={setAccessCode} sentAt={codeSentAt} onValidate={validateAccessCode} onResend={resendAccessCode} loading={codeLoading} resendLoading={accessCodeLoading} onBack={() => setView('email')} message={authMessage} />}
     {view === 'register' && <RegisterView email={email} setEmail={setEmail} accepted={accepted} setAccepted={setAccepted} onSend={sendRegistrationCode} loading={accessCodeLoading} message={authMessage} onBack={() => setView('access')} />}
@@ -589,36 +624,80 @@ function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, mes
     </ThemedView>
   );
 }
-function PasswordView({ email, setEmail, password, setPassword, onLogin, loading, message, onBack, onForgot }: { email: string; setEmail: (value: string) => void; password: string; setPassword: (value: string) => void; onLogin: () => void; loading: boolean; message: string | null; onBack: () => void; onForgot: () => void }) {
+function PasswordView({ email, setEmail, password, setPassword, onLogin, loading, message, onBack, onForgot, rememberAccess, onRememberAccessChange, rememberHelpVisible, onRememberHelp, onCloseRememberHelp }: { email: string; setEmail: (value: string) => void; password: string; setPassword: (value: string) => void; onLogin: () => void; loading: boolean; message: string | null; onBack: () => void; onForgot: () => void; rememberAccess: boolean; onRememberAccessChange: (value: boolean) => void; rememberHelpVisible: boolean; onRememberHelp: () => void; onCloseRememberHelp: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
+  const theme = useTheme();
 
   return (
-    <ThemedView style={styles.card}>
-      <ThemedText type="subtitle" style={styles.authTitle}>Entrar com e-mail e senha</ThemedText>
-      <ThemedText themeColor="textSecondary">Insira seu e-mail e senha abaixo</ThemedText>
-      <TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} />
-      <View style={styles.passwordInputWrap}>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Digite sua senha"
-          secureTextEntry={!showPassword}
-          style={[styles.input, styles.passwordInput]}
-        />
-        <Pressable
-          accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => setShowPassword((current) => !current)}
-          style={styles.passwordToggle}>
-          <EyeIcon color="#5d5955" size={20} off={!showPassword} />
-        </Pressable>
-      </View>
-      <Pressable disabled={loading} onPress={onForgot} style={styles.forgotButton}><ThemedText type="smallBold" style={styles.linkText}>Esqueceu a senha?</ThemedText></Pressable>
-      {!!message && <ThemedText themeColor="textSecondary" style={styles.linkTextAlert}>{message}</ThemedText>}
-      <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.primaryText}>Entrar</ThemedText>}</Pressable>
-      <Pressable onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable>
-    </ThemedView>
+    <>
+      <ThemedView style={styles.card}>
+        <ThemedText type="subtitle" style={styles.authTitle}>Entrar com e-mail e senha</ThemedText>
+        <ThemedText themeColor="textSecondary">Insira seu e-mail e senha abaixo</ThemedText>
+        <TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} />
+        <View style={styles.passwordInputWrap}>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Digite sua senha"
+            secureTextEntry={!showPassword}
+            style={[styles.input, styles.passwordInput]}
+          />
+          <Pressable
+            accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => setShowPassword((current) => !current)}
+            style={styles.passwordToggle}>
+            <EyeIcon color="#5d5955" size={20} off={!showPassword} />
+          </Pressable>
+        </View>
+        <Pressable disabled={loading} onPress={onForgot} style={styles.forgotButton}><ThemedText type="smallBold" style={styles.linkText}>Esqueceu a senha?</ThemedText></Pressable>
+        <View style={styles.rememberAccessRow}>
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityLabel="Lembrar meu acesso"
+            accessibilityState={{ checked: rememberAccess, disabled: loading }}
+            disabled={loading}
+            onPress={() => onRememberAccessChange(!rememberAccess)}
+            style={[styles.rememberSwitch, rememberAccess ? styles.rememberSwitchOn : styles.rememberSwitchOff]}>
+            <View style={styles.rememberSwitchThumb} />
+          </Pressable>
+          <ThemedText themeColor="textSecondary" style={styles.rememberAccessText}>Lembrar meu acesso</ThemedText>
+          <Pressable accessibilityLabel="Como funciona lembrar meu acesso" accessibilityRole="button" onPress={onRememberHelp} style={styles.rememberHelpButton}>
+            <ThemedText themeColor="textSecondary" style={styles.rememberHelpIcon}>?</ThemedText>
+          </Pressable>
+        </View>
+        {!!message && <ThemedText themeColor="textSecondary" style={styles.linkTextAlert}>{message}</ThemedText>}
+        <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.primaryText}>Entrar</ThemedText>}</Pressable>
+        <Pressable onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable>
+      </ThemedView>
+
+      <Modal visible={rememberHelpVisible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onCloseRememberHelp}>
+        <ThemedView style={[styles.rememberHelpScreen, { backgroundColor: theme.background }]}>
+          <SafeAreaView style={styles.rememberHelpSafeArea}>
+            <View style={styles.rememberHelpHeader}>
+              <View style={styles.rememberHelpHeaderSpacer} />
+              <Pressable accessibilityLabel="Fechar explicação sobre lembrar meu acesso" onPress={onCloseRememberHelp} style={styles.rememberHelpClose}>
+                <CloseIcon color={theme.textSecondary} size={22} />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.rememberHelpContent}>
+              <ThemedText style={styles.rememberHelpTitle}>Como funciona:</ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.rememberHelpBody}>
+                “Lembrar meu acesso” memoriza seu e-mail e senha. Ao habilitar, você não vai precisar digitar esses dados cada vez que acessar sua conta.
+              </ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.rememberHelpBody}>
+                Para sua segurança, habilite apenas em dispositivos que você tem acesso.
+              </ThemedText>
+              <ThemedText style={styles.rememberHelpTitle}>Como desabilitar:</ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.rememberHelpBody}>
+                Basta tocar em “Lembrar meu acesso” na tela de login para desativar. Ao desabilitar, você precisará digitar seu e-mail e senha quando quiser acessar o aplicativo novamente.
+              </ThemedText>
+            </ScrollView>
+          </SafeAreaView>
+        </ThemedView>
+      </Modal>
+    </>
   );
 }
 function EmailAccessView({ email, setEmail, onSend, loading, onRegister, onPrivacy, message }: { email: string; setEmail: (value: string) => void; onSend: () => void; loading: boolean; onRegister: () => void; onPrivacy: () => void; message: string | null }) {
@@ -938,6 +1017,14 @@ const styles = StyleSheet.create({
 	passwordInputWrap: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e0ddd7', flexDirection: 'row', alignItems: 'center' },
 	passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' },
 	passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+	rememberAccessRow: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, justifyContent: 'flex-start' },
+	rememberSwitch: { width: 35, height: 20, padding: 2, borderRadius: 50, justifyContent: 'center' },
+	rememberSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' },
+	rememberSwitchOff: { backgroundColor: '#e1e1e1', alignItems: 'flex-start' },
+	rememberSwitchThumb: { width: 16, height: 16, borderRadius: 50, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.16, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+	rememberAccessText: { fontSize: 13 },
+	rememberHelpButton: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+	rememberHelpIcon: { width: 16, height: 16, borderWidth: 1, borderColor: '#8c8781', borderRadius: 8, fontSize: 11, lineHeight: 14, textAlign: 'center', fontWeight: '700' },
 	readonly: { color: '#999' },
 	select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' },
 	genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
@@ -948,6 +1035,14 @@ const styles = StyleSheet.create({
 	forgotButton: { alignSelf: 'flex-start' },
 	linkText: { color: '#625d57', textDecorationLine: 'underline' },
 	linkTextAlert: { color: '#df5f5f', fontSize: 11 },
+	rememberHelpScreen: { flex: 1 },
+	rememberHelpSafeArea: { flex: 1 },
+	rememberHelpHeader: { minHeight: 58, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+	rememberHelpHeaderSpacer: { flex: 1 },
+	rememberHelpClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+	rememberHelpContent: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 32, gap: 12 },
+	rememberHelpTitle: { color: '#ef4444', fontSize: 17, lineHeight: 23, fontWeight: '700' },
+	rememberHelpBody: { fontSize: 12, lineHeight: 17 },
 	authFooter: { flexDirection: 'row', gap: Spacing.two },
 	authFooterButton: { flex: 1, minHeight: 48, justifyContent: 'center' },
 	passwordRules: { gap: Spacing.one, paddingVertical: Spacing.one },

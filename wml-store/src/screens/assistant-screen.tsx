@@ -20,6 +20,7 @@ import { AssistantInitialShowcase } from '@/components/assistant-initial-showcas
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import CameraAiIcon from '@/components/icons/CameraAiIcon';
 import CloseIcon from '@/components/icons/CloseIcon';
+import GalleryIcon from '@/components/icons/GalleryIcon';
 import MicrophoneIcon from '@/components/icons/MicrophoneIcon';
 import RefreshAiIcon from '@/components/icons/RefreshAiIcon';
 import SendAiIcon from '@/components/icons/SendAiIcon';
@@ -692,7 +693,17 @@ export default function AssistantScreen() {
             onPress={() => setImagePickerVisible(false)}
             style={StyleSheet.absoluteFill} />
           <View style={[styles.imagePickerCard, { backgroundColor: theme.backgroundElement }]}>
-            <ThemedText style={[styles.imagePickerTitle, { color: theme.text }]}>Buscar por imagem</ThemedText>
+            <View style={styles.imagePickerHeader}>
+              <ThemedText style={[styles.imagePickerTitle, { color: theme.text }]}>Buscar por imagem</ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fechar busca por imagem"
+                onPress={() => setImagePickerVisible(false)}
+                style={styles.imagePickerClose}
+              >
+                <CloseIcon color={theme.text} size={21} />
+              </Pressable>
+            </View>
             <ThemedText style={[styles.imagePickerMessage, { color: theme.textSecondary }]}>
               Escolha de onde deseja enviar a imagem.
             </ThemedText>
@@ -702,6 +713,7 @@ export default function AssistantScreen() {
                 accessibilityLabel="Abrir câmera"
                 onPress={() => selectImageSource('camera')}
                 style={styles.imagePickerButton}>
+								<CameraAiIcon color={loading ? theme.textSecondary : assistantTextColor} size={22} />
                 <ThemedText style={styles.imagePickerButtonText}>Tirar foto</ThemedText>
               </Pressable>
               <Pressable
@@ -709,13 +721,14 @@ export default function AssistantScreen() {
                 accessibilityLabel="Abrir galeria"
                 onPress={() => selectImageSource('library')}
                 style={styles.imagePickerButton}>
+                <GalleryIcon color={loading ? theme.textSecondary : assistantTextColor} size={22} />
                 <ThemedText style={styles.imagePickerButtonText}>Selecionar foto</ThemedText>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Cancelar busca por imagem"
                 onPress={() => setImagePickerVisible(false)}
-                style={styles.imagePickerButton}>
+                style={styles.imagePickerButtonCalcel}>
                 <ThemedText style={styles.imagePickerButtonText}>Cancelar</ThemedText>
               </Pressable>
             </View>
@@ -774,10 +787,13 @@ const styles = StyleSheet.create({
   sendButton: { width: 32, height: 32, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: AI_COLOR },
   disabledButton: { opacity: 0.45 },
   imagePickerBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'rgba(0, 0, 0, 0.52)' },
-  imagePickerCard: { width: '100%', maxWidth: 380, padding: 30, borderRadius: 16, shadowColor: '#0a0a0a', shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
-  imagePickerTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  imagePickerCard: { width: '100%', maxWidth: 380, padding: 20, paddingBottom: 10, borderRadius: 16, shadowColor: '#0a0a0a', shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  imagePickerHeader: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 },
+  imagePickerTitle: { flex: 1, fontSize: 18, fontWeight: '700' },
+  imagePickerClose: { position:	'absolute', top: -10, right: -10, width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
   imagePickerMessage: { fontSize: 14, lineHeight: 21, marginBottom: 18 },
   imagePickerActions: { flexDirection: 'column', gap: 8 },
-  imagePickerButton: { flex: 1, minHeight: 44, paddingHorizontal: 8, borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  imagePickerButton: { flex: 1, display: 'flex', flexDirection: 'row', gap: 8, minHeight: 44, paddingHorizontal: 18, borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 8, alignItems: 'center', justifyContent: 'flex-start', backgroundColor: '#fff' },
   imagePickerButtonText: { color: '#0a0a0a', fontSize: 12, fontWeight: '600', textAlign: 'center' },
+	imagePickerButtonCalcel: { flex: 1, display: 'flex', flexDirection: 'row', gap: 0, minHeight: 44, paddingHorizontal: 0, borderWidth: 0, borderColor: '#0a0a0a', borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
 });

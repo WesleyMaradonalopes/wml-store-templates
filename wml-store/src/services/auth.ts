@@ -8,6 +8,12 @@ type AccountSessionExpiredListener = () => void;
 
 const SESSION_KEY = 'lojahr:account-session';
 const AUTH_TOKEN_KEY = 'lojahr_vtex_user_token';
+const REMEMBERED_LOGIN_KEY = 'lojahr:remembered-login';
+
+export type RememberedLogin = {
+  email: string;
+  password: string;
+};
 
 let accountSessionCache: AccountSession | null | undefined;
 let accountSessionRequest: Promise<AccountSession | null> | null = null;
@@ -65,6 +71,30 @@ export function saveAccountSession(email: string) {
   accountSessionRequest = null;
   notifyAccountSessionChange(session);
   return setStoredJson<AccountSession>(SESSION_KEY, session);
+}
+
+export async function getRememberedLogin(): Promise<RememberedLogin | null> {
+  try {
+    const value = await SecureStore.getItemAsync(REMEMBERED_LOGIN_KEY);
+    if (!value) return null;
+
+    const parsed = JSON.parse(value) as Partial<RememberedLogin>;
+    const email = typeof parsed.email === 'string' ? parsed.email.trim().toLowerCase() : '';
+    const password = typeof parsed.password === 'string' ? parsed.password : '';
+    return email && password ? { email, password } : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveRememberedLogin(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !password) return;
+  await SecureStore.setItemAsync(REMEMBERED_LOGIN_KEY, JSON.stringify({ email: normalizedEmail, password }));
+}
+
+export async function clearRememberedLogin() {
+  await SecureStore.deleteItemAsync(REMEMBERED_LOGIN_KEY);
 }
 
 export function clearAccountSession() {

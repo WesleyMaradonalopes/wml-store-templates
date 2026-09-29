@@ -249,6 +249,7 @@ export default function SearchScreen() {
     setActiveQuery(value);
     setSuggestions([]);
     setListingResolution(null);
+    setSearchOpen(false);
   }
 
   function search() {
@@ -318,6 +319,7 @@ export default function SearchScreen() {
     setActiveQuery(value);
     setSuggestions([]);
     setListingResolution(null);
+    setSearchOpen(false);
   }
 
   function selectSuggestion(value: string) {
@@ -329,6 +331,7 @@ export default function SearchScreen() {
     setActiveQuery(value);
     setSuggestions([]);
     setListingResolution(null);
+    setSearchOpen(false);
   }
 
   async function loadMore() {

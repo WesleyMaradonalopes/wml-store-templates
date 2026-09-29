@@ -34,7 +34,7 @@ export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack
   const router = useRouter();
   const theme = useTheme();
   const goBack = onBack ?? (() => router.back());
-  const assistantHidden = ['/account', '/checkout', '/search', '/coupons', '/returns', '/privacy-policy', '/stores', '/page', '/assistant']
+  const assistantHidden = ['/account', '/checkout', '/coupons', '/returns', '/privacy-policy', '/stores', '/page', '/assistant']
     .some((route) => pathname === route || pathname.startsWith(`${route}/`));
   return (
     <View style={styles.header}>
