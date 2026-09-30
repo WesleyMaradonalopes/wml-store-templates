@@ -1,7 +1,3 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator as NativeActivityIndicator, Image, ScrollView, StyleSheet, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { OrderStatusBadge } from '@/components/order-status-badge';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -9,6 +5,10 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { CustomerOrder, CustomerOrderBundleItem, CustomerOrderItem, getCustomerOrder } from '@/services/orders';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Image, ActivityIndicator as NativeActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ActivityIndicator = () => <NativeActivityIndicator color="#0a0a0a" />;
 
@@ -42,7 +42,24 @@ export default function OrderDetailsScreen() {
   useEffect(() => { if (id) getCustomerOrder(id).then(setOrder).catch((value) => setError(value instanceof Error ? value.message : 'Não foi possível carregar o pedido.')); }, [id]);
   const address = order?.shippingData && typeof order.shippingData === 'object' ? (order.shippingData as { address?: Address }).address : undefined;
   const payment = order?.paymentData && typeof order.paymentData === 'object' ? (order.paymentData as { transactions?: Array<{ payments?: Payment[] }> }).transactions?.[0]?.payments?.[0] : undefined;
-  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Meus Pedidos" />{!order && !error && <ActivityIndicator />}{!!error && <OrderText secondary>{error}</OrderText>}{order && <ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}><View style={styles.orderHeader}><OrderText label>PEDIDO</OrderText><OrderText>{order.orderId}</OrderText><OrderStatusBadge status={order.status} statusDescription={order.statusDescription} style={styles.status} /></View><OrderText label>Data do pedido</OrderText><OrderText secondary>{order.creationDate ? new Date(order.creationDate).toLocaleDateString('pt-BR') : 'Não informada'}</OrderText><OrderText label>Endereço</OrderText><OrderText secondary>{address ? `${address.street || ''}, ${address.number || ''}${address.complement ? ` - ${address.complement}` : ''}\n${address.neighborhood || ''} - ${address.city || ''}, ${address.state || ''} - ${address.postalCode || ''}` : 'Endereço não informado'}</OrderText><OrderText label>Forma de pagamento</OrderText><OrderText secondary>{payment?.paymentSystemName || 'Não informada'}{payment?.installments ? ` (${payment.installments}x)` : ''} · {money(payment?.value ?? order.value ?? order.totalValue)}</OrderText><OrderText label>Entrega</OrderText><OrderText secondary>{order.shippingData ? 'Informações de entrega disponíveis no pedido' : 'Entrega não informada'}</OrderText><OrderText label>Resumo</OrderText><View style={styles.row}><OrderText secondary>Total dos itens:</OrderText><OrderText>{money(total(order, ['item']))}</OrderText></View><View style={styles.row}><OrderText secondary>Total do frete:</OrderText><OrderText>{money(total(order, ['frete', 'shipping']))}</OrderText></View><View style={styles.totalRow}><OrderText label>Total:</OrderText><OrderText label>{money(order.value ?? order.totalValue)}</OrderText></View><View style={styles.divider} />{(order.items ?? []).map((item, index) => <OrderItemRow key={`${item.name}-${index}`} item={item} index={index} />)}</ScrollView>}</SafeAreaView></ThemedView>;
+  return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Meus Pedidos" />{!order && !error && <ActivityIndicator />}{!!error && <OrderText secondary>{error}</OrderText>}{order && <ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}><View style={styles.orderCard}><View style={styles.orderHeader}><OrderText label>PEDIDO</OrderText><OrderText>{order.orderId}</OrderText><OrderStatusBadge status={order.status} statusDescription={order.statusDescription} style={styles.status} /></View><OrderText label>Data do pedido</OrderText><OrderText secondary>{order.creationDate ? new Date(order.creationDate).toLocaleDateString('pt-BR') : 'Não informada'}</OrderText><OrderText label>Endereço</OrderText><OrderText secondary>{address ? `${address.street || ''}, ${address.number || ''}${address.complement ? ` - ${address.complement}` : ''}\n${address.neighborhood || ''} - ${address.city || ''}, ${address.state || ''} - ${address.postalCode || ''}` : 'Endereço não informado'}</OrderText><OrderText label>Forma de pagamento</OrderText><OrderText secondary>{payment?.paymentSystemName || 'Não informada'}{payment?.installments ? ` (${payment.installments}x)` : ''} · {money(payment?.value ?? order.value ?? order.totalValue)}</OrderText><OrderText label>Entrega</OrderText><OrderText secondary>{order.shippingData ? 'Informações de entrega disponíveis no pedido' : 'Entrega não informada'}</OrderText><OrderText label>Resumo</OrderText><View style={styles.row}><OrderText secondary>Total dos itens:</OrderText><OrderText>{money(total(order, ['item']))}</OrderText></View><View style={styles.row}><OrderText secondary>Total do frete:</OrderText><OrderText>{money(total(order, ['frete', 'shipping']))}</OrderText></View><View style={styles.totalRow}><OrderText label>Total:</OrderText><OrderText label>{money(order.value ?? order.totalValue)}</OrderText></View><View style={styles.divider} />{(order.items ?? []).map((item, index) => <OrderItemRow key={`${item.name}-${index}`} item={item} index={index} />)}</View></ScrollView>}</SafeAreaView></ThemedView>;
 }
 
-const styles = StyleSheet.create({ container: { flex: 1 }, safeArea: { flex: 1, padding: Spacing.four }, content: { gap: Spacing.three, paddingVertical: Spacing.five, paddingBottom: 100 }, orderHeader: { paddingBottom: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#dedbd5', position: 'relative' }, orderText: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16 }, orderLabel: { fontFamily: Fonts.bold, fontSize: 12, lineHeight: 16, fontWeight: '700' }, status: { position: 'absolute', right: 0, top: 0 }, row: { flexDirection: 'row', justifyContent: 'space-between' }, totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.three, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#dedbd5' }, divider: { height: 1, backgroundColor: '#dedbd5' }, item: { flexDirection: 'row', gap: Spacing.two, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#eee' }, serviceItem: { flexDirection: 'row', gap: Spacing.two, marginLeft: Spacing.five, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#eee' }, image: { width: 44, height: 58, borderRadius: 3, resizeMode: 'cover' }, serviceImage: { width: 36, height: 44, borderRadius: 3 }, placeholder: { backgroundColor: '#e8e8ea' }, itemInfo: { flex: 1 } });
+const styles = StyleSheet.create({
+	container: { flex: 1 },
+	safeArea: { flex: 1, padding: Spacing.four },
+	content: { gap: Spacing.three, paddingVertical: Spacing.five, paddingBottom: 100 },
+	orderCard: { gap: Spacing.three, padding: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e2dc' },
+	orderHeader: { paddingBottom: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#dedbd5', position: 'relative' },
+	orderText: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16 },
+	orderLabel: { fontFamily: Fonts.bold, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+	status: { position: 'absolute', right: 0, top: 0 },
+	row: { flexDirection: 'row', justifyContent: 'space-between' },
+	totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.three, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#dedbd5' },
+	divider: { height: 1, backgroundColor: '#dedbd5' },
+	item: { flexDirection: 'row', gap: Spacing.two, paddingVertical: 0, borderBottomWidth: 0, borderBottomColor: '#eee' },
+	serviceItem: { flexDirection: 'row', gap: Spacing.two, marginLeft: Spacing.five, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#eee' },
+	image: { width: 44, height: 58, borderRadius: 3, resizeMode: 'cover' },
+	serviceImage: { width: 36, height: 44, borderRadius: 3 },
+	placeholder: { backgroundColor: '#e8e8ea' },
+	itemInfo: { flex: 1 } });

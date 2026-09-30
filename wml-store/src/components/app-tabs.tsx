@@ -42,7 +42,7 @@ function TabButton({ children, icon, isFocused, settings, ...props }: TabTrigger
         {icon === 'bag' && <ShoppingBagIcon color={iconColor} size={16} />}
         {icon === 'account' && <UserIcon color={iconColor} size={16} />}
         {icon === 'category' && <CategoryGridIcon color={iconColor} size={16} />}
-        <ThemedText style={[styles.tabLabel, { color: textColor }]}>{children}</ThemedText>
+        <ThemedText numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} allowFontScaling={false} style={[styles.tabLabel, { color: textColor }]}>{children}</ThemedText>
       </View>
     </Pressable>
   );
@@ -60,10 +60,10 @@ function FloatingTabList({ hidden, settings, ...props }: TabListProps & { hidden
 const styles = StyleSheet.create({
   outer: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: Spacing.three },
   inner: { width: '100%', maxWidth: 520, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 5, paddingHorizontal: 5, borderRadius: 30, shadowColor: '#0a0a0a', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
-  tabButton: { flex: 1 },
-  tabButtonView: { minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingVertical: 3, paddingHorizontal: 2, borderRadius: 22 },
+  tabButton: { flex: 1, minWidth: 0 },
+  tabButtonView: { width: '100%', minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingVertical: 3, paddingHorizontal: 2, borderRadius: 22 },
   selectedTabButton: { borderRadius: 22 },
-  tabLabel: { fontSize: 9, lineHeight: 11, marginTop: 1 },
+  tabLabel: { width: '100%', flexShrink: 1, textAlign: 'center', fontSize: 9, lineHeight: 12, marginTop: 1 },
   pressed: { opacity: 0.65 },
   hidden: { display: 'none' },
 });

@@ -46,7 +46,7 @@ export default function GlobalTabBar() {
                 {item.icon === 'favorite' && <HeartIcon color={iconColor} size={23} />}
                 {item.icon === 'bag' && <View style={styles.bagIcon}><ShoppingBagIcon color={iconColor} size={20} /><CartCountBadge count={cartCount} variant="bottomTab" backgroundColor={bottomTabSettings.badgeBackgroundColor} textColor={bottomTabSettings.badgeTextColor} /></View>}
                 {item.icon === 'account' && <UserIcon color={iconColor} size={20} />}
-                <ThemedText style={[styles.label, { color: textColor }]}>{item.label}</ThemedText>
+                <ThemedText numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} allowFontScaling={false} style={[styles.label, { color: textColor }]}>{item.label}</ThemedText>
               </View>
             </Pressable>
           );
@@ -59,10 +59,10 @@ export default function GlobalTabBar() {
 const styles = StyleSheet.create({
   outer: { position: 'absolute', left:0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: Spacing.three },
   inner: { width: '100%', maxWidth: 520, flexDirection: 'row', padding: 6, borderRadius: 50, shadowColor: '#0a0a0a', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
-  tabButton: { flex: 1 },
-  tabButtonView: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+  tabButton: { flex: 1, minWidth: 0 },
+  tabButtonView: { width: '100%', minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   selected: { borderRadius: 22 },
-  label: { fontSize: 10, lineHeight: 10, marginTop: 1 },
+  label: { width: '100%', flexShrink: 1, textAlign: 'center', fontSize: 9, lineHeight: 12, marginTop: 1 },
   bagIcon: { width: 22, height: 22, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   hidden: { display: 'none' },
 });

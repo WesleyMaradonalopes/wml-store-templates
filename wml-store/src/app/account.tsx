@@ -538,7 +538,7 @@ export default function AccountScreen() {
   };
 
   const headerTitle = view === 'register' || view === 'register-code' ? 'Registrar' : view === 'register-password' ? 'Criar senha' : view === 'recovery-email' || view === 'recovery-password' ? 'Alterar senha' : 'Acesse sua conta';
-  return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}><ScreenHeader title={headerTitle} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
+  return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, styles.authSafeArea]}><ScreenHeader title={headerTitle} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
     {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
     {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} onForgot={() => { setAuthMessage(null); setView('recovery-email'); }} rememberAccess={rememberAccess} onRememberAccessChange={changeRememberAccess} rememberHelpVisible={rememberHelpVisible} onRememberHelp={() => setRememberHelpVisible(true)} onCloseRememberHelp={() => setRememberHelpVisible(false)} />}
     {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} loading={accessCodeLoading} onRegister={() => setView('register')} onPrivacy={() => router.push('/privacy-policy' as never)} message={authMessage} />}
@@ -996,6 +996,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
 const styles = StyleSheet.create({
   container: { flex: 1 },
 	safeArea: { flex: 1, padding: 30, backgroundColor: '#ffffff' },
+	authSafeArea: { backgroundColor: '#eeeeee' },
 	accountScreen: { flex: 1, position: 'relative' },
 	accountScroll: { flex: 1 },
 	themeToggleAbove: { position: 'absolute', top: -15, right: 0, zIndex: 2 },
