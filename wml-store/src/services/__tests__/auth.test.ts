@@ -63,4 +63,24 @@ describe('authenticated session requests', () => {
     expect((await auth.getAccountSession())?.email).toBe('user@example.com');
     expect(await auth.getVtexUserToken()).toBe('valid-token');
   });
+
+  it('keeps remembered login credentials separate from the account session', async () => {
+    await auth.saveRememberedLogin(' USER@EXAMPLE.COM ', 'secret-password');
+
+    expect(await auth.getRememberedLogin()).toEqual({
+      email: 'user@example.com',
+      password: 'secret-password',
+    });
+
+    await auth.saveAccountSession('user@example.com');
+    await auth.clearAccountSession();
+
+    expect(await auth.getRememberedLogin()).toEqual({
+      email: 'user@example.com',
+      password: 'secret-password',
+    });
+
+    await auth.clearRememberedLogin();
+    expect(await auth.getRememberedLogin()).toBeNull();
+  });
 });

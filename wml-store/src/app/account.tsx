@@ -2,7 +2,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -140,20 +140,30 @@ export default function AccountScreen() {
     selectAccount: true,
   });
   const onScroll = useTabBarScroll();
+  const rememberedLoginLoad = useRef(0);
 
-  useEffect(() => {
+  const loadRememberedAccess = useCallback(async () => {
+    const loadId = rememberedLoginLoad.current + 1;
+    rememberedLoginLoad.current = loadId;
+    const saved = await getRememberedLogin();
+    if (loadId !== rememberedLoginLoad.current) return;
+
+    if (!saved) {
+      setRememberAccess(false);
+      return;
+    }
+
+    setEmail(saved.email);
+    setPassword(saved.password);
+    setRememberAccess(true);
+  }, []);
+
+  useFocusEffect(useCallback(() => {
     if (view !== 'password') return undefined;
 
-    let active = true;
-    void getRememberedLogin().then((saved) => {
-      if (!active || !saved) return;
-      setEmail((current) => current || saved.email);
-      setPassword((current) => current || saved.password);
-      setRememberAccess(true);
-    });
-
-    return () => { active = false; };
-  }, [view]);
+    void loadRememberedAccess();
+    return () => { rememberedLoginLoad.current += 1; };
+  }, [loadRememberedAccess, view]));
 
   useEffect(() => {
     if (configuredGoogleWebClientId || Platform.OS !== 'web') return;
@@ -290,6 +300,7 @@ export default function AccountScreen() {
   }
 
   function changeRememberAccess(value: boolean) {
+    rememberedLoginLoad.current += 1;
     setRememberAccess(value);
     if (!value) {
       setEmail('');
@@ -1018,13 +1029,13 @@ const styles = StyleSheet.create({
 	passwordInput: { flex: 1, paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' },
 	passwordToggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 	rememberAccessRow: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, justifyContent: 'flex-start' },
-	rememberSwitch: { width: 35, height: 20, padding: 2, borderRadius: 50, justifyContent: 'center' },
+	rememberSwitch: { width: 30, height: 18, padding: 2, borderRadius: 50, justifyContent: 'center' },
 	rememberSwitchOn: { backgroundColor: '#0a0a0a', alignItems: 'flex-end' },
 	rememberSwitchOff: { backgroundColor: '#e1e1e1', alignItems: 'flex-start' },
-	rememberSwitchThumb: { width: 16, height: 16, borderRadius: 50, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.16, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+	rememberSwitchThumb: { width: 14, height: 14, borderRadius: 50, backgroundColor: '#ffffff', shadowColor: '#0a0a0a', shadowOpacity: 0.16, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
 	rememberAccessText: { fontSize: 13 },
-	rememberHelpButton: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
-	rememberHelpIcon: { width: 16, height: 16, borderWidth: 1, borderColor: '#8c8781', borderRadius: 8, fontSize: 11, lineHeight: 14, textAlign: 'center', fontWeight: '700' },
+	rememberHelpButton: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 50 },
+	rememberHelpIcon: { width: 14, height: 14, borderWidth: 1, borderColor: '#8c8781', borderRadius: 8, fontSize: 11, lineHeight: 13, textAlign: 'center', fontWeight: '700' },
 	readonly: { color: '#999' },
 	select: { padding: Spacing.three, borderRadius: 8, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cfc8bd', flexDirection: 'row', justifyContent: 'space-between' },
 	genderDropdownIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
