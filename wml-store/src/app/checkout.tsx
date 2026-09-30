@@ -8,10 +8,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { BottomSheetHandle } from '@/components/bottom-sheet-handle';
+import { CartIconButton } from '@/components/cart-icon-button';
 import { ProductShelf } from '@/components/cms-section';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CreditCardIcon from '@/components/icons/CreditCardIcon';
 import EyeIcon from '@/components/icons/EyeIcon';
+import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import StoreIcon from '@/components/icons/StoreIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
@@ -108,6 +110,15 @@ function validCpf(value: string) {
   return calculateDigit(9) === Number(cpf[9]) && calculateDigit(10) === Number(cpf[10]);
 }
 function money(value: number) { return 'R$ ' + value.toFixed(2).replace('.', ','); }
+function formatOrderDate(date = new Date()) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date).replace(',', ' às');
+}
 function formatPhone(value: string) {
   const normalized = formatPhoneInput(value);
   return normalized ? '+55' + normalized : '';
@@ -435,6 +446,7 @@ export default function CheckoutScreen() {
   const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>([]);
   const [addressSelectionOpen, setAddressSelectionOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [reviewItemsExpanded, setReviewItemsExpanded] = useState(false);
   const [orderResult, setOrderResult] = useState<CheckoutOrderResult | null>(null);
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState(CONFIGURED_RECAPTCHA_SITE_KEY);
   const recaptchaRef = useRef<RecaptchaHandle>(null);
@@ -1661,6 +1673,41 @@ export default function CheckoutScreen() {
     setStep('review');
   }
 
+  function continueWithSelectedPayment() {
+    if (!orderForm || saving) return;
+    const paymentMethods = orderForm.paymentData?.paymentSystems ?? [];
+    const explicitlySelected = selectedPayment
+      ? paymentMethods.find((method) => method.id === selectedPayment)
+      : undefined;
+    const paymentMethod = explicitlySelected
+      ?? paymentMethods.find(isCardPayment)
+      ?? paymentMethods.find(isPixPayment)
+      ?? paymentMethods.find(isGiftCardPayment);
+
+    if (!paymentMethod?.id) {
+      setMessage('Nenhuma forma de pagamento está disponível para este carrinho.');
+      return;
+    }
+
+    setMessage('');
+    if (isCardPayment(paymentMethod)) {
+      openCardPayment(paymentMethod);
+      return;
+    }
+    if (isPixPayment(paymentMethod)) {
+      void choosePayment(paymentMethod.id, paymentMethod.name || 'Pix');
+      return;
+    }
+    if (isGiftCardPayment(paymentMethod)) {
+      setSelectedPayment(paymentMethod.id);
+      setSelectedPaymentLabel(paymentMethod.name || 'Vale presente');
+      setSelectedInstallment(null);
+      continueWithGiftCard();
+      return;
+    }
+    void choosePayment(paymentMethod.id, paymentMethod.name || 'Pagamento');
+  }
+
   async function removeVoucher(giftCard: GiftCard) {
     const redemptionCode = giftCard.redemptionCode.trim();
     const removalKey = redemptionCode || giftCard.id || '';
@@ -1802,16 +1849,23 @@ export default function CheckoutScreen() {
       />;
     }
     if (isCompleted) {
-      return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Pedido concluído" onBack={() => router.replace('/')} showSearch={false} showCart /><ScrollView contentContainerStyle={[styles.content, styles.orderSuccessContent]}>
-        <View style={styles.orderSuccessCard}>
-          <View style={styles.orderSuccessIcon}><ThemedText style={styles.orderSuccessCheck}>✓</ThemedText></View>
-          <ThemedText style={styles.orderSuccessTitle}>Pronto, compra feita!</ThemedText>
-          <ThemedText style={styles.orderSuccessDescription}>Enviamos uma confirmação com os detalhes do seu pedido para seu e-mail.</ThemedText>
-          <ThemedText style={styles.orderSuccessLabel}>Seu código de pedido é</ThemedText>
-          <ThemedText style={styles.orderSuccessId}>{orderResult.orderId || orderResult.orderGroup}</ThemedText>
-          {!!orderResult.message && <ThemedText style={styles.orderSuccessDescription}>{orderResult.message}</ThemedText>}
-        </View>
-      </ScrollView><View style={styles.fixedFooter}><Primary title="Ver meus pedidos" onPress={() => { void openOrdersAfterCheckout(); }} /><Secondary title="Voltar ao início" onPress={() => router.replace('/')} /></View></SafeAreaView></ThemedView>;
+      return <OrderSuccessScreen
+        orderId={orderResult.orderId || orderResult.orderGroup}
+        email={email}
+        fullName={`${firstName} ${lastName}`.trim()}
+        document={document}
+        phone={phone}
+        receiverName={receiverName}
+        street={street}
+        number={number}
+        complement={complement}
+        neighborhood={neighborhood}
+        city={city}
+        state={state}
+        postalCode={postalCode}
+        onOrders={() => { void openOrdersAfterCheckout(); }}
+        onHome={() => router.replace('/')}
+      />;
     }
     const title = isPending ? 'Pagamento pendente' : 'Pagamento não autorizado';
     return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title="Resultado do pedido" onBack={() => router.replace('/')} showSearch={false} showCart /><ScrollView contentContainerStyle={styles.content}>
@@ -1926,7 +1980,13 @@ export default function CheckoutScreen() {
   const appliedGiftCards = activeGiftCards(orderForm);
   const giftCardRemainingAmount = paymentAmountAfterGiftCards(orderForm);
   const selectedPaymentMethod = selectedPayment ? payments.find((method) => method.id === selectedPayment) : undefined;
-  const selectedPaymentIsGiftCard = Boolean(selectedPaymentMethod && isGiftCardPayment(selectedPaymentMethod))
+  const selectedPaymentOption = selectedPaymentMethod
+    ?? cardMethod
+    ?? pixMethod
+    ?? payments.find(isGiftCardPayment);
+  const cardPaymentSelected = Boolean(selectedPaymentOption && isCardPayment(selectedPaymentOption));
+  const pixPaymentSelected = Boolean(selectedPaymentOption && isPixPayment(selectedPaymentOption));
+  const selectedPaymentIsGiftCard = Boolean(selectedPaymentOption && isGiftCardPayment(selectedPaymentOption))
     || selectedPaymentLabel.toLowerCase().includes('vale');
   const title: Record<Step, string> = { cart: 'Carrinho', email: 'Dados pessoais', customer: 'Dados pessoais', address: 'Entrega', shipping: 'Entrega', payment: 'Pagamento', card: 'Cartão de crédito', installments: 'Parcelamento', review: 'Revise e confirme' };
   const customerErrors = getCustomerErrors();
@@ -1965,7 +2025,7 @@ export default function CheckoutScreen() {
     {step === 'address' && (addressSaved && !editingAddress ? <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><ThemedText style={styles.bodyText}>{receiverName}</ThemedText><ThemedText style={styles.bodyText}>{street + ', ' + number + (complement ? ' - ' + complement : '')}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ' - ' + city + '/' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText><Pressable onPress={openAddressSelection}><ThemedText style={styles.link}>{customerAddresses.length > 1 ? 'Alterar ou escolher outro endereço' : 'Alterar endereço'}</ThemedText></Pressable></Card> : <Card><ThemedText style={styles.cardTitle}>Endereço de entrega</ThemedText><Field label="CEP" value={postalCode} setValue={lookupCep} required placeholder="00000-000" keyboardType="numeric" error={addressValidationAttempted ? addressErrors.postalCode : ''} /><Field label="Endereço" value={street} setValue={setStreet} required placeholder="Endereço" error={addressValidationAttempted ? addressErrors.street : ''} /><View style={styles.inline}><Field label="Número" value={number} setValue={setNumber} required placeholder="Número" error={addressValidationAttempted ? addressErrors.number : ''} /><Field label="Complemento" value={complement} setValue={setComplement} placeholder="Complemento" /></View><Field label="Bairro" value={neighborhood} setValue={setNeighborhood} required placeholder="Bairro" error={addressValidationAttempted ? addressErrors.neighborhood : ''} /><View style={styles.inline}><Field label="Cidade" value={city} setValue={setCity} required placeholder="Cidade" error={addressValidationAttempted ? addressErrors.city : ''} /><Field label="Estado" value={state} setValue={setState} required placeholder="Estado" error={addressValidationAttempted ? addressErrors.state : ''} /></View><Field label="Quem irá receber?" value={receiverName} setValue={setReceiverName} required placeholder="Nome do recebedor" error={addressValidationAttempted ? addressErrors.receiverName : ''} />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</Card>)}
      {step === 'payment' && <>
        <ThemedText style={styles.pageTitle}>Escolha como pagar</ThemedText>
-       <Pressable disabled={saving} onPress={() => cardMethod ? openCardPayment(cardMethod) : setMessage('Cartão de crédito não está disponível para este carrinho.')} style={styles.paymentCard}>
+       <Pressable accessibilityState={{ selected: cardPaymentSelected }} disabled={saving} onPress={() => cardMethod ? openCardPayment(cardMethod) : setMessage('Cartão de crédito não está disponível para este carrinho.')} style={[styles.paymentCard, cardPaymentSelected && styles.paymentCardSelected]}>
          <View style={styles.paymentHeader}><CreditCardIcon color="#0a0a0a" size={21} /><ThemedText style={styles.sectionTitle}>Cartão de Crédito</ThemedText></View>
          <View style={styles.paymentDivider} />
          <ThemedText style={styles.bodyText} themeColor="textSecondary">+ novo cartão</ThemedText>
@@ -1983,6 +2043,7 @@ export default function CheckoutScreen() {
           voucherMessage={voucherMessage}
           voucherMessageType={voucherMessageType}
           onContinue={continueWithGiftCard}
+          selected={selectedPaymentIsGiftCard}
           giftCardAvailability={giftCardAvailability}
           giftCardIdentityVerified={giftCardIdentityVerified}
           giftCardCreditsHidden={giftCardCreditsHidden}
@@ -1993,11 +2054,12 @@ export default function CheckoutScreen() {
           onApplyAvailableGiftCard={(giftCard) => { void applyAvailableGiftCard(giftCard); }}
         />
        {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.errorText}>{message}</ThemedText>}
-       <Pressable disabled={saving} onPress={() => pixMethod ? choosePayment(pixMethod.id, pixMethod.name || 'Pix') : setMessage('Pix não está disponível para este carrinho.')} style={styles.paymentCard}>
+       <Pressable accessibilityState={{ selected: pixPaymentSelected }} disabled={saving} onPress={() => pixMethod ? choosePayment(pixMethod.id, pixMethod.name || 'Pix') : setMessage('Pix não está disponível para este carrinho.')} style={[styles.paymentCard, pixPaymentSelected && styles.paymentCardSelected]}>
          <ThemedText style={styles.sectionTitle}>Pix</ThemedText>
          <ThemedText style={styles.bodyText} themeColor="textSecondary">Pagamento instantâneo</ThemedText>
          <View style={styles.pixInfo}><PaymentBrandIcon brand="pix" width={58} height={30} /><ThemedText style={styles.bodyText} themeColor="textSecondary">O código Pix será exibido na próxima etapa, após a revisão do seu pedido.</ThemedText></View>
        </Pressable>
+       <Summary orderForm={orderForm} shippingPrice={selectedShipping?.price} />
      </>}
       {step === 'card' && <><CreditCardVisual brand={activeCardBrand} cardNumber={cardNumber} holderName={cardHolder} expiry={cardExpiry} cvv={cardCvv} /><Card><Field label="Número do cartão" value={cardNumber} setValue={(value) => setCardNumber(formatCardNumber(value))} required placeholder="Insira o número do seu cartão" keyboardType="numeric" accessory={activeCardBrand !== 'generic' ? <PaymentBrandIcon brand={activeCardBrand} width={42} height={27} /> : undefined} error={cardValidationAttempted ? cardErrors.number : ''} /><Field label="Nome impresso no cartão" value={cardHolder} setValue={setCardHolder} required placeholder="Nome impresso no cartão" error={cardValidationAttempted ? cardErrors.holder : ''} /><View style={styles.inline}><Field label="Validade" value={cardExpiry} setValue={(value) => setCardExpiry(formatExpiry(value))} required placeholder="MM/AA" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.expiry : ''} /><Field label="CVV" value={cardCvv} setValue={setCardCvv} required placeholder="CVV" keyboardType="numeric" error={cardValidationAttempted ? cardErrors.cvv : ''} /></View><ThemedText style={styles.cardTitle}>Endereço de cobrança</ThemedText><Pressable onPress={() => undefined} style={styles.billingRow}><View style={styles.billingCheckbox}><ThemedText style={styles.billingCheck}>✓</ThemedText></View><ThemedText style={styles.billingText}>O endereço da fatura é {street + ', ' + number + ' - ' + neighborhood + ', ' + city + ' - ' + state}</ThemedText></Pressable></Card><AcceptedBrands />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</>}
       {step === 'review' && <>
@@ -2016,7 +2078,7 @@ export default function CheckoutScreen() {
            <ThemedText style={styles.sectionTitle}>{selectedPickup ? 'Loja para retirada' : 'Endereço de Entrega'}</ThemedText>
            {selectedPickup ? pickupAddressLines(selectedPickup).map((line, index) => <ThemedText key={line + index} style={styles.bodyText}>{line}</ThemedText>) : <><ThemedText style={styles.bodyText}>{street + ', ' + number}</ThemedText><ThemedText style={styles.bodyText}>{neighborhood + ', ' + city + ' - ' + state}</ThemedText><ThemedText style={styles.bodyText}>CEP: {postalCode}</ThemedText></>}
          </View>
-          <View style={styles.reviewItems}>{orderForm.items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}><CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.reviewItemImage} /><View style={styles.reviewItemDetails}><ThemedText style={styles.reviewItemName}>{item.name}</ThemedText><ThemedText style={styles.reviewItemQuantity}>{item.quantity + ' un.'}</ThemedText></View></View>)}</View>
+          <ReviewItemsDisclosure items={orderForm.items} expanded={reviewItemsExpanded} onToggle={() => setReviewItemsExpanded((current) => !current)} />
          <Pressable onPress={() => setStep('shipping')}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable>
        </Card>
        <Card>
@@ -2031,7 +2093,7 @@ export default function CheckoutScreen() {
        </Card>
        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
      </>}
-  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><Pressable accessibilityLabel="Fechar confirmação de remoção" onPress={() => setPendingRemoval(null)} style={StyleSheet.absoluteFill} /><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover <ThemedText style={styles.modalTitleProduct}>{pendingRemoval?.name}</ThemedText> do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><GiftCardIdentityModal visible={giftCardIdentityVisible} checkoutEmail={email} onClose={() => setGiftCardIdentityVisible(false)} onAuthenticated={completeGiftCardIdentity} /><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
+  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><Pressable accessibilityLabel="Fechar confirmação de remoção" onPress={() => setPendingRemoval(null)} style={StyleSheet.absoluteFill} /><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover <ThemedText style={styles.modalTitleProduct}>{pendingRemoval?.name}</ThemedText> do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><GiftCardIdentityModal visible={giftCardIdentityVisible} checkoutEmail={email} onClose={() => setGiftCardIdentityVisible(false)} onAuthenticated={completeGiftCardIdentity} /><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'payment' && <Primary title={saving ? 'Continuando...' : 'Continuar'} onPress={continueWithSelectedPayment} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
 }
 
 function cardGradient(brand: PaymentBrand): [string, string, string] {
@@ -2262,6 +2324,88 @@ function PixPaymentScreen({
   </ThemedView>;
 }
 
+function OrderSuccessScreen({
+  orderId,
+  email,
+  fullName,
+  document,
+  phone,
+  receiverName,
+  street,
+  number,
+  complement,
+  neighborhood,
+  city,
+  state,
+  postalCode,
+  onOrders,
+  onHome,
+}: {
+  orderId: string;
+  email: string;
+  fullName: string;
+  document: string;
+  phone: string;
+  receiverName: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  onOrders: () => void;
+  onHome: () => void;
+}) {
+  const displayOrderId = orderId.startsWith('#') ? orderId : `#${orderId}`;
+  const infoRow = (value: string, key: string) => <ThemedText key={key} style={styles.orderSuccessInfo}>{value || 'Não informado'}</ThemedText>;
+
+  return <ThemedView style={styles.container}>
+    <SafeAreaView style={styles.orderSuccessSafeArea}>
+      <View style={styles.orderSuccessHeader}>
+        <HopeLogoIcon color="#0a0a0a" width={88} height={23} />
+        <CartIconButton color="#0a0a0a" />
+      </View>
+      <ScrollView contentContainerStyle={styles.orderSuccessContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.orderSuccessMessageCard}>
+          <View style={styles.orderSuccessIcon}><ThemedText style={styles.orderSuccessCheck}>✓</ThemedText></View>
+          <ThemedText style={styles.orderSuccessTitle}>Obrigada por sua compra!</ThemedText>
+          <ThemedText style={styles.orderSuccessDescription}>
+            Em até 5 minutos, vamos mandar um e-mail para {email || 'seu e-mail'} com todos os detalhes do seu pedido.{`\n`}Confira a caixa de spam ou aba de promoções.
+          </ThemedText>
+        </View>
+
+        <View style={styles.orderSuccessDetailsCard}>
+          <ThemedText style={styles.orderSuccessSectionTitle}>Pedido</ThemedText>
+          <ThemedText style={styles.orderSuccessId}>{displayOrderId}</ThemedText>
+          <ThemedText style={styles.orderSuccessMeta}>Realizado em {formatOrderDate()}</ThemedText>
+          <Pressable onPress={onOrders} style={styles.orderSuccessOrdersButton}><ThemedText style={styles.orderSuccessOrdersButtonText}>Ver meus pedidos</ThemedText></Pressable>
+
+          <View style={styles.orderSuccessDivider} />
+          <View style={styles.orderSuccessSectionHeader}><UserIcon color="#0a0a0a" size={19} /><ThemedText style={styles.orderSuccessSectionTitle}>Dados pessoais</ThemedText></View>
+          <View style={styles.orderSuccessInfoList}>
+            {infoRow(email, 'email')}
+            {infoRow(fullName, 'name')}
+            {infoRow(document, 'document')}
+            {infoRow(formatPhoneWithoutCountryCode(phone), 'phone')}
+          </View>
+
+          <View style={styles.orderSuccessDivider} />
+          <View style={styles.orderSuccessSectionHeader}><TruckIcon color="#0a0a0a" size={19} /><ThemedText style={styles.orderSuccessSectionTitle}>Entrega</ThemedText></View>
+          <View style={styles.orderSuccessInfoList}>
+            {infoRow(receiverName || fullName, 'receiver')}
+            {infoRow([street, number].filter(Boolean).join(', ') + (complement ? ` - ${complement}` : ''), 'street')}
+            {infoRow([neighborhood, city, state].filter(Boolean).join(' - '), 'city')}
+            {infoRow(postalCode ? `CEP ${postalCode}` : '', 'postalCode')}
+          </View>
+        </View>
+
+        <Pressable onPress={onHome} style={styles.orderSuccessHomeButton}><ThemedText style={styles.orderSuccessHomeButtonText}>Voltar ao início</ThemedText></Pressable>
+      </ScrollView>
+    </SafeAreaView>
+  </ThemedView>;
+}
+
 function CheckoutProductImage({ imageUrl, label, style }: { imageUrl: string; label: string; style: StyleProp<ImageStyle> }) {
   const highResolutionUrl = getCheckoutProductImageUrl(imageUrl);
   if (!highResolutionUrl) return null;
@@ -2327,7 +2471,7 @@ function Radio({ selected }: { selected: boolean }) { return <View style={[style
 function Summary({ orderForm, shippingPrice }: { orderForm: OrderForm; shippingPrice?: number }) {
   const itemsTotal = orderForm.items.reduce((total, item) => total + item.price * item.quantity, 0);
   const shippingLabel = shippingPrice === undefined ? 'A calcular' : shippingPrice === 0 ? 'Grátis' : money(shippingPrice);
-  return <Card><View style={styles.summary}><ThemedText style={styles.bodyText}>Total dos itens</ThemedText><ThemedText style={styles.bodyText}>{money(itemsTotal)}</ThemedText></View><View style={styles.summary}><ThemedText style={styles.bodyText}>Total do frete</ThemedText><ThemedText style={styles.bodyText}>{shippingLabel}</ThemedText></View><View style={[styles.summary, styles.summaryTotal]}><ThemedText style={styles.sectionTitle}>Total</ThemedText><ThemedText style={styles.sectionTitle}>{money(orderForm.value)}</ThemedText></View></Card>;
+  return <Card style={styles.summaryCard}><ThemedText style={styles.summaryTitle}>Resumo</ThemedText><View style={styles.summary}><ThemedText style={styles.bodyText}>Subtotal</ThemedText><ThemedText style={styles.bodyText}>{money(itemsTotal)}</ThemedText></View><View style={styles.summary}><ThemedText style={styles.bodyText}>Entrega</ThemedText><ThemedText style={styles.bodyText}>{shippingLabel}</ThemedText></View><View style={[styles.summary, styles.summaryTotal]}><ThemedText style={styles.sectionTitle}>Total</ThemedText><ThemedText style={styles.sectionTitle}>{money(orderForm.value)}</ThemedText></View></Card>;
 }
 function FreeShippingProgress({ value }: { value: number }) {
   const target = 249;
@@ -2339,7 +2483,32 @@ function ReviewHeader({ icon, title }: { icon: 'user' | 'truck' | 'card'; title:
   return <View style={styles.reviewHeader}>{icon === 'user' && <UserIcon color="#0a0a0a" size={20} />}{icon === 'truck' && <TruckIcon color="#0a0a0a" size={20} />}{icon === 'card' && <CreditCardIcon color="#0a0a0a" size={20} />}<ThemedText style={styles.sectionTitle}>{title}</ThemedText></View>;
 }
 
-function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, saving, onApply, appliedGiftCards, orderValue, removingGiftCard, onRemove, voucherMessage, voucherMessageType, onContinue, giftCardAvailability, giftCardIdentityVerified, giftCardCreditsHidden, availableGiftCards, giftCardDetailsLoading, applyingAvailableGiftCard, onShowCredits, onApplyAvailableGiftCard }: { voucher: string; onVoucherChange: (value: string) => void; voucherLoading: boolean; saving: boolean; onApply: () => void; appliedGiftCards: GiftCard[]; orderValue: number; removingGiftCard: string | null; onRemove: (giftCard: GiftCard) => void; voucherMessage: string; voucherMessageType: 'success' | 'error' | null; onContinue: () => void; giftCardAvailability: GiftCardAvailability; giftCardIdentityVerified: boolean; giftCardCreditsHidden: boolean; availableGiftCards: GiftCard[]; giftCardDetailsLoading: boolean; applyingAvailableGiftCard: string | null; onShowCredits: () => void; onApplyAvailableGiftCard: (giftCard: GiftCard) => void }) {
+function ReviewItemsDisclosure({ items, expanded, onToggle }: { items: CartItem[]; expanded: boolean; onToggle: () => void }) {
+  return <View style={styles.reviewItemsSection}>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={onToggle} style={styles.reviewItemsToggle}>
+      <ThemedText style={styles.reviewItemsToggleLabel}>Ver detalhes do produto</ThemedText>
+      <View style={[styles.reviewItemsChevron, expanded && styles.reviewItemsChevronExpanded]}>
+        <ChevronRightIcon color="#625d57" size={16} />
+      </View>
+    </Pressable>
+    {expanded
+      ? <View style={styles.reviewItemsExpanded}>{items.map((item) => <View key={item.id + '-' + item.index + '-review'} style={styles.reviewItem}>
+        <CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.reviewItemImage} />
+        <View style={styles.reviewItemDetails}>
+          <ThemedText numberOfLines={3} style={styles.reviewItemName}>{item.name}</ThemedText>
+          <ThemedText style={styles.reviewItemQuantity}>{item.quantity + ' un.'}</ThemedText>
+          <ThemedText style={styles.reviewItemPrice}>{money(item.price)}</ThemedText>
+        </View>
+      </View>)}</View>
+      : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reviewItemsPreview}>
+        {items.map((item) => <View key={item.id + '-' + item.index + '-preview'} style={styles.reviewItemPreview}>
+          <CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.reviewItemPreviewImage} />
+        </View>)}
+      </ScrollView>}
+  </View>;
+}
+
+function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, saving, onApply, appliedGiftCards, orderValue, removingGiftCard, onRemove, voucherMessage, voucherMessageType, onContinue, selected, giftCardAvailability, giftCardIdentityVerified, giftCardCreditsHidden, availableGiftCards, giftCardDetailsLoading, applyingAvailableGiftCard, onShowCredits, onApplyAvailableGiftCard }: { voucher: string; onVoucherChange: (value: string) => void; voucherLoading: boolean; saving: boolean; onApply: () => void; appliedGiftCards: GiftCard[]; orderValue: number; removingGiftCard: string | null; onRemove: (giftCard: GiftCard) => void; voucherMessage: string; voucherMessageType: 'success' | 'error' | null; onContinue: () => void; selected: boolean; giftCardAvailability: GiftCardAvailability; giftCardIdentityVerified: boolean; giftCardCreditsHidden: boolean; availableGiftCards: GiftCard[]; giftCardDetailsLoading: boolean; applyingAvailableGiftCard: string | null; onShowCredits: () => void; onApplyAvailableGiftCard: (giftCard: GiftCard) => void }) {
   const appliedValue = giftCardsTotal(appliedGiftCards);
   const canContinue = appliedGiftCards.length > 0 && giftCardsCoverOrder(appliedGiftCards, orderValue);
   const remainingValue = Math.max(0, orderValue - appliedValue);
@@ -2366,7 +2535,7 @@ function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoading, savi
         </View>;
       })}
     </View>}
-    <View style={styles.paymentCard}>
+    <View style={[styles.paymentCard, selected && styles.paymentCardSelected]}>
       <ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>
       <View style={styles.paymentDivider} />
       <View style={styles.inline}>
@@ -2658,14 +2827,26 @@ const styles = StyleSheet.create({
   secondary: { minHeight: 48, padding: Spacing.three, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   secondaryText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, fontWeight: '700' },
   fixedFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, gap: Spacing.two, padding: Spacing.two, paddingTop: 10, paddingBottom: 35, backgroundColor: '#ffffff' },
-  orderSuccessContent: { justifyContent: 'center' },
-  orderSuccessCard: { alignItems: 'center', gap: Spacing.two, padding: Spacing.five, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
-  orderSuccessIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e4f5e9' },
-  orderSuccessCheck: { color: '#2f8f5b', fontFamily: Fonts.bold, fontSize: 32, lineHeight: 36, fontWeight: '700' },
-  orderSuccessTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 20, lineHeight: 26, fontWeight: '700', textAlign: 'center' },
-  orderSuccessDescription: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  orderSuccessLabel: { marginTop: Spacing.two, color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  orderSuccessId: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
+  orderSuccessSafeArea: { flex: 1, paddingHorizontal: Spacing.four },
+  orderSuccessHeader: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#f0ede8' },
+  orderSuccessContent: { gap: Spacing.three, paddingTop: Spacing.three, paddingBottom: Spacing.five },
+  orderSuccessMessageCard: { alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.four, paddingVertical: 24, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
+  orderSuccessDetailsCard: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
+  orderSuccessIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#a9d9bd', backgroundColor: '#f3fbf5' },
+  orderSuccessCheck: { color: '#2f8f5b', fontFamily: Fonts.bold, fontSize: 23, lineHeight: 28, fontWeight: '700' },
+  orderSuccessTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 17, lineHeight: 23, fontWeight: '700', textAlign: 'center' },
+  orderSuccessDescription: { color: '#4f4b47', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 19, textAlign: 'center' },
+  orderSuccessSectionTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, lineHeight: 19, fontWeight: '700' },
+  orderSuccessId: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  orderSuccessMeta: { color: '#8a857f', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  orderSuccessOrdersButton: { minHeight: 42, marginTop: Spacing.one, borderRadius: 8, borderWidth: 1.5, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center' },
+  orderSuccessOrdersButtonText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  orderSuccessDivider: { height: 1, marginVertical: Spacing.two, backgroundColor: '#eeeae5' },
+  orderSuccessSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  orderSuccessInfoList: { gap: 2 },
+  orderSuccessInfo: { color: '#5f5a55', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  orderSuccessHomeButton: { minHeight: 46, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
+  orderSuccessHomeButtonText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   smallButton: { minHeight: 46, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   buttonText: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 13, fontWeight: '700' },
   selected: { borderColor: '#0a0a0a', borderWidth: 2 },
@@ -2685,6 +2866,8 @@ const styles = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#b0a69b', alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: '#0a0a0a' },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#0a0a0a' },
+  summaryCard: { paddingVertical: 16 },
+  summaryTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   summary: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1 },
   summaryTotal: { marginTop: 4, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#eeeae5' },
   progressCard: { gap: 8, padding: Spacing.two, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#fff' },
@@ -2698,6 +2881,7 @@ const styles = StyleSheet.create({
   availableGiftCardsCard: { gap: Spacing.two, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
   availableGiftCardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.two, borderTopWidth: 1, borderTopColor: '#ece8e2' },
   paymentCard: { gap: 6, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1da', backgroundColor: '#FFFFFF' },
+  paymentCardSelected: { borderColor: '#0a0a0a', borderWidth: 2 },
   paymentHeader: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, justifyContent: 'space-between' },
   paymentDivider: { height: 1, backgroundColor: '#eeeae5' },
   giftCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, paddingTop: Spacing.one },
@@ -2764,12 +2948,21 @@ const styles = StyleSheet.create({
   freeText: { color: '#2f9b62', fontFamily: Fonts.sans, fontSize: 13 },
   deliveryText: { color: '#2f9b62', fontFamily: Fonts.sans, fontSize: 12 },
   reviewAddress: { gap: 2, marginTop: Spacing.one, padding: Spacing.two, borderRadius: 8, backgroundColor: '#f8f8f8' },
-  reviewItems: { gap: Spacing.two, marginTop: Spacing.two },
+  reviewItemsSection: { gap: Spacing.two, marginTop: Spacing.two },
+  reviewItemsToggle: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  reviewItemsToggleLabel: { color: '#4f4b47', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, textDecorationLine: 'underline' },
+  reviewItemsChevron: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
+  reviewItemsChevronExpanded: { transform: [{ rotate: '-90deg' }] },
+  reviewItemsPreview: { gap: 6, paddingRight: Spacing.two },
+  reviewItemPreview: { width: 58, height: 78, borderRadius: 3, overflow: 'hidden', backgroundColor: '#eeeae5' },
+  reviewItemPreviewImage: { width: '100%', height: '100%', backgroundColor: '#eeeae5' },
+  reviewItemsExpanded: { gap: Spacing.two },
   reviewItem: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.three },
   reviewItemImage: { width: 50, height: 70, aspectRatio: 3/4, borderRadius: 8, backgroundColor: '#eeeae5' },
   reviewItemDetails: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 4 },
   reviewItemName: { fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '400' },
   reviewItemQuantity: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, fontWeight: '400' },
+  reviewItemPrice: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   paymentReview: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
   paymentReviewCard: { width: '100%', gap: Spacing.two, alignItems: 'center' },
   pixRemainingSummary: { alignItems: 'center', gap: 2, paddingTop: Spacing.one },
