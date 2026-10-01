@@ -1,7 +1,6 @@
 # Deep links
 
-O app usa o esquema próprio `lojahr:` e também reconhece URLs públicas da loja
-sem depender de bibliotecas ou runtime da Eitri.
+O app usa o esquema próprio `lojahr:` e também reconhece URLs públicas da loja.
 
 ## Rotas reconhecidas
 

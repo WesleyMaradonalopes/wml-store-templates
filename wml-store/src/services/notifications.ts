@@ -149,9 +149,8 @@ async function readState(): Promise<NotificationState> {
 }
 
 /**
- * Reads the same effective state used by the account switch. A missing local
- * preference means opt-in when the operating system permission is granted,
- * matching the legacy Eitri behavior.
+ * Reads the same effective state used by the account switch. If there is no
+ * saved preference, an existing operating-system permission means opt-in.
  */
 export function getNotificationState() {
   return readState();
@@ -236,9 +235,9 @@ export function disableNotifications() {
 }
 
 /**
- * Initializes already-authorized installations and asks for permission on the
- * first launch, as the old Eitri home app did. An explicit opt-out is never
- * prompted again automatically; the user can opt back in from the switch.
+ * Initializes already-authorized installations and asks for permission on
+ * first launch. An explicit opt-out is never prompted again automatically;
+ * the user can opt back in from the switch.
  */
 export function initializeNotifications() {
   if (!nativePlatform) return Promise.resolve(readState());

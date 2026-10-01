@@ -1,0 +1,54 @@
+name: App CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify app and backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            wml-store/package-lock.json
+            wml-backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: wml-backend
+
+      - name: Run backend tests
+        run: npm test
+        working-directory: wml-backend
+
+      - name: Install app dependencies
+        run: npm ci
+        working-directory: wml-store
+
+      - name: Run app tests
+        run: npm run test:deep-links
+        working-directory: wml-store
+
+      - name: Check TypeScript
+        run: npx tsc --noEmit
+        working-directory: wml-store
+
+      - name: Export web build
+        run: npx expo export --platform web
+        working-directory: wml-store

@@ -1,6 +1,6 @@
 import Svg, { Rect } from 'react-native-svg';
 
-/** Variante do ícone de categorias usado no BottomBar nativo da Eitri. */
+/** Variante do ícone usado para representar categorias na barra de navegação. */
 export default function CategoryGridIcon({ color = '#0a0a0a', size = 24 }) {
 	return (
 		<Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

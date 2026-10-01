@@ -86,25 +86,11 @@ android/
 # Backup of the old nested Git metadata
 wml-store/.git-local-history-backup/
 
-# Legacy reference projects kept only locally
-wml-store-templates-account/
-wml-store-templates-cart/
-wml-store-templates-checkout/
-wml-store-templates-home/
-wml-store-templates-pdp/
-wml-store-templates-shared/
-# The legacy folders above are included only under this explicit backup path.
-!/wml-backup/
-!/wml-backup/**
-.github/
 .vscode/
 .aiconfig
 .editorconfig
 .eslintrc.json
 .prettierrc
-/app-config.dev.json
-/app-config.yaml
-/bitbucket-pipelines.yml
 /bun.lock
 /check_and_push.js
 /package-lock.json

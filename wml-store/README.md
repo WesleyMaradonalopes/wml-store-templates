@@ -96,8 +96,7 @@ configuração da VTEX/backend e nunca devem ser colocados em `EXPO_PUBLIC_*`.
 O app novo usa `expo-notifications` com FCM no Android. O switch **Notificações**
 da conta controla o tópico `lojahr_promotions`: ao ativar, o app solicita a
 permissão do sistema, registra o dispositivo e inscreve-o no tópico; ao
-desativar, remove a inscrição e o registro nativo. Isso reproduz a intenção do
-fluxo legado da Eitri, mas sem alterar o repositório legado.
+desativar, remove a inscrição e o registro nativo.
 
 ### Configuração no Firebase
 

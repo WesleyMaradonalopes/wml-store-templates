@@ -6,7 +6,7 @@ const SVG = `<svg width="29" height="21" viewBox="0 0 29 21" fill="none" xmlns="
   <path d="M8.5 16C9.08926 17.3215 9.91421 17.9108 11 18.5C9.91421 19.0893 9.08926 19.9142 8.5 21C7.91074 19.9142 7.08579 19.0893 6 18.5C7.08579 17.9107 7.91074 17.3215 8.5 16Z" fill="__ACCENT_COLOR__" />
 </svg>`;
 
-/** Tape-measure icon matching the Sizebay card used by the Eitri app. */
+/** Tape-measure icon used by the product size chart action. */
 export default function TapeMeasureStrokeRoundedIcon({ color = '#0a0a0a', accentColor = '#0a0a0a', size = 21 }) {
 	const xml = SVG.replace(/__ICON_COLOR__/g, color).replace(/__ACCENT_COLOR__/g, accentColor);
 	return <SvgXml xml={xml} width={size * (29 / 21)} height={size} />;

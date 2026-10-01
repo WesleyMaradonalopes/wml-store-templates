@@ -1,8 +1,0 @@
-.next
-node_modules
-dist
-./lib
-build
-.workspaces
-folder.hash
-jsconfig.json

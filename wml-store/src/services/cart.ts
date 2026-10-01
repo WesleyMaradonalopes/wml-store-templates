@@ -694,9 +694,8 @@ export async function selectPaymentMethod({
 
   let targetOrderFormId = orderFormId;
   if (attachedGiftCards.length > 0) {
-    // O fluxo Eitri remove o vale antes de combinar outra forma de pagamento
-    // e o reaplica no POST seguinte. A VTEX exige essa sequência quando o
-    // vale ficou associado a um contexto anterior do mesmo carrinho.
+    // A VTEX exige remover e reaplicar o vale quando ele ficou associado a
+    // um contexto anterior do mesmo carrinho e outra forma de pagamento será combinada.
     const clearResponse = await paymentDataFetch(targetOrderFormId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

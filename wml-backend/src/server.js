@@ -1328,8 +1328,8 @@ app.post('/checkout/order-form/:orderFormId/profile-by-email', async (request, r
   }
 
   try {
-    // Replica a ordem usada pelo checkout Eitri/SmartCheckout: primeiro localiza
-    // o perfil pelo e-mail e depois anexa SOMENTE o e-mail ao orderForm. Enviar
+    // Primeiro localiza o perfil pelo e-mail e depois anexa SOMENTE o e-mail
+    // ao orderForm. Enviar
     // nome, CPF e telefone nesta segunda chamada faz a VTEX tratar os dados como
     // perfil de convidado em alguns contextos e o userProfileId não é vinculado.
     // A sessão VTEX ID do aparelho não participa: o titular é o e-mail informado.
