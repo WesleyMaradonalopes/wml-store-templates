@@ -13,7 +13,7 @@ import { type CustomerOrder, getCustomerOrders } from '@/services/orders';
 
 function money(value?: number | null) {
   const amount = Number(value ?? 0);
-  return `R$ ${(Number.isFinite(amount) ? amount : 0).toFixed(2).replace('.', ',')}`;
+  return `R$ ${((Number.isFinite(amount) ? amount : 0) / 100).toFixed(2).replace('.', ',')}`;
 }
 
 function date(value?: string | null) {

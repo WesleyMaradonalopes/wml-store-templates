@@ -1,0 +1,2 @@
+export const DESCRIPTION_PREVIEW_LINES = 5;
+export const DESCRIPTION_LINE_HEIGHT = 20;
