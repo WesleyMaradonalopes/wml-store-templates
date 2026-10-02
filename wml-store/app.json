@@ -16,13 +16,18 @@
       ],
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Permita que o LoJahr acesse suas fotos para buscar produtos por imagem.",
-        "NSCameraUsageDescription": "Permita que o LoJahr use a câmera para buscar produtos por imagem."
+        "NSCameraUsageDescription": "Permita que o LoJahr use a câmera para buscar produtos por imagem.",
+        "NSSpeechRecognitionUsageDescription": "Permita que o LoJahr reconheça sua voz para pesquisar produtos.",
+        "NSMicrophoneUsageDescription": "Permita que o LoJahr use o microfone para pesquisar produtos por voz."
       }
     },
     "android": {
       "package": "br.com.lojahr.store",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,7 +39,10 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "category": ["BROWSABLE", "DEFAULT"],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "data": [
             {
               "scheme": "https",
@@ -99,6 +107,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5f1dcc8f-e978-47eb-8661-3f4fa82f4b18"
+      }
+    },
+    "owner": "wmlzx10rs-team"
   }
 }

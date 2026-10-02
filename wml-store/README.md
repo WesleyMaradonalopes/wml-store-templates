@@ -105,11 +105,12 @@ desativar, remove a inscrição e o registro nativo.
    Android**.
 2. Informe exatamente o pacote `br.com.lojahr.store`. A configuração do app
    antigo não deve ser reutilizada se ela tiver outro pacote.
-3. Baixe o arquivo `google-services.json` e coloque-o em
-   `wml-store/google-services.json`. O arquivo ainda não é incluído neste
-   repositório porque precisa vir do projeto Firebase escolhido.
-4. Gere um novo development build depois de adicionar esse arquivo e a
-   dependência nativa:
+3. O arquivo `google-services.json` deste app já está configurado para o pacote
+   `br.com.lojahr.store` e versionado em `wml-store/google-services.json`. Se o
+   projeto Firebase mudar, substitua-o pelo arquivo do projeto correto. Nunca
+   coloque credenciais administrativas ou service accounts no app.
+4. Gere um novo development build depois de trocar o projeto Firebase ou alterar
+   a dependência nativa:
 
    ```bash
    npm run android:native
@@ -143,6 +144,43 @@ usada aqui é específica do Android.
 O `google-services.json` contém identificadores públicos do app, mas chaves
 privadas, service accounts e credenciais administrativas nunca devem ser
 colocadas no aplicativo mobile.
+
+## Builds Android e iOS com EAS
+
+O arquivo `eas.json` define três perfis:
+
+- `development`: development build com ferramentas de desenvolvimento.
+- `preview`: build interna instalável para validar em aparelhos.
+- `production`: artefatos para as lojas; o número de build é incrementado no EAS.
+
+O app está associado ao projeto EAS `@wmlzx10rs-team/lojahr-store`. As variáveis
+`EXPO_PUBLIC_*` do `.env` local estão cadastradas com visibilidade `sensitive`
+nos ambientes EAS `preview` e `production`, usando a configuração atualmente
+validada. O `.env` local é ignorado pelo Git e não é enviado à build em nuvem.
+Como essas variáveis são incorporadas ao app, seus valores são públicos para
+quem instalar a build; `sensitive` apenas evita exibi-las diretamente nos logs
+do EAS. Se os valores do `.env` mudarem, atualize também os ambientes no Expo.
+
+Com a conta EAS autenticada e as variáveis configuradas, gere builds internas:
+
+```bash
+npx --yes eas-cli@latest build --platform android --profile preview
+npx --yes eas-cli@latest build --platform ios --profile preview
+```
+
+O Android interno gera um APK instalável. A distribuição interna do iOS exige
+conta Apple Developer, credenciais de assinatura e registro dos aparelhos
+permitidos. Este projeto ainda precisa dessas credenciais Apple no EAS. Para
+preparar os artefatos de loja:
+
+```bash
+npx --yes eas-cli@latest build --platform all --profile production
+```
+
+Esse comando gera os artefatos, mas não os envia às lojas. O Android usa AAB;
+no iOS, o artefato deve ser enviado ao App Store Connect para distribuição por
+TestFlight ou publicação. As credenciais privadas VTEX permanecem no backend e
+nunca devem ser cadastradas como variáveis `EXPO_PUBLIC_*`.
 
 ## Join the community
 
