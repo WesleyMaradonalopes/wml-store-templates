@@ -1,19 +1,15 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/context/theme-context';
 import { useTheme } from '@/hooks/use-theme';
-import { getAccountSession, subscribeAccountSession } from '@/services/auth';
 import { type Product } from '@/services/catalog';
-import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, subscribeFavoriteChanges, toggleFavorite } from '@/services/favorites';
 
-import HeartIcon from './icons/HeartIcon';
 import SimilarAiIcon from './icons/SimilarAiIcon';
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
-import { LoginRequiredModal } from './login-required-modal';
+import { ProductFavoriteButton } from './product-favorite-button';
 import { ProductQuickViewButton } from './product-quick-view';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -43,108 +39,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
   const { colorScheme } = useAppTheme();
   const theme = useTheme();
   const dark = colorScheme === 'dark';
-  const [localFavorite, setLocalFavorite] = useState(Boolean(controlledFavorite));
-  const [favoriteLoading, setFavoriteLoading] = useState(false);
-  const [loginModalVisible, setLoginModalVisible] = useState(false);
-  const authSyncRevision = useRef(0);
-  const authState = getKnownFavoriteAuthState();
-  const favorite = authState === 'anonymous' ? false : (controlledFavorite ?? localFavorite);
   const discount = discountPercentage(product);
-
-  useEffect(() => {
-    if (controlledFavorite !== undefined) {
-      setLocalFavorite(controlledFavorite);
-      return;
-    }
-    let active = true;
-    const revision = authSyncRevision.current;
-    isFavorite(product.id).then((value) => {
-      if (active && revision === authSyncRevision.current) setLocalFavorite(value);
-    }).catch(() => undefined);
-    return () => { active = false; };
-  }, [controlledFavorite, product.id]);
-
-  useEffect(() => {
-    let active = true;
-
-    const unsubscribe = subscribeAccountSession((session) => {
-      if (!active) return;
-      const revision = ++authSyncRevision.current;
-
-      if (!session?.email) {
-        setLocalFavorite(false);
-        onFavoriteChange?.(false);
-        return;
-      }
-
-      isFavorite(product.id).then((value) => {
-        if (!active || revision !== authSyncRevision.current) return;
-        setLocalFavorite(value);
-        if (controlledFavorite !== value) onFavoriteChange?.(value);
-      }).catch(() => undefined);
-    });
-
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [controlledFavorite, onFavoriteChange, product.id]);
-
-  useEffect(() => {
-    let active = true;
-
-    const unsubscribe = subscribeFavoriteChanges((change) => {
-      getAccountSession()
-        .then((session) => {
-          if (!active || !session?.email || session.email.trim().toLowerCase() !== change.email) return;
-          const nextFavorite = change.wishlist.includes(product.id);
-          setLocalFavorite(nextFavorite);
-          if (controlledFavorite !== nextFavorite) onFavoriteChange?.(nextFavorite);
-        })
-        .catch(() => undefined);
-    });
-
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [controlledFavorite, onFavoriteChange, product.id]);
-
-  function updateFavorite(value: boolean, notify = true) {
-    setLocalFavorite(value);
-    if (notify) onFavoriteChange?.(value);
-  }
-
-  async function changeFavorite() {
-    if (favoriteLoading) return;
-    const previous = favorite;
-    const authRevision = authSyncRevision.current;
-    const authState = getKnownFavoriteAuthState();
-    if (authState === 'anonymous') {
-      setLoginModalVisible(true);
-      return;
-    }
-
-    const nextFavorite = !previous;
-    if (authState === 'authenticated') updateFavorite(nextFavorite);
-    setFavoriteLoading(true);
-    try {
-      if (authState !== 'authenticated') {
-        if (!(await canSaveFavorites())) {
-          setLoginModalVisible(true);
-          return;
-        }
-        updateFavorite(nextFavorite);
-      }
-      const result = await toggleFavorite(product, { hydrate: false });
-      if (authRevision === authSyncRevision.current) updateFavorite(result.favorite);
-    } catch (error) {
-      updateFavorite(previous);
-      Alert.alert('Favoritos', error instanceof Error ? error.message : 'Não foi possível atualizar os favoritos.');
-    } finally {
-      setFavoriteLoading(false);
-    }
-  }
 
   return (
     <ThemedView style={[styles.card, style]}>
@@ -157,14 +52,12 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
               {discount > 0 && <View style={[styles.badge, styles.discountBadge]}><ThemedText style={styles.badgeText}>{discount}%</ThemedText></View>}
             </View>
           )}
-          <Pressable
-            accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-            accessibilityState={{ selected: favorite }}
-            disabled={favoriteLoading}
-            onPress={(event) => { event.stopPropagation(); void changeFavorite(); }}
-            style={styles.favoriteButton}>
-            <HeartIcon size={28} color={favorite ? '#C62828' : dark ? theme.text : '#0a0a0a'} filled={favorite} />
-          </Pressable>
+          <ProductFavoriteButton
+            product={product}
+            favorite={controlledFavorite}
+            onFavoriteChange={onFavoriteChange}
+            buttonStyle={styles.favoriteButton}
+          />
           {onSimilar && (
             <Pressable
               accessibilityLabel="Ver produtos similares"
@@ -192,14 +85,6 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
           {product.price !== null && <ThemedText type="smallBold" style={styles.price}>{money(product.price)}</ThemedText>}
         </View>
       </Pressable>
-      <LoginRequiredModal
-        visible={loginModalVisible}
-        onClose={() => setLoginModalVisible(false)}
-        onLogin={() => {
-          setLoginModalVisible(false);
-          router.push('/account?view=access' as never);
-        }}
-      />
     </ThemedView>
   );
 }

@@ -18,6 +18,7 @@ import { subscribeAccountSession } from '@/services/auth';
 import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
 import { parseCmsRouteFacets } from '@/services/cms-actions';
 import { isFavorite } from '@/services/favorites';
+import { trackEvent } from '@/services/telemetry';
 import { abortSpeechRecognition, isSpeechRecognitionAvailable, isSpeechRecognitionModuleInstalled, requestSpeechRecognitionPermissions, startSpeechRecognition, stopSpeechRecognition, subscribeSpeechRecognitionEvent, type VoiceRecognitionErrorEvent, type VoiceRecognitionResultEvent } from '@/services/speech-recognition';
 
 function paramText(value: string | string[] | undefined) {
@@ -242,6 +243,7 @@ export default function SearchScreen() {
       clearSearch();
       return;
     }
+    void trackEvent({ name: 'search', search_length: value.length });
     setContextFacets([]);
     setSelectedFacets([]);
     setSort('score:desc');

@@ -64,23 +64,29 @@ describe('authenticated session requests', () => {
     expect(await auth.getVtexUserToken()).toBe('valid-token');
   });
 
-  it('keeps remembered login credentials separate from the account session', async () => {
-    await auth.saveRememberedLogin(' USER@EXAMPLE.COM ', 'secret-password');
+  it('keeps only the remembered email separate from the account session', async () => {
+    await auth.saveRememberedLogin(' USER@EXAMPLE.COM ');
 
     expect(await auth.getRememberedLogin()).toEqual({
       email: 'user@example.com',
-      password: 'secret-password',
     });
+    expect(state.secureStore.get('lojahr:remembered-login')).toBe(JSON.stringify({ email: 'user@example.com' }));
 
     await auth.saveAccountSession('user@example.com');
     await auth.clearAccountSession();
 
     expect(await auth.getRememberedLogin()).toEqual({
       email: 'user@example.com',
-      password: 'secret-password',
     });
 
     await auth.clearRememberedLogin();
     expect(await auth.getRememberedLogin()).toBeNull();
+  });
+
+  it('removes a password left by an older remembered-login record', async () => {
+    state.secureStore.set('lojahr:remembered-login', JSON.stringify({ email: ' USER@EXAMPLE.COM ', password: 'old-password' }));
+
+    expect(await auth.getRememberedLogin()).toEqual({ email: 'user@example.com' });
+    expect(state.secureStore.get('lojahr:remembered-login')).toBe(JSON.stringify({ email: 'user@example.com' }));
   });
 });

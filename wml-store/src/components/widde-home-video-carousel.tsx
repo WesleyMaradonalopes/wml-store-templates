@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -76,6 +77,7 @@ function money(value: number | null) {
 }
 
 export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [items, setItems] = useState<HomeVideoItem[]>([]);
@@ -258,6 +260,7 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
         }]}
         renderItem={({ item: carouselItem, index }) => {
           const isActive = !selectedItem && index === activeCarouselIndex;
+          const shouldRenderPlayback = index === activeCarouselIndex;
           const scale = scrollX.interpolate({
             inputRange: [
               (index - 1) * snapInterval,
@@ -288,10 +291,11 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
               >
                 <View style={[styles.media, { height: cardHeight }]}>
                   {!!carouselItem.item.story.thumbnailUrl && <Image source={{ uri: carouselItem.item.story.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
-                  {isActive && (
+                  {shouldRenderPlayback && (
                     <WiddeStoryPlayback
+                      key={`carousel-${carouselItem.item.story.key}`}
                       source={carouselItem.item.story.videoUrl}
-                      active
+                      active={isFocused && !selectedItem}
                       loop
                       muted
                       style={StyleSheet.absoluteFill}
@@ -315,8 +319,9 @@ export function WiddeHomeVideoCarousel({ data }: WiddeHomeVideoCarouselProps) {
           <View style={styles.fullscreen}>
             {!!selectedItem.story.thumbnailUrl && <Image source={{ uri: selectedItem.story.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
             <WiddeStoryPlayback
+              key={`modal-${selectedItem.story.key}`}
               source={selectedItem.story.videoUrl}
-              active
+              active={isFocused}
               loop
               muted={muted}
               style={StyleSheet.absoluteFill}

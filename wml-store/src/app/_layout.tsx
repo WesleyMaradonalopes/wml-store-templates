@@ -1,5 +1,5 @@
 import { Montserrat_300Light, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, useFonts } from '@expo-google-fonts/montserrat';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider as RouterThemeProvider, useRouter } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as RouterThemeProvider, usePathname, useRouter } from 'expo-router';
 import { Alert, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { DEFAULT_BOTTOM_TAB_SETTINGS } from '@/config/bottom-tab';
@@ -9,6 +9,8 @@ import { getAccountSession, getVtexUserToken, subscribeAccountSessionExpired } f
 import { getBottomTabSettings } from '@/services/bottom-tab-settings';
 import { resolveDeepLink } from '@/services/deep-links';
 import { addNotificationResponseListener, configureNotificationPresentation, getLastNotificationResponse, initializeNotifications, type NotificationResponse } from '@/services/notifications';
+import { registerFirebaseAnalyticsProvider } from '@/services/firebase-analytics';
+import { initializeTracking, screenNameForPath, trackEvent } from '@/services/telemetry';
 import GlobalTabBar from '@/components/global-tab-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -18,6 +20,7 @@ export default function TabLayout() {
 
 function AppLayout() {
   const { colorScheme } = useAppTheme();
+  const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const [showOnCheckout, setShowOnCheckout] = useState(false);
   const [bottomTabSettings, setBottomTabSettings] = useState(DEFAULT_BOTTOM_TAB_SETTINGS);
@@ -33,6 +36,15 @@ function AppLayout() {
   useEffect(() => {
     void Promise.all([getAccountSession(), getVtexUserToken()]);
   }, []);
+
+  useEffect(() => {
+    registerFirebaseAnalyticsProvider();
+    void initializeTracking();
+  }, []);
+
+  useEffect(() => {
+    void trackEvent({ name: 'screen_view', screen_name: screenNameForPath(pathname) });
+  }, [pathname]);
 
   useEffect(() => {
     let mounted = true;

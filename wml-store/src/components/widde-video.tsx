@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useIsFocused } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Pressable, ScrollView, StyleProp, StyleSheet, useWindowDimensions, View, ViewStyle } from 'react-native';
@@ -71,6 +72,7 @@ export function WiddeStoryPlayback({ source, active, loop, muted, onEnded, onPro
 
   return (
     <VideoView
+      key={source}
       player={player}
       nativeControls={false}
       contentFit="cover"
@@ -82,6 +84,7 @@ export function WiddeStoryPlayback({ source, active, loop, muted, onEnded, onPro
 }
 
 export function WiddeVideo({ product }: { product: Product }) {
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [stories, setStories] = useState<WiddeStory[]>([]);
@@ -266,7 +269,14 @@ export function WiddeVideo({ product }: { product: Product }) {
           >
             <View style={styles.previewMedia}>
               {!!firstStory.thumbnailUrl && <Image source={{ uri: firstStory.thumbnailUrl }} contentFit="cover" style={StyleSheet.absoluteFill} />}
-              <WiddeStoryPlayback source={firstStory.previewUrl} active={!fullscreen} loop muted style={StyleSheet.absoluteFill} />
+              <WiddeStoryPlayback
+                key={`preview-${firstStory.previewUrl}`}
+                source={firstStory.previewUrl}
+                active={isFocused && !fullscreen}
+                loop
+                muted
+                style={StyleSheet.absoluteFill}
+              />
               <Pressable
                 accessibilityLabel="Abrir vídeo do produto"
                 onPress={openFullscreen}
@@ -297,7 +307,7 @@ export function WiddeVideo({ product }: { product: Product }) {
           <WiddeStoryPlayback
             key={activeStory.key}
             source={activeStory.videoUrl}
-            active
+            active={isFocused}
             loop={false}
             muted={muted}
             onEnded={advanceStory}

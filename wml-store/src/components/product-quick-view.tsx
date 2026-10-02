@@ -12,6 +12,7 @@ import { buildVariationGroups } from '@/utils/product-variations';
 
 import { AddedToCartModal, type AddedProductInfo } from './added-to-cart-modal';
 import { BottomSheetHandle } from './bottom-sheet-handle';
+import { ProductFavoriteButton } from './product-favorite-button';
 import { SkeletonBlock } from './skeleton';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -236,9 +237,12 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                         renderItem={({ item }) => <Image source={{ uri: item }} style={styles.image} contentFit="cover" />}
                       />
                     )}
-                    {!isKit && (selectedVariant?.price ?? details.price) !== null && (
-                      <ThemedText style={styles.priceQuickView} type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
-                    )}
+                    <View style={styles.priceRow}>
+                      {!isKit && (selectedVariant?.price ?? details.price) !== null && (
+                        <ThemedText style={styles.priceQuickView} type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
+                      )}
+                      <ProductFavoriteButton product={details} buttonStyle={styles.favoriteButton} />
+                    </View>
                     {isKit ? (
                       <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
                     ) : variationNames.map((name) => (
@@ -311,7 +315,7 @@ export function ProductQuickViewButton({ product, label = 'Adicionar', icon, acc
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.62)' },
   dismissArea: { flex: 1 },
-  sheet: { maxHeight: '84%', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  sheet: { maxHeight: '84%', width: '95%', margin: 'auto', marginBottom: 30, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF' },
   safeArea: { maxHeight: '100%' },
   header: { minHeight: 64, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#ece8e2' },
   title: { flex: 1, paddingRight: Spacing.three },
@@ -329,7 +333,9 @@ const styles = StyleSheet.create({
   gallery: { gap: 12, paddingRight: Spacing.four },
   image: { width: 160, height: 220, borderRadius: 8, backgroundColor: '#e8e8ea' },
 	nameQuickView: { fontSize: 14},
-	priceQuickView: { display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 16, height: 30, margin: 0 },
+  priceRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center' },
+  priceQuickView: { fontSize: 16, margin: 0 },
+  favoriteButton: { marginLeft: 'auto', width: 30, height: 30, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 0, borderColor: '#d6d0c8' },
   variationGroup: { gap: Spacing.two},
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, paddingBottom: 5 },
   option: { minWidth: 38, minHeight: 38, borderRadius: 21, borderWidth: 1, borderColor: '#d6d0c8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },

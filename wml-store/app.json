@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "br.com.lojahr.store",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "associatedDomains": [
         "applinks:www.hoperesort.com.br",
         "applinks:hoperesort.com.br"
@@ -97,12 +98,32 @@
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "forceStaticLinking": [
+              "RNFBApp",
+              "RNFBAnalytics"
+            ]
           }
         }
       ],
       "expo-web-browser",
-      "expo-video"
+      "expo-video",
+      [
+        "@react-native-firebase/app",
+        {
+          "ios": {
+            "disableSPM": true
+          }
+        }
+      ],
+      [
+        "@react-native-firebase/analytics",
+        {
+          "ios": {
+            "withoutAdIdSupport": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

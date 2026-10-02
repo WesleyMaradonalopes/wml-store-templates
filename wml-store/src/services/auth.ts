@@ -12,7 +12,6 @@ const REMEMBERED_LOGIN_KEY = 'lojahr:remembered-login';
 
 export type RememberedLogin = {
   email: string;
-  password: string;
 };
 
 let accountSessionCache: AccountSession | null | undefined;
@@ -78,19 +77,26 @@ export async function getRememberedLogin(): Promise<RememberedLogin | null> {
     const value = await SecureStore.getItemAsync(REMEMBERED_LOGIN_KEY);
     if (!value) return null;
 
-    const parsed = JSON.parse(value) as Partial<RememberedLogin>;
-    const email = typeof parsed.email === 'string' ? parsed.email.trim().toLowerCase() : '';
-    const password = typeof parsed.password === 'string' ? parsed.password : '';
-    return email && password ? { email, password } : null;
+    const parsed = JSON.parse(value) as { email?: unknown; password?: unknown } | null;
+    const email = typeof parsed?.email === 'string' ? parsed.email.trim().toLowerCase() : '';
+    if (!email) return null;
+
+    // Remove a senha salva por versões anteriores do aplicativo assim que o
+    // registro antigo for lido novamente.
+    if (parsed && Object.prototype.hasOwnProperty.call(parsed, 'password')) {
+      await SecureStore.setItemAsync(REMEMBERED_LOGIN_KEY, JSON.stringify({ email }));
+    }
+
+    return { email };
   } catch {
     return null;
   }
 }
 
-export async function saveRememberedLogin(email: string, password: string) {
+export async function saveRememberedLogin(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
-  if (!normalizedEmail || !password) return;
-  await SecureStore.setItemAsync(REMEMBERED_LOGIN_KEY, JSON.stringify({ email: normalizedEmail, password }));
+  if (!normalizedEmail) return;
+  await SecureStore.setItemAsync(REMEMBERED_LOGIN_KEY, JSON.stringify({ email: normalizedEmail }));
 }
 
 export async function clearRememberedLogin() {

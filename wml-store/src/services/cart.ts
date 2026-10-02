@@ -2,6 +2,7 @@ import { storeConfig } from '@/config/store';
 
 import { getStoredJson, removeStoredValue, setStoredJson } from './storage';
 import { fetchAuthenticated, getAccountSession, getVtexUserToken } from './auth';
+import { trackEvent } from './telemetry';
 
 export type CartOffering = {
   id: string;
@@ -145,6 +146,24 @@ export function subscribeToCartChanges(listener: CartChangeListener) {
 
 function publishCartChange(orderForm: OrderForm) {
   cartChangeListeners.forEach((listener) => listener(orderForm));
+}
+
+function trackAddedCartItem(orderForm: OrderForm, itemId: string, sellerId: string, quantity: number) {
+  const item = orderForm.items.find((cartItem) => cartItem.id === itemId && cartItem.seller === sellerId);
+  if (!item) return;
+
+  void trackEvent({
+    name: 'add_to_cart',
+    currency: 'BRL',
+    value: item.price * quantity,
+    items: [{
+      item_id: item.productId || item.id,
+      item_name: item.name,
+      item_variant: item.id,
+      price: item.price,
+      quantity,
+    }],
+  });
 }
 
 export type ShippingQuote = {
@@ -867,13 +886,15 @@ export async function addItemToCart({
     const currentOrderForm = await getOrderForm(orderFormId);
     const existingItem = currentOrderForm.items.find((item) => item.id === itemId && item.seller === sellerId);
     if (existingItem) {
-      return updateCartItem({
+      const updatedOrderForm = await updateCartItem({
         orderFormId: currentOrderForm.orderFormId,
         index: existingItem.index,
         itemId: existingItem.id,
         sellerId: existingItem.seller,
         quantity: existingItem.quantity + quantity,
       });
+      trackAddedCartItem(updatedOrderForm, itemId, sellerId, quantity);
+      return updatedOrderForm;
     }
   } catch {
     // Se a leitura falhar, mantém a tentativa normal de inclusão abaixo.
@@ -900,6 +921,7 @@ export async function addItemToCart({
   await setStoredJson(ORDER_FORM_ID_KEY, orderForm.orderFormId);
   const normalizedOrderForm = normalizeOrderForm(orderForm);
   publishCartChange(normalizedOrderForm);
+  trackAddedCartItem(normalizedOrderForm, itemId, sellerId, quantity);
   return normalizedOrderForm;
 }
 

@@ -36,6 +36,7 @@ import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuot
 import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 import { getProductInformation, type SizebayProductInformation } from '@/services/sizebay';
+import { trackEvent } from '@/services/telemetry';
 import { htmlToPlainText } from '@/utils/html';
 import { buildVariationGroups } from '@/utils/product-variations';
 import { styles } from '@/styles/product.styles';
@@ -195,6 +196,18 @@ export default function ProductScreen() {
       .then((value) => {
         if (!active) return;
         setProduct(value);
+        void trackEvent({
+          name: 'view_item',
+          currency: 'BRL',
+          ...(value.price !== null ? { value: value.price } : {}),
+          items: [{
+            item_id: value.id,
+            item_name: value.name,
+            ...(value.itemId ? { item_variant: value.itemId } : {}),
+            ...(value.price !== null ? { price: value.price } : {}),
+            quantity: 1,
+          }],
+        });
         isFavorite(value.id).then((saved) => { if (active) setFavorite(saved); }).catch(() => undefined);
         getProductColorOptions(value).then((items) => { if (active) setColorProducts(items); }).catch(() => undefined);
         setSimilarLoading(true);

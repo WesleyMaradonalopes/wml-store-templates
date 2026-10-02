@@ -7,6 +7,7 @@ import { Spacing } from '@/constants/theme';
 import { getCompleteLookProducts, getProduct, type Product } from '@/services/catalog';
 
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
+import { ProductFavoriteButton } from './product-favorite-button';
 import { ProductQuickViewButton } from './product-quick-view';
 import { SkeletonBlock } from './skeleton';
 import { ThemedText } from './themed-text';
@@ -59,6 +60,11 @@ function numberFromData(value: unknown, fallback: number) {
 
 function money(value: number | null) {
   return value === null ? '' : `R$ ${value.toFixed(2).replace('.', ',')}`;
+}
+
+function discountPercentage(product: Product) {
+  if (product.listPrice === null || product.price === null || product.listPrice <= product.price || product.listPrice <= 0) return 0;
+  return Math.round((1 - product.price / product.listPrice) * 100);
 }
 
 const productColorHexPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -301,6 +307,13 @@ export function ProductCollectionCarousel({ data }: ProductCollectionCarouselPro
           >
             <View style={[styles.mainImage, { height: mainImageHeight }]}>
               {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} contentFit="contain" style={StyleSheet.absoluteFill} />}
+              {(product.isNewProduct || discountPercentage(product) > 0) && (
+                <View pointerEvents="none" style={styles.badges}>
+                  {product.isNewProduct && <View style={[styles.badge, styles.newBadge]}><ThemedText style={styles.badgeText}>Novo</ThemedText></View>}
+                  {discountPercentage(product) > 0 && <View style={[styles.badge, styles.discountBadge]}><ThemedText style={styles.badgeText}>{discountPercentage(product)}%</ThemedText></View>}
+                </View>
+              )}
+              <ProductFavoriteButton product={product} buttonStyle={styles.favoriteButton} />
               <ProductQuickViewButton
                 product={product}
                 icon={<ShoppingBagIcon size={22} color="#0a0a0a" />}
@@ -390,6 +403,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: 'transparent',
   },
+  badges: { position: 'absolute', left: 10, top: 10, zIndex: 10, alignItems: 'flex-start', gap: 4 },
+  badge: { minHeight: 20, paddingHorizontal: 5, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
+  newBadge: { backgroundColor: '#0a0a0a' },
+  discountBadge: { backgroundColor: '#cf242c' },
+  badgeText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
+  favoriteButton: { position: 'absolute', right: 5, top: 5, width: 35, height: 35, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
   addButton: {
     position: 'absolute',
     right: 10,

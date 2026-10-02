@@ -151,11 +151,13 @@ export default function AccountScreen() {
 
     if (!saved) {
       setRememberAccess(false);
+      setEmail('');
+      setPassword('');
       return;
     }
 
     setEmail(saved.email);
-    setPassword(saved.password);
+    setPassword('');
     setRememberAccess(true);
   }, []);
 
@@ -187,14 +189,15 @@ export default function AccountScreen() {
     const unsubscribe = subscribeAccountSession((session) => {
       if (session?.email) return;
       setLoggedIn(false);
-      setEmail('');
-      setPassword('');
       setProfile({});
       setProfileMessage(null);
       setView('home');
+      // Sair da conta remove apenas a sessão autenticada. A preferência de
+      // lembrar o acesso continua válida e deve reaparecer no próximo login.
+      void loadRememberedAccess();
     });
     return unsubscribe;
-  }, []);
+  }, [loadRememberedAccess]);
 
   useEffect(() => {
     let active = true;
@@ -283,7 +286,7 @@ export default function AccountScreen() {
       setLoginLoading(true);
       await loginVtexPassword(normalizedEmail, password);
       try {
-        if (rememberAccess) await saveRememberedLogin(normalizedEmail, password);
+        if (rememberAccess) await saveRememberedLogin(normalizedEmail);
         else await clearRememberedLogin();
       } catch {
         // A preferência de lembrar o acesso não deve impedir um login válido.
@@ -307,7 +310,12 @@ export default function AccountScreen() {
       setEmail('');
       setPassword('');
       void clearRememberedLogin().catch(() => undefined);
+      return;
     }
+
+    // Persiste o e-mail assim que a opção é ativada, sem esperar um novo
+    // login. O login continua salvando novamente o e-mail normalizado.
+    if (email.trim()) void saveRememberedLogin(email).catch(() => undefined);
   }
 
   async function logout() {
@@ -315,11 +323,10 @@ export default function AccountScreen() {
     try {
       await clearAccountSession();
       setLoggedIn(false);
-      setEmail('');
-      setPassword('');
       setProfile({});
       setProfileMessage(null);
       setView('home');
+      await loadRememberedAccess();
     } finally {
       setLogoutLoading(false);
     }
@@ -696,14 +703,14 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
             <ScrollView contentContainerStyle={styles.rememberHelpContent}>
               <ThemedText style={styles.rememberHelpTitle}>Como funciona:</ThemedText>
               <ThemedText themeColor="textSecondary" style={styles.rememberHelpBody}>
-                “Lembrar meu acesso” memoriza seu e-mail e senha. Ao habilitar, você não vai precisar digitar esses dados cada vez que acessar sua conta.
+                “Lembrar meu acesso” memoriza apenas seu e-mail. Ao habilitar, o e-mail será preenchido quando você voltar à tela de login, mas a senha deverá ser digitada novamente.
               </ThemedText>
               <ThemedText themeColor="textSecondary" style={styles.rememberHelpBody}>
-                Para sua segurança, habilite apenas em dispositivos que você tem acesso.
+                A senha nunca é armazenada pelo aplicativo. Ainda assim, habilite essa opção apenas em dispositivos aos quais você tem acesso.
               </ThemedText>
               <ThemedText style={styles.rememberHelpTitle}>Como desabilitar:</ThemedText>
               <ThemedText themeColor="textSecondary" style={styles.rememberHelpBody}>
-                Basta tocar em “Lembrar meu acesso” na tela de login para desativar. Ao desabilitar, você precisará digitar seu e-mail e senha quando quiser acessar o aplicativo novamente.
+                Basta tocar em “Lembrar meu acesso” na tela de login para desativar. O e-mail salvo será removido, e você precisará digitar seu e-mail e sua senha novamente.
               </ThemedText>
             </ScrollView>
           </SafeAreaView>

@@ -23,6 +23,7 @@ import { getAccountSession } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, addItemOffering, checkGiftCardAvailability, clearCart, createFreshOrderForm, getCustomerGiftCards, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult } from '@/services/orders';
+import { trackEvent, type TrackingItem } from '@/services/telemetry';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
 import {
   mergeCustomerProfiles,
@@ -98,6 +99,15 @@ import {
 } from '@/components/checkout/checkout-presentation';
 import { styles } from '@/styles/checkout.styles';
 
+function trackingItems(items: CartItem[]): TrackingItem[] {
+  return items.map((item) => ({
+    item_id: item.productId || item.id,
+    item_name: item.name,
+    item_variant: item.id,
+    price: item.price,
+    quantity: item.quantity,
+  }));
+}
 
 
 export default function CheckoutScreen() {
@@ -173,6 +183,8 @@ export default function CheckoutScreen() {
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [reviewItemsExpanded, setReviewItemsExpanded] = useState(false);
   const [orderResult, setOrderResult] = useState<CheckoutOrderResult | null>(null);
+  const trackedPurchaseKeys = useRef(new Set<string>());
+  const cartViewTracked = useRef(false);
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState(CONFIGURED_RECAPTCHA_SITE_KEY);
   const recaptchaRef = useRef<RecaptchaHandle>(null);
   const checkoutScrollRef = useRef<ScrollView>(null);
@@ -222,6 +234,48 @@ export default function CheckoutScreen() {
     setShowOnCheckout(Boolean(orderForm && orderForm.items.length === 0));
     return () => setShowOnCheckout(false);
   }, [orderForm?.items.length, setShowOnCheckout]);
+
+  useEffect(() => {
+    if (step !== 'cart') {
+      cartViewTracked.current = false;
+      return;
+    }
+    if (!orderForm || orderForm.items.length === 0 || cartViewTracked.current) return;
+    cartViewTracked.current = true;
+    void trackEvent({
+      name: 'view_cart',
+      currency: 'BRL',
+      value: orderForm.value,
+      items: trackingItems(orderForm.items),
+    });
+  }, [orderForm, step]);
+
+  function trackCompletedPurchase(result: CheckoutOrderResult, purchasedOrderForm: OrderForm | null) {
+    const deduplicationKey = result.orderId || result.orderGroup || result.transactionId;
+    if (!deduplicationKey || trackedPurchaseKeys.current.has(deduplicationKey)) return;
+    if (!purchasedOrderForm || purchasedOrderForm.items.length === 0) return;
+
+    trackedPurchaseKeys.current.add(deduplicationKey);
+    void trackEvent({
+      name: 'purchase',
+      transaction_id: deduplicationKey,
+      currency: 'BRL',
+      value: purchasedOrderForm.value,
+      items: trackingItems(purchasedOrderForm.items),
+    });
+  }
+
+  function beginCheckout() {
+    if (orderForm && orderForm.items.length > 0) {
+      void trackEvent({
+        name: 'begin_checkout',
+        currency: 'BRL',
+        value: orderForm.value,
+        items: trackingItems(orderForm.items),
+      });
+    }
+    setStep('email');
+  }
 
   function loadCustomerData(customerEmail: string) {
     const key = customerEmail.trim().toLowerCase();
@@ -368,6 +422,7 @@ export default function CheckoutScreen() {
         const status = await getTransactionStatus(orderResult.transactionId, orderResult.orderGroup, pixPayload?.paymentId);
         if (!active) return;
         if (status.status === 'completed') {
+          trackCompletedPurchase({ ...orderResult, status: 'completed' }, orderForm);
           void clearCart(orderForm?.orderFormId).catch(() => undefined);
           setOrderResult((current) => current ? {
             ...current,
@@ -1012,6 +1067,7 @@ export default function CheckoutScreen() {
       }
       setOrderResult(result);
       if (result.status === 'completed') {
+        trackCompletedPurchase(result, paymentOrderForm);
         void clearCart(paymentOrderForm.orderFormId).catch(() => undefined);
       }
     } catch (error) {
@@ -1818,5 +1874,5 @@ export default function CheckoutScreen() {
        </Card>
        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
      </>}
-  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><Pressable accessibilityLabel="Fechar confirmação de remoção" onPress={() => setPendingRemoval(null)} style={StyleSheet.absoluteFill} /><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover <ThemedText style={styles.modalTitleProduct}>{pendingRemoval?.name}</ThemedText> do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><GiftCardIdentityModal visible={giftCardIdentityVisible} checkoutEmail={email} onClose={() => setGiftCardIdentityVisible(false)} onAuthenticated={completeGiftCardIdentity} /><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={() => setStep('email')} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'payment' && <Primary title={saving ? 'Continuando...' : 'Continuar'} onPress={continueWithSelectedPayment} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
+  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><Pressable accessibilityLabel="Fechar confirmação de remoção" onPress={() => setPendingRemoval(null)} style={StyleSheet.absoluteFill} /><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover <ThemedText style={styles.modalTitleProduct}>{pendingRemoval?.name}</ThemedText> do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><GiftCardIdentityModal visible={giftCardIdentityVisible} checkoutEmail={email} onClose={() => setGiftCardIdentityVisible(false)} onAuthenticated={completeGiftCardIdentity} /><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={beginCheckout} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'payment' && <Primary title={saving ? 'Continuando...' : 'Continuar'} onPress={continueWithSelectedPayment} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
 }

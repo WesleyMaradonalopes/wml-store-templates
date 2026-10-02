@@ -145,6 +145,35 @@ O `google-services.json` contém identificadores públicos do app, mas chaves
 privadas, service accounts e credenciais administrativas nunca devem ser
 colocadas no aplicativo mobile.
 
+## Analytics e monitoramento
+
+`src/services/telemetry.ts` centraliza os eventos de analytics e os encaminha ao
+Firebase Analytics/GA4 do LoJahr usando os módulos nativos
+`@react-native-firebase/app` e `@react-native-firebase/analytics`. A integração
+está configurada para Android e iOS; a versão web não carrega o SDK nativo.
+
+Os eventos cobrem telas, busca, visualização de produto, carrinho, início do
+checkout e compra confirmada. A coleta é ativada automaticamente em uma nova
+instalação. Uma escolha `denied` já salva continua desativando a coleta. O app
+não envia o texto da busca, dados de login, dados pessoais ou informações de
+pagamento. A tela automática do Firebase foi desativada para evitar duplicar os
+eventos `screen_view` instrumentados pelo roteador.
+
+O Firebase Analytics usa os arquivos do projeto `app-test-one-663ca` associados
+ao pacote Android/iOS `br.com.lojahr.store`. No iOS, o build usa CocoaPods e
+desativa o suporte ao ID de publicidade; não foi incluída instrumentação de
+anúncios nem integração com IDFA.
+
+Para validar o recebimento real, é necessário gerar um novo development build
+nativo e conferir os eventos no Firebase/GA4 DebugView. A instalação atual do
+Expo Go não contém os módulos nativos. Neste ambiente Windows não é possível
+compilar localmente o aplicativo iOS; o build iOS precisa ocorrer em macOS ou
+por um serviço de build compatível. Antes de publicação, a política de
+privacidade do app deve informar a coleta de métricas e os dados enviados.
+
+Datadog, Insider e Salesforce continuam fora desta integração; dependem da
+conta, do produto e do caso de uso escolhidos para cada serviço.
+
 ## Builds Android e iOS com EAS
 
 O arquivo `eas.json` define três perfis:
