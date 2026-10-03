@@ -439,7 +439,7 @@ export function ReviewItemsDisclosure({ items, expanded, onToggle }: { items: Ca
         <CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.reviewItemImage} />
         <View style={styles.reviewItemDetails}>
           <ThemedText numberOfLines={3} style={styles.reviewItemName}>{item.name}</ThemedText>
-          <ThemedText style={styles.reviewItemQuantity}>{item.quantity + ' un.'}</ThemedText>
+          <ThemedText style={styles.reviewItemQuantity}>{`Qtd: ${item.quantity}`}</ThemedText>
           <ThemedText style={styles.reviewItemPrice}>{money(item.price)}</ThemedText>
         </View>
       </View>)}</View>

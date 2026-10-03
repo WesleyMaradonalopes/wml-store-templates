@@ -87,6 +87,39 @@ A busca por voz usa o módulo nativo `expo-speech-recognition`. Depois de
 instalar essa dependência ou alterar sua configuração no `app.json`, gere um
 novo development build antes de testar o microfone no Android ou no iOS.
 
+## Login com Google no app nativo
+
+Android e iOS usam `react-native-nitro-google-signin` (Credential Manager no
+Android e o SDK oficial do Google no iOS). A versão Web continua usando
+Expo AuthSession. No app nativo, configure `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
+explicitamente com o cliente **Web do mesmo projeto Google Cloud** dos clientes
+Android/iOS. O ID público retornado pela VTEX pode pertencer a outro projeto e
+não deve ser usado como fallback no SDK nativo. A configuração é validada antes
+de abrir a seleção de contas; os erros são exibidos de forma curta, sem stacks.
+
+O `.env` local já aponta para o cliente Web `LoJahr Mobile Native Login`, do
+projeto `app-test-one-663ca`. Esse arquivo não é versionado: configure os mesmos
+IDs públicos no ambiente das builds. Na versão Web, a configuração pública da
+VTEX continua sendo usada, com override separado em
+`EXPO_PUBLIC_GOOGLE_BROWSER_CLIENT_ID`.
+
+São duas validações diferentes: o Google precisa emitir a credencial do app e
+a VTEX precisa aceitá-la para gerar uma sessão da loja. O app **não** cria uma
+sessão somente por receber um e-mail do Google. O fluxo atual utiliza
+`/api/vtexid/google/onetap/signin`; a aceitação da audiência do app pela VTEX
+ainda precisa ser confirmada em um login real. A rota alternativa
+`/api/vtexid/audience/webstore/provider/oauth/exchange` respondeu
+`Feature disabled` na conta `lojahr` em 03/10/2026; não é um fallback disponível
+sem habilitar/configurar essa integração com a VTEX. Nenhuma configuração de
+autenticação do site foi alterada.
+
+Os Client IDs Android/iOS precisam corresponder ao pacote/bundle
+`br.com.lojahr.store`. O cliente Android também precisa ter o SHA-1 da assinatura
+do build: o SHA-1 de debug serve para testes locais; uma build de loja pode exigir
+o certificado de assinatura de release/Play Store. O cliente iOS deve usar o
+mesmo Bundle ID. Após alterar ou instalar dependências nativas, gere novamente
+o development build; reiniciar apenas o Metro não incorpora o módulo nativo.
+
 Os `clientId`/site keys são públicos e podem ficar em `EXPO_PUBLIC_*`. O
 `clientSecret`, a Google API key e outras credenciais permanecem somente na
 configuração da VTEX/backend e nunca devem ser colocados em `EXPO_PUBLIC_*`.

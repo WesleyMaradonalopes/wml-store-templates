@@ -213,9 +213,6 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
             <BottomSheetHandle />
             <SafeAreaView edges={['bottom']} style={styles.safeArea}>
               <View style={styles.header}>
-                <ThemedText numberOfLines={2} style={styles.title}>
-                  {isKit ? <>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></> : details.name }
-                </ThemedText>
                 <Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.closeButton}>
                   <ThemedText style={styles.closeText}>✕</ThemedText>
                 </Pressable>
@@ -237,8 +234,9 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                         renderItem={({ item }) => <Image source={{ uri: item }} style={styles.image} contentFit="cover" />}
                       />
                     )}
+                    <ThemedText numberOfLines={2} style={styles.nameQuickView}>{details.name}</ThemedText>
                     <View style={styles.priceRow}>
-                      {!isKit && (selectedVariant?.price ?? details.price) !== null && (
+                      {isKit ? <ThemedText numberOfLines={2} style={styles.kitPrompt}>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></ThemedText> : (selectedVariant?.price ?? details.price) !== null && (
                         <ThemedText style={styles.priceQuickView} type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
                       )}
                       <ProductFavoriteButton product={details} buttonStyle={styles.favoriteButton} />
@@ -315,13 +313,12 @@ export function ProductQuickViewButton({ product, label = 'Adicionar', icon, acc
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.62)' },
   dismissArea: { flex: 1 },
-  sheet: { maxHeight: '84%', width: '95%', margin: 'auto', marginBottom: 30, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  sheet: { maxHeight: '84%', width: '95%', margin: 'auto', marginBottom: 30, borderRadius: 24, overflow: 'hidden', backgroundColor: '#ffffff' },
   safeArea: { maxHeight: '100%' },
-  header: { minHeight: 64, paddingHorizontal: Spacing.four, paddingVertical: Spacing.three, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#ece8e2' },
-  title: { flex: 1, paddingRight: Spacing.three },
-  closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
-  content: { gap: 5, padding: Spacing.four, paddingBottom: Spacing.five },
+  header: { backgroundColor: 'transparent', position: 'absolute', top: -17, left: 'auto', right: 2, bottom: 'auto', borderRadius: 50, width: 30, height: 30, padding: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  closeButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderRadius: 50 },
+  closeText: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', fontWeight: '400' },
+  content: { gap: 5, padding: Spacing.four, paddingBottom: Spacing.five, marginTop: 10 },
   skeletonContent: { gap: 12 },
   skeletonGallery: { flexDirection: 'row', gap: 12, overflow: 'hidden' },
   skeletonGalleryImage: { width: 160, height: 220, borderRadius: 8 },
@@ -332,8 +329,9 @@ const styles = StyleSheet.create({
   skeletonButton: { width: '100%', height: 50, borderRadius: 8 },
   gallery: { gap: 12, paddingRight: Spacing.four },
   image: { width: 160, height: 220, borderRadius: 8, backgroundColor: '#e8e8ea' },
-	nameQuickView: { fontSize: 14},
+	nameQuickView: { fontSize: 13, lineHeight: 16},
   priceRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center' },
+  kitPrompt: { flex: 1, paddingRight: Spacing.two, fontSize: 14, lineHeight: 18 },
   priceQuickView: { fontSize: 16, margin: 0 },
   favoriteButton: { marginLeft: 'auto', width: 30, height: 30, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 0, borderColor: '#d6d0c8' },
   variationGroup: { gap: Spacing.two},
@@ -343,7 +341,7 @@ const styles = StyleSheet.create({
   selectedOptionText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableOption: { opacity: 0.35, backgroundColor: '#eeeae4' },
   unavailableText: { textDecorationLine: 'line-through' },
-  messageText: { color: '#B42318', fontWeight: '600' },
+  messageText: { color: '#B42318', fontWeight: '600', fontSize: 12 },
   productButton: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   addButton: { minHeight: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   addButtonText: { color: '#FFFFFF', fontWeight: '700' },

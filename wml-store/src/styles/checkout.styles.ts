@@ -222,7 +222,7 @@ export const styles = StyleSheet.create({
   reviewItemPreviewImage: { width: '100%', height: '100%', backgroundColor: '#eeeae5' },
   reviewItemsExpanded: { gap: Spacing.two },
   reviewItem: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.three },
-  reviewItemImage: { width: 50, height: 70, aspectRatio: 3/4, borderRadius: 8, backgroundColor: '#eeeae5' },
+  reviewItemImage: { width: 58, height: 78, borderRadius: 3, backgroundColor: '#eeeae5' },
   reviewItemDetails: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 4 },
   reviewItemName: { fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '400' },
   reviewItemQuantity: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 17, fontWeight: '400' },

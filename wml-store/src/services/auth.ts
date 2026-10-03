@@ -1,6 +1,7 @@
 import { getStoredJson, removeStoredValue, setStoredJson } from './storage';
 import * as SecureStore from 'expo-secure-store';
 import { storeConfig } from '@/config/store';
+import { GoogleLoginError } from './google-login';
 
 export type AccountSession = { email: string; loggedAt: string };
 type AccountSessionListener = (session: AccountSession | null) => void;
@@ -198,7 +199,7 @@ export async function getVtexGoogleClientId() {
   });
   const data = await response.json().catch(() => ({})) as GoogleClientIdResponse;
   if (!response.ok || data.enabled === false || !data.clientId) {
-    throw new Error('O login com Google não está configurado na VTEX.');
+    throw new GoogleLoginError('store-unavailable');
   }
   return data.clientId;
 }
@@ -211,6 +212,7 @@ function extractAuthToken(value: unknown) {
 }
 
 export async function loginVtexGoogle(credential: string) {
+  if (!credential.trim()) throw new GoogleLoginError('credential');
   const form = new URLSearchParams();
   form.append('account', storeConfig.account);
   form.append('credential', credential);
@@ -222,18 +224,17 @@ export async function loginVtexGoogle(credential: string) {
   const data = await response.json().catch(() => ({})) as VtexGoogleLoginResponse;
   const token = extractAuthToken(data.authCookie) || extractAuthToken(data.accountAuthCookie);
   if (!response.ok || data.authStatus !== 'Success' || !token) {
-    const messages: Record<string, string> = {
-      InvalidToken: 'O Google não retornou uma credencial válida.',
-      CanceledByUser: 'O login com Google foi cancelado.',
-      InativeUser: 'Esta conta Google não está ativa na loja.',
-    };
-    throw new Error(messages[data.authStatus || ''] || 'Não foi possível concluir o login com Google.');
+    if (data.authStatus === 'CanceledByUser') throw Object.assign(new Error('Cancelled'), { code: 'SIGN_IN_CANCELLED' });
+    if (data.authStatus === 'InvalidToken') throw new GoogleLoginError('credential');
+    if (data.authStatus === 'InativeUser' || data.authStatus === 'InactiveUser') throw new GoogleLoginError('inactive-account');
+    throw new GoogleLoginError('store-unavailable');
   }
   await saveVtexUserToken(token);
   return data;
 }
 
 export async function exchangeVtexGoogleAccessToken(accessToken: string) {
+  if (!accessToken.trim()) throw new GoogleLoginError('credential');
   const providerId = process.env.EXPO_PUBLIC_VTEX_GOOGLE_PROVIDER_ID || 'Google';
   const response = await fetch(`${storeConfig.vtexBaseUrl}/api/vtexid/audience/webstore/provider/oauth/exchange`, {
     method: 'POST',
@@ -243,7 +244,7 @@ export async function exchangeVtexGoogleAccessToken(accessToken: string) {
   const data = await response.json().catch(() => ({})) as VtexGoogleLoginResponse;
   const token = extractAuthToken(data.authToken) || extractAuthToken(data.authCookie) || extractAuthToken(data.accountAuthCookie);
   if (!response.ok || !token) {
-    throw new Error(data.message || 'Não foi possível vincular o login Google à VTEX.');
+    throw new GoogleLoginError('store-unavailable');
   }
   await saveVtexUserToken(token);
   return data;

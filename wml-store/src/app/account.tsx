@@ -18,6 +18,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { clearAccountSession, clearRememberedLogin, exchangeVtexGoogleAccessToken, getAccountSession, getGoogleEmailFromIdToken, getRememberedLogin, getVtexGoogleClientId, loginVtexGoogle, loginVtexPassword, saveAccountSession, saveRememberedLogin, sendVtexAccessKey, setVtexPassword, startVtexAuthentication, subscribeAccountSession, validateVtexAccessKey } from '@/services/auth';
 import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
+import { getGoogleLoginFailure, GoogleLoginError, signInWithNativeGoogle } from '@/services/google-login';
 import { disableNotifications, enableNotifications, initializeNotifications, NotificationModuleUnavailableError, NotificationPermissionError } from '@/services/notifications';
 import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode, phoneToApi } from '@/utils/customer-formatters';
 
@@ -84,6 +85,9 @@ function mergeOrderFormProfile(current: CustomerProfile, incoming: OrderFormProf
   };
 }
 
+// Keep the Google login implementation, but omit its button until the VTEX
+// integration is complete. Re-enable it in a future app version after testing.
+const SHOW_GOOGLE_LOGIN = false;
 const googleClientIdPlaceholder = 'not-configured.apps.googleusercontent.com';
 const googleRedirectUri = makeRedirectUri({ scheme: 'lojahr', path: 'oauthredirect' });
 const customerServiceWhatsAppUrl = 'https://api.whatsapp.com/send?phone=5511993680367';
@@ -126,9 +130,10 @@ export default function AccountScreen() {
   const [rememberAccess, setRememberAccess] = useState(false);
   const [rememberHelpVisible, setRememberHelpVisible] = useState(false);
   const configuredGoogleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
+  const configuredGoogleBrowserClientId = process.env.EXPO_PUBLIC_GOOGLE_BROWSER_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
   const configuredGoogleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
   const configuredGoogleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
-  const [googleWebClientId, setGoogleWebClientId] = useState(configuredGoogleWebClientId || googleClientIdPlaceholder);
+  const [googleWebClientId, setGoogleWebClientId] = useState(configuredGoogleBrowserClientId || googleClientIdPlaceholder);
   const [googleConfigMessage, setGoogleConfigMessage] = useState<string | null>(null);
   const googlePlatformClientId = Platform.select({
     ios: configuredGoogleIosClientId,
@@ -151,6 +156,7 @@ export default function AccountScreen() {
   });
   const onScroll = useTabBarScroll();
   const rememberedLoginLoad = useRef(0);
+  const googleLoginInProgress = useRef(false);
 
   const loadRememberedAccess = useCallback(async () => {
     const loadId = rememberedLoginLoad.current + 1;
@@ -178,17 +184,17 @@ export default function AccountScreen() {
   }, [loadRememberedAccess, view]));
 
   useEffect(() => {
-    if (configuredGoogleWebClientId || Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || configuredGoogleBrowserClientId) return;
     let active = true;
     getVtexGoogleClientId().then((clientId) => {
       if (!active) return;
       setGoogleWebClientId(clientId);
     }).catch(() => {
       if (!active) return;
-      setGoogleConfigMessage('Não foi possível carregar a configuração do Google da VTEX.');
+      setGoogleConfigMessage('O login com Google está temporariamente indisponível. Use outra opção de acesso.');
     });
     return () => { active = false; };
-  }, [configuredGoogleWebClientId]);
+  }, [configuredGoogleBrowserClientId]);
 
   useEffect(() => {
     if (requestedView === 'access') setView('access');
@@ -494,36 +500,60 @@ export default function AccountScreen() {
   }
 
   async function loginWithGoogle() {
-    if (!googleConfigured || !googleRequest) {
-      const platformMessage = Platform.OS === 'ios'
-        ? 'Configure o Client ID OAuth do iOS para este app.'
-        : Platform.OS === 'android'
-          ? 'Configure o Client ID OAuth do Android para este app.'
-          : 'A configuração web do login Google ainda não está pronta.';
-      setAuthMessage(googleConfigMessage || platformMessage);
+    if (googleLoginInProgress.current || loginLoading) return;
+    if (Platform.OS === 'web' && (!googleConfigured || !googleRequest)) {
+      setAuthMessage(googleConfigMessage || 'O login com Google está temporariamente indisponível. Use outra opção de acesso.');
       return;
     }
+
+    googleLoginInProgress.current = true;
+    let stage = 'google';
     try {
       setAuthMessage(null);
       setLoginLoading(true);
-      const result = await promptGoogleAsync();
-      if (result.type !== 'success') {
-        if (result.type !== 'cancel' && result.type !== 'dismiss') setAuthMessage('Não foi possível abrir o login com Google.');
-        return;
+
+      let credential = '';
+      let accessToken = '';
+      let googleEmail = '';
+
+      if (Platform.OS === 'web') {
+        const result = await promptGoogleAsync();
+        if (result.type !== 'success') {
+          if (result.type !== 'cancel' && result.type !== 'dismiss') setAuthMessage('Não foi possível abrir o login com Google.');
+          return;
+        }
+        credential = result.params.id_token || result.authentication?.idToken || '';
+        accessToken = result.authentication?.accessToken || result.params.access_token || '';
+      } else {
+        const result = await signInWithNativeGoogle(Platform.OS === 'ios' ? 'ios' : 'android', {
+          webClientId: configuredGoogleWebClientId,
+          androidClientId: configuredGoogleAndroidClientId,
+          iosClientId: configuredGoogleIosClientId,
+        });
+        if (!result) return;
+        credential = result.idToken;
+        googleEmail = result.email;
       }
-      const credential = result.params.id_token || result.authentication?.idToken || '';
-      const accessToken = result.authentication?.accessToken || result.params.access_token || '';
-      if (!credential && !accessToken) throw new Error('O Google não retornou a credencial de acesso.');
-      const data = accessToken ? await exchangeVtexGoogleAccessToken(accessToken) : await loginVtexGoogle(credential);
-      const accountEmail = getGoogleEmailFromIdToken(credential) || (data.userId?.includes('@') ? data.userId.toLowerCase() : '');
-      if (!accountEmail) throw new Error('Não foi possível identificar o e-mail da conta Google.');
+
+      if (!credential && !accessToken) throw new GoogleLoginError('credential');
+      stage = 'vtex';
+      // Prefer the existing Google ID-token flow. The optional VTEX OAuth
+      // exchange must not replace it just because the web SDK also returns an access token.
+      const data = credential ? await loginVtexGoogle(credential) : await exchangeVtexGoogleAccessToken(accessToken);
+      const accountEmail = getGoogleEmailFromIdToken(credential) || googleEmail.toLowerCase() || (data.userId?.includes('@') ? data.userId.toLowerCase() : '');
+      if (!accountEmail) throw new GoogleLoginError('identity');
+      stage = 'session';
       await saveAccountSession(accountEmail);
       setEmail(accountEmail);
       setLoggedIn(true);
       setView('home');
     } catch (error) {
-      setAuthMessage(error instanceof Error ? error.message : 'Não foi possível entrar com Google.');
+      const failure = getGoogleLoginFailure(error);
+      setAuthMessage(failure.message);
+      // Only fixed diagnostic codes: never log credentials, personal data or native stacks.
+      if (__DEV__ && failure.message) console.info('[Google login]', { stage, reason: failure.code });
     } finally {
+      googleLoginInProgress.current = false;
       setLoginLoading(false);
     }
   }
@@ -627,7 +657,7 @@ function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, mes
   return (
     <ThemedView style={styles.card}>
       <ThemedText type="subtitle" style={styles.authTitle}>Acesse sua conta</ThemedText>
-      <ThemedText themeColor="textSecondary">Entre de forma rápida e segura usando uma das opções abaixo</ThemedText>
+      <ThemedText style={styles.authText}>Entre de forma rápida e segura usando uma das opções abaixo</ThemedText>
       <View style={styles.divider} />
       <Pressable onPress={onEmail} style={styles.outlineButton}>
         <ThemedText type="smallBold">Receber código de acesso por e-mail</ThemedText>
@@ -636,10 +666,12 @@ function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, mes
       <Pressable onPress={onPassword} style={styles.outlineButton}>
         <ThemedText type="smallBold">Entrar com e-mail e senha</ThemedText>
       </Pressable>
-      <Pressable disabled={googleLoading} onPress={onGoogle} style={[styles.outlineButton, styles.googleButton, googleLoading && styles.disabled]}>
-        <GoogleGIcon size={18} />
-        {googleLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold">Entrar com Google</ThemedText>}
-      </Pressable>
+      {SHOW_GOOGLE_LOGIN && (
+        <Pressable disabled={googleLoading} onPress={onGoogle} style={[styles.outlineButton, styles.googleButton, googleLoading && styles.disabled]}>
+          <GoogleGIcon size={18} />
+          {googleLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold">Entrar com Google</ThemedText>}
+        </Pressable>
+      )}
       <Pressable onPress={onApple} style={[styles.outlineButton, styles.googleButton]}>
         <AppleLogoIcon size={22} />
         <ThemedText type="smallBold">Entrar com Apple</ThemedText>
@@ -729,7 +761,7 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
   );
 }
 function EmailAccessView({ email, setEmail, onSend, loading, onRegister, onPrivacy, message }: { email: string; setEmail: (value: string) => void; onSend: () => void; loading: boolean; onRegister: () => void; onPrivacy: () => void; message: string | null }) {
-  return <ThemedView style={styles.card}><ThemedText type="subtitle" style={styles.authTitle}>Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Informe seu e-mail para acessar ou registrar seus dados com segurança</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} /><Pressable disabled={loading} onPress={onSend} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Insira seu e-mail</ThemedText>}</Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<ThemedText themeColor="textSecondary">Ao se cadastrar, você concorda com nossa <Text onPress={onPrivacy} style={styles.privacyLink}>Política de Privacidade.</Text></ThemedText><Pressable disabled={loading} onPress={onRegister}><ThemedText type="link">Criar uma conta</ThemedText></Pressable></ThemedView>;
+  return <ThemedView style={styles.card}><ThemedText type="subtitle" style={styles.authTitle}>Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Informe seu e-mail para acessar ou registrar seus dados com segurança</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} /><Pressable disabled={loading} onPress={onSend} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Insira seu e-mail</ThemedText>}</Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<ThemedText themeColor="textSecondary">Ao se cadastrar, você concorda com nossa <Text onPress={onPrivacy} style={styles.privacyLink}>Política de Privacidade.</Text></ThemedText><Pressable disabled={loading} onPress={onRegister}><ThemedText type="link" style={styles.privacyCreateLink}>Criar uma conta</ThemedText></Pressable></ThemedView>;
 }
 function CodeView({ email, code, setCode, sentAt, onValidate, onResend, loading, resendLoading, onBack, message }: { email: string; code: string; setCode: (value: string) => void; sentAt: number | null; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
   return <CodeAccessView title="Acesse sua conta" email={email} code={code} setCode={setCode} sentAt={sentAt} onValidate={onValidate} onResend={onResend} loading={loading} resendLoading={resendLoading} onBack={onBack} message={message} />;
