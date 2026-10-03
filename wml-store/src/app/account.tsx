@@ -3,7 +3,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NewsletterOptIn } from '@/components/newsletter-opt-in';
@@ -86,6 +86,15 @@ function mergeOrderFormProfile(current: CustomerProfile, incoming: OrderFormProf
 
 const googleClientIdPlaceholder = 'not-configured.apps.googleusercontent.com';
 const googleRedirectUri = makeRedirectUri({ scheme: 'lojahr', path: 'oauthredirect' });
+const customerServiceWhatsAppUrl = 'https://api.whatsapp.com/send?phone=5511993680367';
+
+async function openCustomerServiceWhatsApp() {
+  try {
+    await Linking.openURL(customerServiceWhatsAppUrl);
+  } catch {
+    Alert.alert('Não foi possível abrir a Central de Ajuda', 'Tente novamente em instantes.');
+  }
+}
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -527,7 +536,7 @@ export default function AccountScreen() {
     return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}><View style={styles.accountScreen}><ScrollView onScroll={onScroll} scrollEventThrottle={16} style={styles.accountScroll}>
       <ScreenHeader back={false} showSearch={false} showCart={false} logoWidth={88} logoHeight={24} logoOffsetY={0} />
       <View style={styles.content}>
-        {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} /> : <GuestAccount notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onEnter={() => setView('access')} onRegister={() => setView('register')} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} />}
+        {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} onHelp={() => { void openCustomerServiceWhatsApp(); }} /> : <GuestAccount notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onEnter={() => setView('access')} onRegister={() => setView('register')} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} onHelp={() => { void openCustomerServiceWhatsApp(); }} />}
       </View>
     </ScrollView><View style={styles.themeToggleAbove}>{SHOW_THEME_TOGGLE && <ThemeToggle />}</View></View></SafeAreaView></ThemedView>;
   }
@@ -559,11 +568,11 @@ export default function AccountScreen() {
   </ScrollView></SafeAreaView></ThemedView>;
 }
 
-function GuestAccount({ onEnter, onRegister, onCoupons, onReturns, onPrivacy, notifications, onNotificationsChange, notificationsLoading, notificationsMessage }: { onEnter: () => void; onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null }) {
+function GuestAccount({ onEnter, onRegister, onCoupons, onReturns, onPrivacy, onHelp, notifications, onNotificationsChange, notificationsLoading, notificationsMessage }: { onEnter: () => void; onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void; onHelp: () => void; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null }) {
   const { colorScheme } = useAppTheme();
   const theme = useTheme();
   const dark = colorScheme === 'dark';
-  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={[styles.primaryButton, dark && { backgroundColor: theme.surface }]}><ThemedText style={[styles.primaryText, dark && { color: theme.text }]}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} onCoupons={onCoupons} onReturns={onReturns} onPrivacy={onPrivacy} /><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={[styles.helpButton, dark && { borderColor: theme.borderStrong }]}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
+  return <><ThemedText style={styles.greeting}>Para uma melhor experiência, entre ou cadastre-se</ThemedText><Pressable onPress={onEnter} style={[styles.primaryButton, dark && { backgroundColor: theme.surface }]}><ThemedText style={[styles.primaryText, dark && { color: theme.text }]}>Entrar</ThemedText></Pressable><UtilityGrid onRegister={onRegister} onCoupons={onCoupons} onReturns={onReturns} onPrivacy={onPrivacy} /><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable accessibilityRole="button" accessibilityLabel="Abrir Central de Ajuda no WhatsApp" onPress={onHelp} style={[styles.helpButton, dark && { borderColor: theme.borderStrong }]}><ThemedText type="smallBold">Central de Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
 }
 
 type AccountTileData = { label: string; icon: ReactNode; onPress?: () => void };
@@ -843,7 +852,7 @@ const logoutButtonStyles = StyleSheet.create({
   label: { color: '#0a0a0a', fontWeight: '600' },
 });
 
-function LoggedAccountV2({ email, notifications, onNotificationsChange, notificationsLoading, notificationsMessage, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset, onCoupons, onReturns, onPrivacy }: { email: string; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void; onCoupons?: () => void; onReturns?: () => void; onPrivacy?: () => void }) {
+function LoggedAccountV2({ email, notifications, onNotificationsChange, notificationsLoading, notificationsMessage, onLogout, logoutLoading, onPersonal, onOrders, onFavorites, onPasswordReset, onCoupons, onReturns, onPrivacy, onHelp }: { email: string; notifications: boolean; onNotificationsChange: (value: boolean) => void; notificationsLoading: boolean; notificationsMessage: string | null; onLogout: () => void; logoutLoading: boolean; onPersonal: () => void; onOrders: () => void; onFavorites: () => void; onPasswordReset: () => void; onCoupons?: () => void; onReturns?: () => void; onPrivacy?: () => void; onHelp?: () => void }) {
   const theme = useTheme();
   const tiles: AccountTileData[] = [
     { label: 'Meus pedidos', icon: <Box01Icon color={theme.text} size={18} />, onPress: onOrders },
@@ -855,7 +864,7 @@ function LoggedAccountV2({ email, notifications, onNotificationsChange, notifica
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={18} /> },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color={theme.text} size={18} />, onPress: onPrivacy },
   ];
-  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><View style={styles.logoutDivider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, { borderColor: theme.border }, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color={theme.text} /> : <><LogoutIcon color={theme.text} size={16} /><ThemedText style={[logoutButtonStyles.label, { color: theme.text }]}>Sair</ThemedText></>}</View></Pressable><View style={styles.logoutDivider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable style={[styles.helpButton, { borderColor: theme.borderStrong }]}><ThemedText type="smallBold">Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
+  return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><View style={styles.logoutDivider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, { borderColor: theme.border }, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color={theme.text} /> : <><LogoutIcon color={theme.text} size={16} /><ThemedText style={[logoutButtonStyles.label, { color: theme.text }]}>Sair</ThemedText></>}</View></Pressable><View style={styles.logoutDivider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable accessibilityRole="button" accessibilityLabel="Abrir Central de Ajuda no WhatsApp" onPress={onHelp} style={[styles.helpButton, { borderColor: theme.borderStrong }]}><ThemedText type="smallBold">Central de Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;
 }
 
 function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPrivacyPress }: { email: string; profile: CustomerProfile; profileMessage: string | null; onSaved: (profile: CustomerProfile) => void; onBack: () => void; onPrivacyPress: () => void }) {
