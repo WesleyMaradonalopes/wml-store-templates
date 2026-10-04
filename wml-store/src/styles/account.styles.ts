@@ -104,9 +104,9 @@ export const styles = StyleSheet.create({
   personalDataField: { gap: 4 },
   personalDataLabel: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, fontWeight: '400' },
   personalDataValue: { color: '#a29b93', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, fontWeight: '400' },
-  personalDataInput: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', backgroundColor: '#ffffff', color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 20 },
+  personalDataInput: { minHeight: 42, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', backgroundColor: '#ffffff', color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 20 },
   personalDataReadonlyInput: { borderColor: '#0a0a0a', backgroundColor: '#ebe8e5', color: '#a7a099' },
-  personalDataSelect: { minHeight: 50, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  personalDataSelect: { minHeight: 42, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   personalDataSelectText: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 16, lineHeight: 22, fontWeight: '400' },
   personalDataDropdown: { borderWidth: 1, borderColor: '#0a0a0a', borderRadius: 8, backgroundColor: '#ffffff' },
   personalDataOption: { paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 0, borderBottomColor: '#eeeae5' },
@@ -116,5 +116,5 @@ export const styles = StyleSheet.create({
   saveSuccessText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', textAlign: 'center' },
   personalDataEditSection: { marginTop: 28, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#e8e3dd' },
   personalDataEditLink: { color: '#5d5850', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, textDecorationLine: 'underline' },
-  personalDataConfirmButton: { minHeight: 50, display: 'flex', justifyContent: 'center' , alignItems: 'center' },
+  personalDataConfirmButton: { minHeight: 42, display: 'flex', justifyContent: 'center' , alignItems: 'center' },
 });

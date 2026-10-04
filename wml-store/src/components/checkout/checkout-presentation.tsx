@@ -480,7 +480,6 @@ export function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoadin
     </View>}
     <View style={[styles.paymentCard, selected && styles.paymentCardSelected]}>
       <ThemedText style={styles.sectionTitle}>Vale presente</ThemedText>
-      <View style={styles.paymentDivider} />
       <View style={styles.inline}>
         <TextInput value={voucher} onChangeText={onVoucherChange} autoCapitalize="characters" autoCorrect={false} placeholder="Insira o código do vale-presente" style={[styles.input, styles.flex]} />
         <Pressable disabled={saving || voucherLoading} onPress={onApply} style={[styles.smallButton, (saving || voucherLoading) && styles.giftCardButtonDisabled]}>

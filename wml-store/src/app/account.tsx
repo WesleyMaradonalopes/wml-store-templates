@@ -883,8 +883,8 @@ function LoggedAccountV2({ email, notifications, onNotificationsChange, notifica
   const tiles: AccountTileData[] = [
     { label: 'Meus pedidos', icon: <Box01Icon color={theme.text} size={18} />, onPress: onOrders },
     { label: 'Dados pessoais', icon: <UserIcon color={theme.text} size={18} />, onPress: onPersonal },
-    { label: 'Favoritos', icon: <HeartIcon color={theme.text} size={18} />, onPress: onFavorites },
-    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color={theme.text} size={18} />, onPress: onReturns },
+    { label: 'Favoritos', icon: <HeartIcon color={theme.text} size={20} />, onPress: onFavorites },
+    { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color={theme.text} size={16} />, onPress: onReturns },
     { label: 'Redefinição de senha', icon: <LockIcon color={theme.text} size={18} />, onPress: onPasswordReset },
     { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={18} />, onPress: onCoupons },
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={18} /> },
