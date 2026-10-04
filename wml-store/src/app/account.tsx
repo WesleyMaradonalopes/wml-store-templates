@@ -88,6 +88,9 @@ function mergeOrderFormProfile(current: CustomerProfile, incoming: OrderFormProf
 // Keep the Google login implementation, but omit its button until the VTEX
 // integration is complete. Re-enable it in a future app version after testing.
 const SHOW_GOOGLE_LOGIN = false;
+// Keep the Apple login handler and UI implementation available, but hide its
+// button until the Apple Developer and VTEX authentication setup is complete.
+const SHOW_APPLE_LOGIN = false;
 const googleClientIdPlaceholder = 'not-configured.apps.googleusercontent.com';
 const googleRedirectUri = makeRedirectUri({ scheme: 'lojahr', path: 'oauthredirect' });
 const customerServiceWhatsAppUrl = 'https://api.whatsapp.com/send?phone=5511993680367';
@@ -113,7 +116,7 @@ export default function AccountScreen() {
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
-  const [accepted, setAccepted] = useState(false);
+  const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const [notifications, setNotifications] = useState(false);
   const [notificationsMessage, setNotificationsMessage] = useState<string | null>(null);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -373,16 +376,13 @@ export default function AccountScreen() {
       setAuthMessage('Informe um e-mail válido.');
       return;
     }
-    if (!accepted) {
-      setAuthMessage('Aceite os termos de serviço para continuar.');
-      return;
-    }
     try {
       setAuthMessage(null);
       setAccessCodeLoading(true);
       // Garante que o cliente também exista no Shopper/Master Data antes de
-      // concluir o cadastro por código na VTEX.
-      await updateCustomerProfile(normalizedEmail, { email: normalizedEmail, isNewsletterOptIn: true });
+      // concluir o cadastro por código na VTEX. O valor pode ser false: o
+      // checkbox é um opt-in de novidades, não uma condição para cadastro.
+      await updateCustomerProfile(normalizedEmail, { email: normalizedEmail, isNewsletterOptIn: newsletterOptIn });
       const token = await startVtexAuthentication();
       await sendVtexAccessKey(normalizedEmail, token);
       setEmail(normalizedEmail);
@@ -562,11 +562,17 @@ export default function AccountScreen() {
     setAuthMessage('O login com Apple será ativado após a configuração das credenciais da Apple.');
   }
 
+  function openRegister() {
+    setAuthMessage(null);
+    setNewsletterOptIn(true);
+    setView('register');
+  }
+
   if (view === 'home') {
     return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}><View style={styles.accountScreen}><ScrollView onScroll={onScroll} scrollEventThrottle={16} style={styles.accountScroll}>
       <ScreenHeader back={false} showSearch={false} showCart={false} logoWidth={88} logoHeight={24} logoOffsetY={0} />
       <View style={styles.content}>
-        {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} onHelp={() => { void openCustomerServiceWhatsApp(); }} /> : <GuestAccount notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onEnter={() => setView('access')} onRegister={() => setView('register')} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} onHelp={() => { void openCustomerServiceWhatsApp(); }} />}
+        {loggedIn ? <LoggedAccountV2 email={email} notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onLogout={logout} logoutLoading={logoutLoading} onPersonal={() => setView('personal')} onOrders={() => router.push('/orders')} onFavorites={() => router.push('/favorites')} onPasswordReset={() => { setAuthMessage(null); setView('recovery-email'); }} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} onHelp={() => { void openCustomerServiceWhatsApp(); }} /> : <GuestAccount notifications={notifications} onNotificationsChange={(value) => { void changeNotifications(value); }} notificationsLoading={notificationsLoading} notificationsMessage={notificationsMessage} onEnter={() => setView('access')} onRegister={openRegister} onCoupons={() => router.push('/coupons' as never)} onReturns={() => router.push('/returns' as never)} onPrivacy={() => router.push('/privacy-policy' as never)} onHelp={() => { void openCustomerServiceWhatsApp(); }} />}
       </View>
     </ScrollView><View style={styles.themeToggleAbove}>{SHOW_THEME_TOGGLE && <ThemeToggle />}</View></View></SafeAreaView></ThemedView>;
   }
@@ -584,14 +590,14 @@ export default function AccountScreen() {
     if (view === 'recovery-password') return setView('recovery-email');
   };
 
-  const headerTitle = view === 'register' || view === 'register-code' ? 'Registrar' : view === 'register-password' ? 'Criar senha' : view === 'recovery-email' || view === 'recovery-password' ? 'Alterar senha' : 'Acesse sua conta';
+  const headerTitle = view === 'register' || view === 'register-code' ? 'Criar conta' : view === 'register-password' ? 'Criar senha' : view === 'recovery-email' || view === 'recovery-password' ? 'Alterar senha' : 'Acesse sua conta';
   return <ThemedView style={styles.container}><SafeAreaView style={[styles.safeArea, styles.authSafeArea]}><ScreenHeader title={headerTitle} onBack={previousAccountView} showSearch={false} showCart={false} /><ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-    {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={() => setView('register')} />}
+    {view === 'access' && <AccessView onPassword={() => setView('password')} onEmail={() => setView('email')} onGoogle={loginWithGoogle} onApple={loginWithApple} googleLoading={loginLoading} message={authMessage} onRegister={openRegister} />}
     {view === 'password' && <PasswordView email={email} setEmail={setEmail} password={password} setPassword={setPassword} onLogin={login} loading={loginLoading} message={authMessage} onBack={() => setView('access')} onForgot={() => { setAuthMessage(null); setView('recovery-email'); }} rememberAccess={rememberAccess} onRememberAccessChange={changeRememberAccess} rememberHelpVisible={rememberHelpVisible} onRememberHelp={() => setRememberHelpVisible(true)} onCloseRememberHelp={() => setRememberHelpVisible(false)} />}
-    {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} loading={accessCodeLoading} onRegister={() => setView('register')} onPrivacy={() => router.push('/privacy-policy' as never)} message={authMessage} />}
+    {view === 'email' && <EmailAccessView email={email} setEmail={setEmail} onSend={requestAccessCode} loading={accessCodeLoading} onRegister={openRegister} onPrivacy={() => router.push('/privacy-policy' as never)} message={authMessage} />}
     {view === 'code' && <CodeView email={email} code={accessCode} setCode={setAccessCode} sentAt={codeSentAt} onValidate={validateAccessCode} onResend={resendAccessCode} loading={codeLoading} resendLoading={accessCodeLoading} onBack={() => setView('email')} message={authMessage} />}
-    {view === 'register' && <RegisterView email={email} setEmail={setEmail} accepted={accepted} setAccepted={setAccepted} onSend={sendRegistrationCode} loading={accessCodeLoading} message={authMessage} onBack={() => setView('access')} />}
-    {view === 'register-code' && <RegisterCodeView email={email} code={accessCode} setCode={setAccessCode} accepted={accepted} setAccepted={setAccepted} sentAt={codeSentAt} onValidate={validateAccessCode} onResend={resendAccessCode} loading={codeLoading} resendLoading={accessCodeLoading} message={authMessage} onBack={() => setView('register')} />}
+    {view === 'register' && <RegisterView email={email} setEmail={setEmail} newsletterOptIn={newsletterOptIn} setNewsletterOptIn={setNewsletterOptIn} onSend={sendRegistrationCode} loading={accessCodeLoading} message={authMessage} onPrivacy={() => router.push('/privacy-policy' as never)} />}
+    {view === 'register-code' && <RegisterCodeView email={email} code={accessCode} setCode={setAccessCode} sentAt={codeSentAt} onValidate={validateAccessCode} onResend={resendAccessCode} loading={codeLoading} resendLoading={accessCodeLoading} message={authMessage} onBack={() => setView('register')} />}
     {view === 'register-password' && <PasswordSetupView mode="register" email={email} code={accessCode} setCode={setAccessCode} newPassword={newPassword} setNewPassword={setNewPassword} newPasswordConfirmation={newPasswordConfirmation} setNewPasswordConfirmation={setNewPasswordConfirmation} onSubmit={completePasswordSetup} loading={codeLoading} message={authMessage} onBack={() => setView('register')} />}
     {view === 'recovery-email' && <RecoveryEmailView email={email} setEmail={setEmail} onSend={sendRecoveryCode} loading={accessCodeLoading} message={authMessage} onBack={() => setView('password')} />}
     {view === 'recovery-password' && <PasswordSetupView mode="recovery" email={email} code={accessCode} setCode={setAccessCode} newPassword={newPassword} setNewPassword={setNewPassword} newPasswordConfirmation={newPasswordConfirmation} setNewPasswordConfirmation={setNewPasswordConfirmation} onSubmit={completePasswordSetup} loading={codeLoading} message={authMessage} onBack={() => setView('recovery-email')} />}
@@ -672,10 +678,12 @@ function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, mes
           {googleLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold">Entrar com Google</ThemedText>}
         </Pressable>
       )}
-      <Pressable onPress={onApple} style={[styles.outlineButton, styles.googleButton]}>
-        <AppleLogoIcon size={22} />
-        <ThemedText type="smallBold">Entrar com Apple</ThemedText>
-      </Pressable>
+      {SHOW_APPLE_LOGIN && (
+        <Pressable onPress={onApple} style={[styles.outlineButton, styles.googleButton]}>
+          <AppleLogoIcon size={22} />
+          <ThemedText type="smallBold">Entrar com Apple</ThemedText>
+        </Pressable>
+      )}
       <View style={styles.divider} />
       <ThemedText style={styles.centerText}>Ainda não possui uma conta?</ThemedText>
       <Pressable onPress={onRegister} style={styles.outlineButton}>
@@ -733,7 +741,7 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
       </ThemedView>
 
       <Modal visible={rememberHelpVisible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onCloseRememberHelp}>
-        <ThemedView style={[styles.rememberHelpScreen, { backgroundColor: theme.background }]}>
+        <ThemedView style={styles.rememberHelpScreen}>
           <SafeAreaView style={styles.rememberHelpSafeArea}>
             <View style={styles.rememberHelpHeader}>
               <View style={styles.rememberHelpHeaderSpacer} />
@@ -767,11 +775,11 @@ function CodeView({ email, code, setCode, sentAt, onValidate, onResend, loading,
   return <CodeAccessView title="Acesse sua conta" email={email} code={code} setCode={setCode} sentAt={sentAt} onValidate={onValidate} onResend={onResend} loading={loading} resendLoading={resendLoading} onBack={onBack} message={message} />;
 }
 
-function RegisterCodeView({ email, code, setCode, accepted, setAccepted, sentAt, onValidate, onResend, loading, resendLoading, onBack, message }: { email: string; code: string; setCode: (value: string) => void; accepted: boolean; setAccepted: (value: boolean) => void; sentAt: number | null; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
-  return <CodeAccessView title="Acessar com o seu e-mail" email={email} code={code} setCode={setCode} accepted={accepted} setAccepted={setAccepted} sentAt={sentAt} showEmailInput showTerms onValidate={onValidate} onResend={onResend} loading={loading} resendLoading={resendLoading} onBack={onBack} message={message} />;
+function RegisterCodeView({ email, code, setCode, sentAt, onValidate, onResend, loading, resendLoading, onBack, message }: { email: string; code: string; setCode: (value: string) => void; sentAt: number | null; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
+  return <CodeAccessView title="Acessar com o seu e-mail" email={email} code={code} setCode={setCode} sentAt={sentAt} showEmailInput onValidate={onValidate} onResend={onResend} loading={loading} resendLoading={resendLoading} onBack={onBack} message={message} />;
 }
 
-function CodeAccessView({ title, email, code, setCode, accepted, setAccepted, sentAt, showEmailInput = false, showTerms = false, onValidate, onResend, loading, resendLoading, onBack, message }: { title: string; email: string; code: string; setCode: (value: string) => void; accepted?: boolean; setAccepted?: (value: boolean) => void; sentAt: number | null; showEmailInput?: boolean; showTerms?: boolean; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
+function CodeAccessView({ title, email, code, setCode, sentAt, showEmailInput = false, onValidate, onResend, loading, resendLoading, onBack, message }: { title: string; email: string; code: string; setCode: (value: string) => void; sentAt: number | null; showEmailInput?: boolean; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const hasCode = Boolean(code.trim());
   const resendDisabled = secondsLeft > 0 || loading || resendLoading;
@@ -790,7 +798,6 @@ function CodeAccessView({ title, email, code, setCode, accepted, setAccepted, se
   return <ThemedView style={styles.card}>
     <ThemedText type="subtitle" style={styles.authTitle}>{title}</ThemedText>
     {showEmailInput ? <TextInput value={email} editable={false} style={[styles.input, styles.readonly]} /> : <ThemedText themeColor="textSecondary">Enviamos um código para o e-mail {email}.</ThemedText>}
-    {showTerms && accepted !== undefined && setAccepted && <TermsCheckbox accepted={accepted} setAccepted={setAccepted} disabled={showEmailInput || loading || resendLoading} />}
     <ThemedText themeColor="textSecondary">Código de verificação</ThemedText>
     <TextInput value={code} onChangeText={setCode} placeholder="Código de verificação" keyboardType="number-pad" style={styles.input} />
     {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
@@ -804,30 +811,17 @@ function CodeAccessView({ title, email, code, setCode, accepted, setAccepted, se
   </ThemedView>;
 }
 
-function TermsCheckbox({ accepted, setAccepted, disabled = false }: { accepted: boolean; setAccepted: (value: boolean) => void; disabled?: boolean }) {
-  return <Pressable
-    accessibilityRole="checkbox"
-    accessibilityState={{ checked: accepted, disabled }}
-    disabled={disabled}
-    onPress={() => setAccepted(!accepted)}
-    style={styles.checkRow}>
-    <View style={[styles.checkbox, accepted && styles.checked]}>
-      {accepted && <ThemedText style={styles.checkboxMark}>✓</ThemedText>}
-    </View>
-    <ThemedText themeColor="textSecondary">Ao clicar em Registrar você concorda com os termos de serviço.</ThemedText>
-  </Pressable>;
-}
-
-function RegisterView({ email, setEmail, accepted, setAccepted, onSend, loading, message, onBack }: { email: string; setEmail: (value: string) => void; accepted: boolean; setAccepted: (value: boolean) => void; onSend: () => void; loading: boolean; message: string | null; onBack: () => void }) {
-  return <ThemedView style={styles.card}>
-    <ThemedText type="subtitle" style={styles.authTitle}>Acessar com o seu e-mail</ThemedText>
-    <TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} />
-    <TermsCheckbox accepted={accepted} setAccepted={setAccepted} />
-    {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
-    <Pressable disabled={!accepted || loading} onPress={onSend} style={[styles.primaryButton, (!accepted || loading) && styles.disabled]}>
-      {loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Enviar código</ThemedText>}
+function RegisterView({ email, setEmail, newsletterOptIn, setNewsletterOptIn, onSend, loading, message, onPrivacy }: { email: string; setEmail: (value: string) => void; newsletterOptIn: boolean; setNewsletterOptIn: (value: boolean) => void; onSend: () => void; loading: boolean; message: string | null; onPrivacy: () => void }) {
+  const canSubmit = isValidEmail(email);
+  return <ThemedView style={[styles.card, styles.registerCard]}>
+    <ThemedText style={styles.registerTitle}>Criar conta</ThemedText>
+    <ThemedText style={styles.registerSubtitle}>Informe seu e-mail para começar</ThemedText>
+    <TextInput value={email} onChangeText={setEmail} placeholder="Digite seu e-mail" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} style={[styles.input, styles.registerInput]} />
+    <NewsletterOptIn value={newsletterOptIn} onChange={setNewsletterOptIn} onPrivacyPress={onPrivacy} />
+    {!!message && <ThemedText themeColor="textSecondary" style={styles.registerMessage}>{message}</ThemedText>}
+    <Pressable disabled={!canSubmit || loading} onPress={onSend} style={[styles.primaryButton, styles.registerButton, (!canSubmit || loading) && styles.disabled]}>
+      {loading ? <ActivityIndicator size="small" color="#9e9991" /> : <ThemedText style={[styles.registerButtonText, (!canSubmit || loading) && styles.registerButtonTextDisabled]}>Enviar código</ThemedText>}
     </Pressable>
-    <Pressable onPress={onBack} style={styles.outlineButton}><ThemedText type="smallBold">Voltar</ThemedText></Pressable>
   </ThemedView>;
 }
 
@@ -967,7 +961,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={[styles.safeArea, styles.subscreenSafeArea]}>
         <ScreenHeader title="Dados Pessoais" onBack={onBack} />
         <ScrollView contentContainerStyle={[styles.content, styles.personalDataContent]}>
           <ThemedView style={[styles.card, styles.personalDataCard, dark && { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
@@ -976,7 +970,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
               <View style={styles.personalDataField}>
                 <ThemedText style={styles.personalDataLabel}>E-mail</ThemedText>
                 {editing ? (
-                  <TextInput value={email} editable={false} style={[styles.personalDataInput, styles.personalDataReadonlyInput, dark && { backgroundColor: theme.surfaceMuted, color: theme.textSecondary, borderColor: theme.border }]} />
+                  <TextInput value={email} editable={false} style={[styles.personalDataInput, styles.personalDataReadonlyInput, dark && { backgroundColor: theme.surfaceMuted, color: theme.textSecondary }]} />
                 ) : (
                   <ThemedText style={styles.personalDataValue}>{email || 'Não informado'}</ThemedText>
                 )}
@@ -989,7 +983,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
                     <TextInput
                       value={field.label === 'Telefone com DDD' ? formatPhoneWithoutCountryCode(field.value) : field.value}
                       onChangeText={field.set}
-                      style={[styles.personalDataInput, dark && { backgroundColor: theme.inputBackground, color: theme.text, borderColor: theme.borderStrong }]}
+                      style={[styles.personalDataInput, dark && { backgroundColor: theme.inputBackground, color: theme.text }]}
                     />
                   ) : (
                     <ThemedText style={styles.personalDataValue}>{(field.displayValue ?? field.value) || 'Não informado'}</ThemedText>
@@ -1001,13 +995,13 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
                 <ThemedText style={styles.personalDataLabel}>Gênero (opcional)</ThemedText>
                 {editing ? (
                   <>
-                    <Pressable onPress={() => setGenderOpen(!genderOpen)} style={[styles.personalDataSelect, dark && { backgroundColor: theme.inputBackground, borderColor: theme.borderStrong }]}>
+                    <Pressable onPress={() => setGenderOpen(!genderOpen)} style={[styles.personalDataSelect, dark && { backgroundColor: theme.inputBackground }]}>
                       <ThemedText style={styles.personalDataSelectText}>{formatGenderLabel(gender) || 'Selecione'}</ThemedText>
                       <View style={[styles.genderDropdownIcon, genderOpen && styles.genderDropdownIconOpen]}>
                         <ChevronRightIcon color={dark ? theme.textSecondary : '#625d57'} size={16} />
                       </View>
                     </Pressable>
-                    {genderOpen && <View style={[styles.personalDataDropdown, dark && { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option}</ThemedText></Pressable>)}</View>}
+                    {genderOpen && <View style={[styles.personalDataDropdown, dark && { backgroundColor: theme.backgroundElement }]}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option}</ThemedText></Pressable>)}</View>}
                   </>
                 ) : (
                   <ThemedText style={styles.personalDataValue}>{formatGenderLabel(gender) || 'Não informado'}</ThemedText>

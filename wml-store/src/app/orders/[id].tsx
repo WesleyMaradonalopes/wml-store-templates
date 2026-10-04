@@ -47,7 +47,7 @@ export default function OrderDetailsScreen() {
 
 const styles = StyleSheet.create({
 	container: { flex: 1 },
-	safeArea: { flex: 1, padding: Spacing.four },
+	safeArea: { flex: 1, padding: Spacing.four, backgroundColor: '#eeeeee' },
 	content: { gap: Spacing.three, paddingVertical: Spacing.five, paddingBottom: 100 },
 	orderCard: { gap: Spacing.three, padding: Spacing.three, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#e6e2dc' },
 	orderHeader: { paddingBottom: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#dedbd5', position: 'relative' },

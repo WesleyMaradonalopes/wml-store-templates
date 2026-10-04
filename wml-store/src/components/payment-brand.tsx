@@ -29,17 +29,19 @@ export function PaymentBrandIcon({
   brand,
   width = 42,
   height = 27,
+  tintColor,
   style,
 }: {
   brand: PaymentBrand;
   width?: number;
   height?: number;
+  tintColor?: string;
   style?: StyleProp<ViewStyle>;
 }) {
   const source = assets[brand];
   if (!source) return null;
   return <View style={[styles.container, { width, height }, style]}>
-    <Image source={source} contentFit="contain" style={styles.image} />
+    <Image source={source} contentFit="contain" style={[styles.image, tintColor ? { tintColor } : undefined]} />
   </View>;
 }
 

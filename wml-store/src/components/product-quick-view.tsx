@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   dismissArea: { flex: 1 },
   sheet: { maxHeight: '84%', width: '95%', margin: 'auto', marginBottom: 30, borderRadius: 24, overflow: 'hidden', backgroundColor: '#ffffff' },
   safeArea: { maxHeight: '100%' },
-  header: { backgroundColor: 'transparent', position: 'absolute', top: -17, left: 'auto', right: 2, bottom: 'auto', borderRadius: 50, width: 30, height: 30, padding: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  header: { backgroundColor: 'transparent', position: 'absolute', top: -17, left: 'auto', right: 5, bottom: 'auto', borderRadius: 50, width: 30, height: 30, padding: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   closeButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderRadius: 50 },
   closeText: { fontSize: 20, lineHeight: 20, color: '#0a0a0a', fontWeight: '400' },
   content: { gap: 5, padding: Spacing.four, paddingBottom: Spacing.five, marginTop: 10 },

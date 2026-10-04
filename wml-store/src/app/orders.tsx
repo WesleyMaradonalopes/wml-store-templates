@@ -124,7 +124,7 @@ function OrderCard({ order, onDetails }: { order: CustomerOrder; onDetails: () =
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.four, backgroundColor: '#eeeeee' },
   loader: { marginTop: Spacing.two },
   list: { gap: Spacing.three, paddingVertical: Spacing.three, paddingBottom: 100 },
   emptyList: { flexGrow: 1 },

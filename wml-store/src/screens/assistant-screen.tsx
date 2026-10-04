@@ -643,7 +643,7 @@ export default function AssistantScreen() {
           )}
 
           <View style={[styles.composerBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
-            <View style={[styles.composer, { borderColor: theme.border, backgroundColor: colorScheme === 'dark' ? theme.inputBackground : '#FFFFFF' }]}>
+            <View style={[styles.composer, { borderColor: '#0a0a0a', backgroundColor: colorScheme === 'dark' ? theme.inputBackground : '#FFFFFF' }]}>
               <Pressable
                 accessibilityLabel="Enviar foto ou imagem"
                 disabled={loading}

@@ -13,7 +13,7 @@ export function NewsletterOptIn({ value, onChange, onPrivacyPress, disabled = fa
         <ThemedText style={styles.label}>Desejo receber novidades e ofertas por e-mail</ThemedText>
       </Pressable>
     </View>
-    <ThemedText style={styles.legalText}>Ao marcar esta opção, você concorda com o tratamento dos seus dados conforme a <Text onPress={onPrivacyPress} style={styles.privacyLink}>Política de Privacidade.</Text></ThemedText>
+    <ThemedText style={styles.legalText}>Ao marcar esta opção, você concorda com o tratamento dos seus dados conforme as <Text onPress={onPrivacyPress} style={styles.privacyLink}>Políticas de Privacidade</Text></ThemedText>
   </View>;
 }
 

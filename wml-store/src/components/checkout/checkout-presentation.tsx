@@ -124,7 +124,7 @@ export function InstallmentsScreen({
             <ThemedText style={styles.installmentCount}>{`${option.count}x ${money(option.value)}`}</ThemedText>
             {option.count > 1 && <ThemedText style={styles.installmentInterest}>{option.hasInterestRate ? 'com juros' : 'sem juros'}</ThemedText>}
           </View>
-          <View style={styles.installmentOptionRight}>{option.count > 1 && <ThemedText style={styles.installmentTotal}>{money(option.total)}</ThemedText>}<ChevronRightIcon color="#625d57" size={20} /></View>
+          <View style={styles.installmentOptionRight}>{option.count > 1 && <ThemedText style={styles.installmentTotal}>{money(option.total)}</ThemedText>}<ChevronRightIcon color="#0a0a0a" size={20} /></View>
         </Pressable>)}</View>
       </ScrollView>
     </SafeAreaView>
@@ -325,7 +325,7 @@ export function OrderSuccessScreen({
           <Pressable onPress={onOrders} style={styles.orderSuccessOrdersButton}><ThemedText style={styles.orderSuccessOrdersButtonText}>Ver meus pedidos</ThemedText></Pressable>
 
           <View style={styles.orderSuccessDivider} />
-          <View style={styles.orderSuccessSectionHeader}><UserIcon color="#0a0a0a" size={19} /><ThemedText style={styles.orderSuccessSectionTitle}>Dados pessoais</ThemedText></View>
+          <View style={styles.orderSuccessSectionHeader}><UserIcon color="#0a0a0a" size={19} /><ThemedText style={styles.orderSuccessSectionTitle}>Dados 1pessoais</ThemedText></View>
           <View style={styles.orderSuccessInfoList}>
             {infoRow(email, 'email')}
             {infoRow(fullName, 'name')}
@@ -398,10 +398,10 @@ export function PickupStoreCard({ option, selected, disabled, onPress }: { optio
     </View>
   </Pressable>;
 }
-export function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '', accessory, style, variant = 'default' }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string; accessory?: ReactNode; style?: StyleProp<ViewStyle>; variant?: 'default' | 'personal' }) {
+export function Field({ label, value, setValue, placeholder, keyboardType, required = false, error = '', accessory, trailingAction, style, variant = 'default' }: { label: string; value: string; setValue: (value: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address'; required?: boolean; error?: string; accessory?: ReactNode; trailingAction?: ReactNode; style?: StyleProp<ViewStyle>; variant?: 'default' | 'personal' }) {
   const isFreeText = !keyboardType || keyboardType === 'default';
   const inputMode = isFreeText ? 'text' : keyboardType === 'email-address' ? 'email' : keyboardType === 'phone-pad' ? 'tel' : 'numeric';
-  return <View style={[styles.field, variant === 'personal' && styles.personalField, style]}><ThemedText style={[styles.fieldLabel, variant === 'personal' && styles.personalFieldLabel]}>{label + (required ? ' *' : '')}</ThemedText><View style={styles.inputWrap}><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} inputMode={inputMode} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={false} spellCheck={false} placeholderTextColor="#96918b" style={[styles.input, variant === 'personal' && styles.personalInput, accessory ? styles.inputWithAccessory : undefined, error ? styles.inputError : undefined]} />{accessory && <View style={styles.fieldAccessory}>{accessory}</View>}</View>{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
+  return <View style={[styles.field, variant === 'personal' && styles.personalField, style]}><ThemedText style={[styles.fieldLabel, variant === 'personal' && styles.personalFieldLabel]}>{label + (required ? ' *' : '')}</ThemedText><View style={trailingAction ? styles.fieldActionRow : undefined}><View style={trailingAction ? styles.fieldActionInput : undefined}><View style={styles.inputWrap}><TextInput value={value} onChangeText={setValue} placeholder={placeholder || label} keyboardType={keyboardType || 'default'} inputMode={inputMode} autoCapitalize={isFreeText ? 'sentences' : 'none'} autoCorrect={false} spellCheck={false} placeholderTextColor="#0a0a0a" style={[styles.input, variant === 'personal' && styles.personalInput, accessory ? styles.inputWithAccessory : undefined, error ? styles.inputError : undefined]} />{accessory && <View style={styles.fieldAccessory}>{accessory}</View>}</View></View>{trailingAction}</View>{!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}</View>;
 }
 export function Primary({ title, onPress, loading }: { title: string; onPress: () => void; loading?: boolean }) {
   const isLoading = loading ?? title.endsWith('...');
@@ -431,7 +431,7 @@ export function ReviewItemsDisclosure({ items, expanded, onToggle }: { items: Ca
     <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={onToggle} style={styles.reviewItemsToggle}>
       <ThemedText style={styles.reviewItemsToggleLabel}>Ver detalhes do produto</ThemedText>
       <View style={[styles.reviewItemsChevron, expanded && styles.reviewItemsChevronExpanded]}>
-        <ChevronRightIcon color="#625d57" size={16} />
+        <ChevronRightIcon color="#0a0a0a" size={16} />
       </View>
     </Pressable>
     {expanded
@@ -458,9 +458,9 @@ export function GiftCardPaymentSection({ voucher, onVoucherChange, voucherLoadin
   const appliedKeys = new Set(appliedGiftCards.map((giftCard) => giftCard.id || giftCard.redemptionCode));
   const unappliedGiftCards = availableGiftCards.filter((giftCard) => !appliedKeys.has(giftCard.id || giftCard.redemptionCode));
   return <View style={styles.giftCardSection}>
-    {giftCardAvailability === 'loading' && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#625d57" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Consultando créditos disponíveis...</ThemedText></View>}
+    {giftCardAvailability === 'loading' && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#0a0a0a" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Consultando créditos disponíveis...</ThemedText></View>}
     {giftCardAvailability === 'available' && !giftCardIdentityVerified && <Pressable accessibilityRole="button" onPress={onShowCredits} style={styles.giftCardNotice}><ThemedText style={styles.giftCardNoticeText}>Você possui créditos para usar na compra! Deseja exibi-los?</ThemedText></Pressable>}
-    {giftCardIdentityVerified && giftCardDetailsLoading && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#625d57" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Carregando seus créditos...</ThemedText></View>}
+    {giftCardIdentityVerified && giftCardDetailsLoading && <View style={styles.giftCardLookup}><ActivityIndicator size="small" color="#0a0a0a" /><ThemedText style={styles.bodyText} themeColor="textSecondary">Carregando seus créditos...</ThemedText></View>}
     {giftCardIdentityVerified && !giftCardCreditsHidden && !giftCardDetailsLoading && unappliedGiftCards.length > 0 && <View style={styles.availableGiftCardsCard}>
       <ThemedText style={styles.sectionTitle}>Créditos disponíveis</ThemedText>
       <ThemedText style={styles.bodyText} themeColor="textSecondary">Escolha um vale-presente para usar nesta compra.</ThemedText>
@@ -635,8 +635,8 @@ export function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthe
               <View style={[styles.field, styles.giftCardIdentityField]}>
                 <ThemedText style={styles.fieldLabel}>Senha</ThemedText>
                 <View style={styles.giftCardIdentityPasswordWrap}>
-                  <TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} placeholder="Digite sua senha" placeholderTextColor="#96918b" style={[styles.input, styles.giftCardIdentityInput, styles.giftCardIdentityPasswordInput]} />
-                  <Pressable accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowPassword((current) => !current)} style={styles.giftCardIdentityPasswordToggle}><EyeIcon color="#5d5955" size={20} off={!showPassword} /></Pressable>
+                  <TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} placeholder="Digite sua senha" placeholderTextColor="#0a0a0a" style={[styles.input, styles.giftCardIdentityInput, styles.giftCardIdentityPasswordInput]} />
+                  <Pressable accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowPassword((current) => !current)} style={styles.giftCardIdentityPasswordToggle}><EyeIcon color="#0a0a0a" size={20} off={!showPassword} /></Pressable>
                 </View>
               </View>
               {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
@@ -650,7 +650,7 @@ export function GiftCardIdentityModal({ visible, checkoutEmail, onClose, onAuthe
             </>}
             {view === 'code' && <>
               <ThemedText style={styles.bodyText} themeColor="textSecondary">Enviamos um código para {email}.</ThemedText>
-              <View style={[styles.field, styles.giftCardIdentityField]}><ThemedText style={styles.fieldLabel}>Código de acesso</ThemedText><TextInput value={accessCode} onChangeText={setAccessCode} keyboardType="numeric" autoCapitalize="none" autoCorrect={false} placeholder="Digite o código" placeholderTextColor="#96918b" style={[styles.input, styles.giftCardIdentityInput]} /></View>
+              <View style={[styles.field, styles.giftCardIdentityField]}><ThemedText style={styles.fieldLabel}>Código de acesso</ThemedText><TextInput value={accessCode} onChangeText={setAccessCode} keyboardType="numeric" autoCapitalize="none" autoCorrect={false} placeholder="Digite o código" placeholderTextColor="#0a0a0a" style={[styles.input, styles.giftCardIdentityInput]} /></View>
               {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
               <Pressable disabled={loading} onPress={() => { void validateCode(); }} style={styles.giftCardIdentityPrimary}>{loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Confirmar e exibir créditos</ThemedText>}</Pressable>
               <Pressable disabled={loading} onPress={() => { void resendCode(); }} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Reenviar código</ThemedText></Pressable>
