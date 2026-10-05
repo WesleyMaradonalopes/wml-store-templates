@@ -202,7 +202,7 @@ export default function CouponsScreen() {
 
               <View style={styles.card}>
                 {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
-                {error && <ThemedText themeColor="textSecondary">Não foi possível carregar os cupons.</ThemedText>}
+                {error && <ThemedText style={styles.errorText}>Não foi possível carregar os cupons.</ThemedText>}
                 {!loading && !error && coupons.length === 0 && (
                   <ThemedText themeColor="textSecondary">Nenhum cupom disponível no momento.</ThemedText>
                 )}
@@ -281,6 +281,7 @@ const styles = StyleSheet.create({
   heroSubtitle: { marginTop: Spacing.three, color: '#ffffff', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21, textAlign: 'center' },
   card: { gap: Spacing.three, padding: Spacing.four, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1dc', backgroundColor: '#ffffff' },
   loader: { marginVertical: Spacing.two },
+  errorText: { color: '#ed6560' },
   couponRow: { gap: Spacing.two },
   separator: { height: 1, marginBottom: Spacing.two, backgroundColor: '#e6e1dc' },
   couponTitle: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 15, lineHeight: 22, textTransform: 'uppercase' },

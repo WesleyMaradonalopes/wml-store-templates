@@ -52,7 +52,7 @@ export default function PrivacyPolicyScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.content}>
             {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
-            {error && <ThemedText themeColor="textSecondary">Não foi possível carregar a política de privacidade.</ThemedText>}
+            {error && <ThemedText style={styles.errorText}>Não foi possível carregar a política de privacidade.</ThemedText>}
             {!loading && !error && richTextSection && (
               <View style={styles.card}>
                 <CmsRichText data={richTextData} />
@@ -82,6 +82,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, marginHorizontal: -Spacing.four, paddingHorizontal: Spacing.five, backgroundColor: '#f7f7f7' },
   content: { gap: Spacing.three, paddingTop: Spacing.four, paddingBottom: 70 },
   loader: { marginTop: Spacing.four },
+  errorText: { color: '#ed6560' },
   card: { padding: Spacing.five, paddingTop: 15, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1dc', backgroundColor: '#ffffff' },
   backToTopButton: { alignSelf: 'center', minHeight: 40, paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, borderWidth: 1, borderColor: '#e6e1dc', backgroundColor: '#ffffff' },
   backToTopText: { fontFamily: Fonts.medium, fontSize: 13, lineHeight: 18, color: '#0a0a0a' },

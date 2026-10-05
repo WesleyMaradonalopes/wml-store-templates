@@ -40,7 +40,7 @@ export default function CmsPageScreen() {
         <ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
           {!isCategoryPage && <ThemedText type="subtitle">{page?.name ?? slug}</ThemedText>}
           {loading && <ActivityIndicator color="#0a0a0a" />}
-          {error && <ThemedText themeColor="textSecondary">Não foi possível carregar esta página.</ThemedText>}
+          {error && <ThemedText style={styles.errorText}>Não foi possível carregar esta página.</ThemedText>}
           {!loading && !error && page?.sections.length === 0 && (
             <ThemedText themeColor="textSecondary">Nenhuma seção publicada nesta página.</ThemedText>
           )}
@@ -58,4 +58,5 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, padding: Spacing.four },
   content: { gap: Spacing.three, paddingVertical: Spacing.three },
   hiddenBack: { display: 'none' },
+  errorText: { color: '#ed6560' },
 });

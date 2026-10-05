@@ -67,7 +67,7 @@ export function AssistantInitialShowcase({
   if (products.length === 0) {
     return (
       <View style={styles.empty}>
-        <ThemedText themeColor="textSecondary" style={styles.emptyText}>
+        <ThemedText themeColor="textSecondary" style={[styles.emptyText, error && styles.errorText]}>
           {error || 'Ainda não encontramos novidades para mostrar.'}
         </ThemedText>
         <Pressable onPress={onRetry} style={[styles.retryButton, { borderColor: theme.border }]}>
@@ -129,6 +129,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 14, alignItems: 'flex-start' },
   empty: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 32 },
   emptyText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  errorText: { color: '#ed6560' },
   retryButton: { minHeight: 38, paddingHorizontal: 16, borderWidth: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   suggestion: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, gap: 8, borderRadius: 8 },
   suggestionIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },

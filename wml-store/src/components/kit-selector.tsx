@@ -135,6 +135,6 @@ const styles = StyleSheet.create({
   selectedOptionText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableOption: { opacity: 0.45 },
   unavailableOptionText: { color: '#a49a8e', textDecorationLine: 'line-through' },
-  warning: { marginTop: 2, color: '#C42C21', fontSize: 11, lineHeight: 15 },
+  warning: { marginTop: 2, color: '#ed6560', fontSize: 11, lineHeight: 15 },
   divider: { height: 1, backgroundColor: '#eee8e2' },
 });

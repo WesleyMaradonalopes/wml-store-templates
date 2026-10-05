@@ -52,7 +52,7 @@ export default function HomeScreen() {
             lastScrollY.current = currentY;
           }}>
           {cmsLoading && !cmsPage && <HomeSkeleton />}
-          {cmsError && <ThemedText themeColor="textSecondary">Nao foi possivel consultar o CMS agora.</ThemedText>}
+          {cmsError && <ThemedText style={styles.errorText}>Nao foi possivel consultar o CMS agora.</ThemedText>}
           {!cmsLoading && !cmsError && cmsPage?.sections.length === 0 && <ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>}
           {cmsPage?.sections.map((section, index) => <CmsSectionView key={`${section.name}-${index}`} section={section} isHome />)}
         </ScrollView>
@@ -81,5 +81,6 @@ const styles = StyleSheet.create({
   headerAction: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#ffffff' },
   heroHeaderAction: { backgroundColor: 'rgba(255, 255, 255, 0.62)' },
   content: { gap: Spacing.three, paddingVertical: Spacing.five },
+  errorText: { color: '#ed6560' },
   heroContent: { gap: Spacing.three, paddingBottom: Spacing.five },
 });

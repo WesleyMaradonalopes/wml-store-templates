@@ -28,7 +28,7 @@ import { ProductCollectionCarousel } from './product-collection-carousel';
 import { WiddeHomeVideoCarousel } from './widde-home-video-carousel';
 import { styles } from './cms-section.styles';
 
-type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean };
+type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean; searchPresentation?: boolean };
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -743,7 +743,7 @@ function CategoryGroup({
   );
 }
 
-export function CmsSectionView({ section, categoryPageSlug, isHome = false }: Props) {
+export function CmsSectionView({ section, categoryPageSlug, isHome = false, searchPresentation = false }: Props) {
   const router = useRouter();
   const [heroIndex, setHeroIndex] = useState(0);
   const heroRef = useRef<ScrollView | null>(null);
@@ -803,7 +803,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false }: Pr
     if (images.length === 0) return null;
 
     const configuredAspectRatio = bannerRatio(data.aspectRatio, 4 / 3);
-    const configuredBorderRadius = bannerDimension(data.borderRadius, 5);
+    const configuredBorderRadius = searchPresentation ? 16 : bannerDimension(data.borderRadius, 5);
     const ratioFor = (key: string, fallback: number) => bannerAspectRatios[key] ?? bannerRatio(data.aspectRatio, fallback);
     const homeBannerSectionStyle = !isHome
       ? undefined
@@ -1048,7 +1048,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false }: Pr
 
     return (
       <View style={isFullScreenHero ? styles.heroSection : [styles.bannerSection, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle]}>
-        {!!text(data.mainTitle) && <ThemedText type="subtitle" style={[styles.bannerSectionTitle, isHome && homeBannerTitleStyle]}>{text(data.mainTitle)}</ThemedText>}
+        {!!text(data.mainTitle) && <ThemedText type="subtitle" style={[styles.bannerSectionTitle, isHome && homeBannerTitleStyle, searchPresentation && styles.searchBannerSectionTitle]}>{text(data.mainTitle)}</ThemedText>}
         {renderModeContent()}
       </View>
     );

@@ -44,7 +44,7 @@ export default function CategoriesScreen() {
 							<BlurView intensity={24} tint={dark ? 'dark' : 'light'} style={[styles.glassPanel, dark && { borderColor: theme.border }]}>
 									<ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
 										{loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
-										{error && <ThemedText themeColor="textSecondary">Nao foi possivel carregar as categorias.</ThemedText>}
+										{error && <ThemedText style={styles.errorText}>Nao foi possivel carregar as categorias.</ThemedText>}
 										{!loading && !error && cmsPage?.sections.length === 0 && (
 											<ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>
 										)}
@@ -77,4 +77,5 @@ const styles = StyleSheet.create({
   },
   gradientFill: { flex: 1 },
   content: { gap: Spacing.three, paddingTop: 16, paddingBottom: 100 },
+  errorText: { color: '#ed6560' },
 });

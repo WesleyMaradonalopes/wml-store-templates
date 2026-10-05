@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   selectedOptionText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableOption: { opacity: 0.35, backgroundColor: '#eeeae4' },
   unavailableText: { textDecorationLine: 'line-through' },
-  messageText: { color: '#B42318', fontWeight: '600', fontSize: 12 },
+  messageText: { color: '#ed6560', fontWeight: '600', fontSize: 12 },
   productButton: { minHeight: 48, borderRadius: 8, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   addButton: { minHeight: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   addButtonText: { color: '#FFFFFF', fontWeight: '700' },

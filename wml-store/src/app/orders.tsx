@@ -59,7 +59,7 @@ export default function OrdersScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Meus Pedidos" />
         {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
-        {!!error && <ThemedText style={styles.orderText} themeColor="textSecondary">{error}</ThemedText>}
+        {!!error && <ThemedText style={[styles.orderText, styles.errorText]}>{error}</ThemedText>}
         <FlatList
           data={orders}
           onScroll={onScroll}
@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', justifyContent: 'space-between' },
   total: { alignItems: 'flex-end' },
   orderText: { fontFamily: Fonts.sans, fontSize: 12, lineHeight: 16 },
+  errorText: { color: '#ed6560' },
   orderLabel: { fontFamily: Fonts.bold, fontSize: 12, lineHeight: 16, fontWeight: '700' },
   item: { flexDirection: 'row', gap: Spacing.two },
   thumb: { width: 42, height: 52, backgroundColor: '#e8e8ea', borderRadius: 4, resizeMode: 'cover' },

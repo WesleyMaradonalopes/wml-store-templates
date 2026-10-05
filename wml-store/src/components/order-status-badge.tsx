@@ -51,6 +51,6 @@ const styles = StyleSheet.create({
     color: '#5f655f',
   },
   canceledText: {
-    color: '#c84339',
+    color: '#ed6560',
   },
 });

@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
   typingDots: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 2 },
   typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: AI_COLOR },
   statusArea: { paddingHorizontal: 14, paddingTop: 2 },
-  status: { fontSize: 12, paddingBottom: 5 },
+  status: { color: '#ed6560', fontSize: 12, paddingBottom: 5 },
   composerBar: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 },
   composer: { borderWidth: 1, borderRadius: 25, paddingVertical: 0, paddingHorizontal: 5, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 2 },
   composerIconButton: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 3 },

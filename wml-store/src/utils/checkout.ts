@@ -55,6 +55,7 @@ export const CART_BEST_SELLING_PRODUCTS_SHELF: Record<string, unknown> = {
 export const EMPTY_CART_RECENT_PRODUCTS_SHELF: Record<string, unknown> = {
   ...RECENT_PRODUCTS_SHELF,
   title: 'Mais recentes',
+  showSeeAll: false,
 };
 
 export function digits(value: string) { return value.replace(/\D/g, ''); }

@@ -631,7 +631,7 @@ function LoggedAccount({ email, notifications, setNotifications, onLogout, onPer
 function UtilityGrid({ onRegister, onCoupons, onReturns, onPrivacy }: { onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void }) {
   const theme = useTheme();
   const tiles: AccountTileData[] = [
-    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={18} />, onPress: onCoupons },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={16} />, onPress: onCoupons },
     { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color={theme.text} size={18} />, onPress: onReturns },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color={theme.text} size={18} />, onPress: onPrivacy },
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={18} />, onPress: onRegister },
@@ -668,7 +668,7 @@ function AccessView({ onPassword, onEmail, onGoogle, onApple, googleLoading, mes
       <Pressable onPress={onEmail} style={styles.outlineButton}>
         <ThemedText type="smallBold">Receber código de acesso por e-mail</ThemedText>
       </Pressable>
-      {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
+      {!!message && <ThemedText style={styles.errorMessage}>{message}</ThemedText>}
       <Pressable onPress={onPassword} style={styles.outlineButton}>
         <ThemedText type="smallBold">Entrar com e-mail e senha</ThemedText>
       </Pressable>
@@ -735,7 +735,7 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
             <ThemedText themeColor="textSecondary" style={styles.rememberHelpIcon}>?</ThemedText>
           </Pressable>
         </View>
-        {!!message && <ThemedText themeColor="textSecondary" style={styles.linkTextAlert}>{message}</ThemedText>}
+        {!!message && <ThemedText style={styles.linkTextAlert}>{message}</ThemedText>}
         <Pressable disabled={loading} onPress={onLogin} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.primaryText}>Entrar</ThemedText>}</Pressable>
         <Pressable onPress={onBack} style={styles.textButton}><ThemedText>Voltar</ThemedText></Pressable>
       </ThemedView>
@@ -769,7 +769,7 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
   );
 }
 function EmailAccessView({ email, setEmail, onSend, loading, onRegister, onPrivacy, message }: { email: string; setEmail: (value: string) => void; onSend: () => void; loading: boolean; onRegister: () => void; onPrivacy: () => void; message: string | null }) {
-  return <ThemedView style={styles.card}><ThemedText type="subtitle" style={styles.authTitle}>Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Informe seu e-mail para acessar ou registrar seus dados com segurança</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} /><Pressable disabled={loading} onPress={onSend} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Insira seu e-mail</ThemedText>}</Pressable>{!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}<ThemedText themeColor="textSecondary">Ao se cadastrar, você concorda com nossa <Text onPress={onPrivacy} style={styles.privacyLink}>Política de Privacidade.</Text></ThemedText><Pressable disabled={loading} onPress={onRegister}><ThemedText type="link" style={styles.privacyCreateLink}>Criar uma conta</ThemedText></Pressable></ThemedView>;
+  return <ThemedView style={styles.card}><ThemedText type="subtitle" style={styles.authTitle}>Acesse sua conta</ThemedText><ThemedText themeColor="textSecondary">Informe seu e-mail para acessar ou registrar seus dados com segurança</ThemedText><TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} /><Pressable disabled={loading} onPress={onSend} style={[styles.primaryButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Insira seu e-mail</ThemedText>}</Pressable>{!!message && <ThemedText style={styles.errorMessage}>{message}</ThemedText>}<ThemedText themeColor="textSecondary">Ao se cadastrar, você concorda com nossa <Text onPress={onPrivacy} style={styles.privacyLink}>Política de Privacidade.</Text></ThemedText><Pressable disabled={loading} onPress={onRegister}><ThemedText type="link" style={styles.privacyCreateLink}>Criar uma conta</ThemedText></Pressable></ThemedView>;
 }
 function CodeView({ email, code, setCode, sentAt, onValidate, onResend, loading, resendLoading, onBack, message }: { email: string; code: string; setCode: (value: string) => void; sentAt: number | null; onValidate: () => void; onResend: () => void; loading: boolean; resendLoading: boolean; onBack: () => void; message: string | null }) {
   return <CodeAccessView title="Acesse sua conta" email={email} code={code} setCode={setCode} sentAt={sentAt} onValidate={onValidate} onResend={onResend} loading={loading} resendLoading={resendLoading} onBack={onBack} message={message} />;
@@ -800,7 +800,7 @@ function CodeAccessView({ title, email, code, setCode, sentAt, showEmailInput = 
     {showEmailInput ? <TextInput value={email} editable={false} style={[styles.input, styles.readonly]} /> : <ThemedText themeColor="textSecondary">Enviamos um código para o e-mail {email}.</ThemedText>}
     <ThemedText themeColor="textSecondary">Código de verificação</ThemedText>
     <TextInput value={code} onChangeText={setCode} placeholder="Código de verificação" keyboardType="number-pad" style={styles.input} />
-    {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
+    {!!message && <ThemedText style={styles.errorMessage}>{message}</ThemedText>}
     <Pressable disabled={!hasCode || loading || resendLoading} onPress={onValidate} style={[styles.primaryButton, (!hasCode || loading || resendLoading) && styles.disabled]}>
       {loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Login</ThemedText>}
     </Pressable>
@@ -818,7 +818,7 @@ function RegisterView({ email, setEmail, newsletterOptIn, setNewsletterOptIn, on
     <ThemedText style={styles.registerSubtitle}>Informe seu e-mail para começar</ThemedText>
     <TextInput value={email} onChangeText={setEmail} placeholder="Digite seu e-mail" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} style={[styles.input, styles.registerInput]} />
     <NewsletterOptIn value={newsletterOptIn} onChange={setNewsletterOptIn} onPrivacyPress={onPrivacy} />
-    {!!message && <ThemedText themeColor="textSecondary" style={styles.registerMessage}>{message}</ThemedText>}
+    {!!message && <ThemedText style={styles.registerMessage}>{message}</ThemedText>}
     <Pressable disabled={!canSubmit || loading} onPress={onSend} style={[styles.primaryButton, styles.registerButton, (!canSubmit || loading) && styles.disabled]}>
       {loading ? <ActivityIndicator size="small" color="#9e9991" /> : <ThemedText style={[styles.registerButtonText, (!canSubmit || loading) && styles.registerButtonTextDisabled]}>Enviar código</ThemedText>}
     </Pressable>
@@ -830,7 +830,7 @@ function RecoveryEmailView({ email, setEmail, onSend, loading, message, onBack }
     <ThemedText type="subtitle" style={styles.authTitle}>Alterar senha</ThemedText>
     <ThemedText themeColor="textSecondary">Informe seu e-mail para receber o código e criar uma nova senha.</ThemedText>
     <TextInput value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" autoCapitalize="none" style={styles.input} />
-    {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
+    {!!message && <ThemedText style={styles.errorMessage}>{message}</ThemedText>}
     <Pressable disabled={loading} onPress={onSend} style={[styles.primaryButton, loading && styles.disabled]}>
       {loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Enviar código</ThemedText>}
     </Pressable>
@@ -866,7 +866,7 @@ function PasswordSetupView({ mode, email, code, setCode, newPassword, setNewPass
       <Pressable accessibilityLabel={showConfirmation ? 'Ocultar confirmação da senha' : 'Mostrar confirmação da senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowConfirmation((current) => !current)} style={styles.passwordToggle}><EyeIcon color="#5d5955" size={20} off={!showConfirmation} /></Pressable>
     </View>
     <PasswordRules value={newPassword} />
-    {!!message && <ThemedText themeColor="textSecondary">{message}</ThemedText>}
+    {!!message && <ThemedText style={styles.errorMessage}>{message}</ThemedText>}
     <View style={styles.authFooter}>
       <Pressable disabled={loading} onPress={onBack} style={[styles.outlineButton, styles.authFooterButton]}><ThemedText type="smallBold">Voltar</ThemedText></Pressable>
       <Pressable disabled={loading} onPress={onSubmit} style={[styles.primaryButton, styles.authFooterButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>{submitLabel}</ThemedText>}</Pressable>

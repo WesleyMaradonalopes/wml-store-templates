@@ -27,7 +27,7 @@ export default function StoresScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader back={false} /><ThemedText type="subtitle">Nossas lojas</ThemedText>
         {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
-        {error && <ThemedText themeColor="textSecondary">{error}</ThemedText>}
+        {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
         {!loading && !error && stores.length === 0 && (
           <ThemedText themeColor="textSecondary">Nenhuma loja encontrada.</ThemedText>
         )}
@@ -56,6 +56,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1, padding: Spacing.four, gap: Spacing.three },
   loader: { marginTop: Spacing.four },
+  errorText: { color: '#ed6560' },
   list: { gap: Spacing.three, paddingVertical: Spacing.three },
   card: { gap: Spacing.one, padding: Spacing.four, borderRadius: Spacing.three },
 });

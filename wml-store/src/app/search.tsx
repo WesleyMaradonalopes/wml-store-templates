@@ -4,6 +4,7 @@ import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
+import { CmsSectionView, ProductShelf } from '@/components/cms-section';
 import MicrophoneIcon from '@/components/icons/MicrophoneIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
 import { FilterGlyph, ProductFilterModal } from '@/components/product-filter-modal';
@@ -17,6 +18,8 @@ import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { subscribeAccountSession } from '@/services/auth';
 import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
 import { parseCmsRouteFacets } from '@/services/cms-actions';
+import { getCmsPage, type CmsPage } from '@/services/cms';
+import { EMPTY_CART_RECENT_PRODUCTS_SHELF } from '@/utils/checkout';
 import { isFavorite } from '@/services/favorites';
 import { trackEvent } from '@/services/telemetry';
 import { abortSpeechRecognition, isSpeechRecognitionAvailable, isSpeechRecognitionModuleInstalled, requestSpeechRecognitionPermissions, startSpeechRecognition, stopSpeechRecognition, subscribeSpeechRecognitionEvent, type VoiceRecognitionErrorEvent, type VoiceRecognitionResultEvent } from '@/services/speech-recognition';
@@ -37,6 +40,8 @@ function isCategoryFacet(facet: SelectedFacet) {
   const key = facet.key.toLowerCase();
   return key === 'c' || /^category-\d+$/.test(key);
 }
+
+const SEARCH_CMS_DOCUMENT = 'buscar';
 
 function replaceResolvedCategoryValues(contextFacets: SelectedFacet[], resolvedFacets: SelectedFacet[]) {
   const resolvedCategories = resolvedFacets.filter(isCategoryFacet);
@@ -82,6 +87,7 @@ export default function SearchScreen() {
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [popularTerms, setPopularTerms] = useState<string[]>([]);
+  const [searchCmsPage, setSearchCmsPage] = useState<CmsPage | null>(null);
   const [listingResolution, setListingResolution] = useState<ListingResolution | null>(null);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -89,6 +95,7 @@ export default function SearchScreen() {
   const activeFacets = mergeFacets(contextFacets, selectedFacets);
   const facetSignature = JSON.stringify(selectedFacets);
   const productRows = useMemo(() => buildProductGridRows(products), [products]);
+  const showSearchCms = searchOpen && !activeQuery && activeFacets.length === 0;
 
   useEffect(() => {
     const unsubscribe = subscribeAccountSession((session) => {
@@ -134,6 +141,14 @@ export default function SearchScreen() {
 
   useEffect(() => {
     getTopSearchTerms().then(setPopularTerms).catch(() => setPopularTerms([]));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    getCmsPage('search', SEARCH_CMS_DOCUMENT, { forceRefresh: true })
+      .then((page) => { if (active) setSearchCmsPage(page); })
+      .catch(() => { if (active) setSearchCmsPage(null); });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -402,32 +417,8 @@ export default function SearchScreen() {
             })}
           </View>
         )}
-        <View style={styles.body}>
-
-        {!activeQuery && activeFacets.length === 0 && popularTerms.length > 0 && (
-          <ThemedView style={styles.trending}>
-            <ThemedText type="smallBold">Em alta</ThemedText>
-            <View style={styles.chips}>
-              {popularTerms.map((popular) => <Pressable key={popular} onPress={() => openPopular(popular)} style={styles.chip}><ThemedText style={styles.chipText}>{popular}</ThemedText></Pressable>)}
-            </View>
-          </ThemedView>
-        )}
-
-        {(!!activeQuery || activeFacets.length > 0) && (
-          <View style={styles.listingHeader}>
-            <View style={styles.listingHeading}>
-              <ThemedText style={styles.listingTitle}>{listingTitle || activeQuery || 'Produtos'}</ThemedText>
-              <ThemedText themeColor="textSecondary" style={styles.resultCount}>{resultCount} {resultCount === 1 ? 'peça' : 'peças'}</ThemedText>
-            </View>
-            <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterText}>Filtrar e Ordenar</ThemedText></Pressable>
-          </View>
-        )}
-
-        {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
-        {loading && <ProductGridSkeleton variant="plp" />}
-        {!loading && (activeQuery || activeFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
-
         <FlatList<ProductGridRow>
+          style={styles.body}
           data={loading ? [] : productRows}
           keyExtractor={(item) => item.key}
           contentContainerStyle={styles.list}
@@ -436,6 +427,38 @@ export default function SearchScreen() {
           onEndReachedThreshold={0.4}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View style={styles.listHeaderContent}>
+              {!activeQuery && activeFacets.length === 0 && popularTerms.length > 0 && (
+                <ThemedView style={styles.trending}>
+                  <ThemedText type="smallBold">Em alta</ThemedText>
+                  <View style={styles.chips}>
+                    {popularTerms.map((popular) => <Pressable key={popular} onPress={() => openPopular(popular)} style={styles.chip}><ThemedText style={styles.chipText}>{popular}</ThemedText></Pressable>)}
+                  </View>
+                </ThemedView>
+              )}
+
+              {showSearchCms && searchCmsPage?.sections.map((section, index) => (
+                <CmsSectionView key={`${section.name}-${index}`} section={section} searchPresentation />
+              ))}
+
+              {showSearchCms && <ProductShelf data={EMPTY_CART_RECENT_PRODUCTS_SHELF} titleStyle={styles.searchProductShelfTitle} />}
+
+              {(!!activeQuery || activeFacets.length > 0) && (
+                <View style={styles.listingHeader}>
+                  <View style={styles.listingHeading}>
+                    <ThemedText style={styles.listingTitle}>{listingTitle || activeQuery || 'Produtos'}</ThemedText>
+                    <ThemedText themeColor="textSecondary" style={styles.resultCount}>{resultCount} {resultCount === 1 ? 'peça' : 'peças'}</ThemedText>
+                  </View>
+                  <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterText}>Filtrar e Ordenar</ThemedText></Pressable>
+                </View>
+              )}
+
+              {!!message && <ThemedText style={message.includes('adicionado') ? styles.successText : styles.messageText}>{message}</ThemedText>}
+              {loading && <ProductGridSkeleton variant="plp" />}
+              {!loading && (activeQuery || activeFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
+            </View>
+          }
           ListFooterComponent={loadingMore ? <ProductGridSkeleton variant="plp" /> : null}
           renderItem={({ item }) => (
             <ProductGridRowView
@@ -445,7 +468,6 @@ export default function SearchScreen() {
             />
           )}
           />
-        </View>
 
         <ProductFilterModal
           visible={filtersVisible}
@@ -492,7 +514,8 @@ const styles = StyleSheet.create({
   suggestionCopy: { flex: 1, gap: 2 },
   suggestionText: { fontSize: 14 },
   suggestionMeta: { fontSize: 11 },
-  body: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three, gap: Spacing.three },
+  body: { flex: 1 },
+  listHeaderContent: { gap: Spacing.three },
   trending: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, borderWidth: 1, borderColor: '#ebe7e1', backgroundColor: '#FFFFFF' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   chip: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: 18, borderWidth: 1, borderColor: '#d7d3cc' },
@@ -503,7 +526,8 @@ const styles = StyleSheet.create({
   resultCount: { fontSize: 12 },
   filterButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
   filterText: { fontSize: 12 },
-  list: { paddingBottom: 120, gap: Spacing.three },
+  list: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, paddingBottom: 120, gap: Spacing.three },
   successText: { color: '#26734d', fontWeight: '600' },
-  messageText: { color: '#B42318' },
+  messageText: { color: '#ed6560' },
+  searchProductShelfTitle: { fontSize: 16, lineHeight: 20 },
 });

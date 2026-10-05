@@ -95,7 +95,7 @@ export default function ReturnsScreen() {
             contentContainerStyle={styles.content}>
             <View style={styles.inner}>
               {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
-              {error && <ThemedText themeColor="textSecondary">Não foi possível carregar a política de trocas e devoluções.</ThemedText>}
+              {error && <ThemedText style={styles.errorText}>Não foi possível carregar a política de trocas e devoluções.</ThemedText>}
               {!loading && !error && introSection && (
                 <View style={styles.introCard}>
                   <CmsRichText
@@ -139,6 +139,7 @@ const styles = StyleSheet.create({
   content: { paddingTop: Spacing.four, paddingBottom: 70 },
   inner: { width: '100%', maxWidth: 360, alignSelf: 'center', gap: Spacing.three },
   loader: { marginTop: Spacing.four },
+  errorText: { color: '#ed6560' },
   introCard: { padding: Spacing.four, borderRadius: 16, borderWidth: 1, borderColor: '#e6e1dc', backgroundColor: '#ffffff' },
   introTitle: { marginBottom: Spacing.two, color: '#1e120d', fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22 },
   introText: { color: '#625d57', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 19 },
