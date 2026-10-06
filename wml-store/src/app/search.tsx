@@ -41,6 +41,37 @@ function isCategoryFacet(facet: SelectedFacet) {
   return key === 'c' || /^category-\d+$/.test(key);
 }
 
+function collectionTitleFromProducts(products: Product[], facets: SelectedFacet[]) {
+  const collectionId = facets
+    .find((facet) => facet.key.trim().toLowerCase() === 'productclusterids')
+    ?.value.trim();
+  if (!collectionId) return '';
+
+  const clusters = products.flatMap((product) => {
+    const rawClusters = product.raw?.productClusters;
+    if (Array.isArray(rawClusters)) {
+      return rawClusters.flatMap((cluster) => {
+        if (!cluster || typeof cluster !== 'object') return [];
+        const value = cluster as Record<string, unknown>;
+        const id = String(value.id ?? value.Id ?? '').trim();
+        const name = String(value.name ?? value.Name ?? '').trim();
+        return id && name ? [{ id, name }] : [];
+      });
+    }
+
+    if (rawClusters && typeof rawClusters === 'object') {
+      return Object.entries(rawClusters as Record<string, unknown>).flatMap(([id, name]) => {
+        const value = String(name ?? '').trim();
+        return id && value ? [{ id, name: value }] : [];
+      });
+    }
+
+    return [];
+  });
+
+  return clusters.find((cluster) => cluster.id === collectionId)?.name ?? '';
+}
+
 const SEARCH_CMS_DOCUMENT = 'buscar';
 
 function replaceResolvedCategoryValues(contextFacets: SelectedFacet[], resolvedFacets: SelectedFacet[]) {
@@ -67,7 +98,8 @@ export default function SearchScreen() {
   const initialQuery = paramText(q).trim();
   const initialFacets = parseCmsRouteFacets(paramText(facetsParam));
   const initialSort = paramText(sortParam) || 'score:desc';
-  const initialTitle = paramText(collectionCatalogTitleParam).trim() || paramText(titleParam).trim();
+  const configuredTitle = paramText(collectionCatalogTitleParam).trim() || paramText(titleParam).trim();
+  const initialTitle = configuredTitle;
   const initialHasListingContext = Boolean(initialQuery || initialFacets.length > 0 || initialTitle);
   const [term, setTerm] = useState(initialQuery);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
@@ -96,6 +128,8 @@ export default function SearchScreen() {
   const facetSignature = JSON.stringify(selectedFacets);
   const productRows = useMemo(() => buildProductGridRows(products), [products]);
   const showSearchCms = searchOpen && !activeQuery && activeFacets.length === 0;
+  const isCollectionListing = activeFacets.some((facet) => facet.key.trim().toLowerCase() === 'productclusterids');
+  const displayListingTitle = listingTitle || activeQuery || (isCollectionListing && loading ? '' : 'Produtos');
 
   useEffect(() => {
     const unsubscribe = subscribeAccountSession((session) => {
@@ -237,6 +271,10 @@ export default function SearchScreen() {
       setResultCount(listing.recordsFiltered);
       setFacets(listing.facets);
       setListingResolution({ query: listing.resolvedQuery, facets: listing.resolvedFacets, source: listing.source });
+      if (!configuredTitle) {
+        const collectionTitle = collectionTitleFromProducts(listing.products, mergeFacets(requestFacets, listing.resolvedFacets));
+        if (collectionTitle) setListingTitle(collectionTitle);
+      }
       const saved = await Promise.all(listing.products.map(async (product) => (await isFavorite(product.id) ? product.id : null)));
       if (active) setFavoriteIds(saved.filter((id): id is string => Boolean(id)));
     }
@@ -250,7 +288,7 @@ export default function SearchScreen() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [activeQuery, contextFacets, facetSignature, sort]);
+  }, [activeQuery, configuredTitle, contextFacets, facetSignature, sort]);
 
   function searchFor(query: string) {
     const value = query.trim();
@@ -447,7 +485,7 @@ export default function SearchScreen() {
               {(!!activeQuery || activeFacets.length > 0) && (
                 <View style={styles.listingHeader}>
                   <View style={styles.listingHeading}>
-                    <ThemedText style={styles.listingTitle}>{listingTitle || activeQuery || 'Produtos'}</ThemedText>
+                    <ThemedText style={styles.listingTitle}>{displayListingTitle}</ThemedText>
                     <ThemedText themeColor="textSecondary" style={styles.resultCount}>{resultCount} {resultCount === 1 ? 'peça' : 'peças'}</ThemedText>
                   </View>
                   <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterText}>Filtrar e Ordenar</ThemedText></Pressable>

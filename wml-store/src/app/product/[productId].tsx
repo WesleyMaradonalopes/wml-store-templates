@@ -33,7 +33,7 @@ import { WiddeVideo } from '@/components/widde-video';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
-import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
+import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductInstallment, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 import { getProductInformation, type SizebayProductInformation } from '@/services/sizebay';
 import { trackEvent } from '@/services/telemetry';
@@ -44,6 +44,11 @@ import { DESCRIPTION_PREVIEW_LINES } from '@/constants/product-detail';
 
 function money(value: number | null) {
   return value === null ? '' : `R$ ${value.toFixed(2).replace('.', ',')}`;
+}
+
+function discountPercentage(listPrice: number | null, price: number | null) {
+  if (listPrice === null || price === null || listPrice <= price || listPrice <= 0) return null;
+  return Math.round(((listPrice - price) / listPrice) * 100);
 }
 
 function normalizeText(value: string) {
@@ -71,6 +76,13 @@ function colorValue(name: string) {
 
 function matchesSelection(variant: ProductVariant, selected: Record<string, string>, ignoredName?: string) {
   return Object.entries(selected).every(([name, value]) => name === ignoredName || variant.variations[name] === value);
+}
+
+function getBestInstallment(installments?: ProductInstallment[]) {
+  return (installments ?? []).reduce<ProductInstallment | null>((best, installment) => {
+    if (!best || installment.count > best.count) return installment;
+    return best;
+  }, null);
 }
 
 function estimateLabel(value: string) {
@@ -155,6 +167,7 @@ export default function ProductScreen() {
         ? variant.available
         : variationNames.every((name) => selectedOptions[name] && variant.variations[name] === selectedOptions[name])
     ));
+  const priceVariant = activeVariant ?? product?.variants.find((variant) => variant.itemId === product.itemId) ?? product?.variants.find((variant) => variant.available) ?? product?.variants[0];
   const shippingVariant = activeVariant ?? product?.variants.find((variant) => variant.available) ?? product?.variants[0];
   const descriptionText = product ? htmlToPlainText(product.description) || 'Descrição não cadastrada.' : '';
   const galleryImages = Array.from(new Set([...(activeVariant?.images ?? []), ...(product?.images ?? [])].filter(Boolean)));
@@ -425,6 +438,8 @@ export default function ProductScreen() {
   const showFloatingButton = Boolean(product && scrollY > floatingButtonThreshold);
   const currentPrice = activeVariant?.price ?? product?.price ?? null;
   const currentListPrice = activeVariant?.listPrice ?? product?.listPrice ?? null;
+  const currentDiscountPercentage = discountPercentage(currentListPrice, currentPrice);
+  const currentInstallment = getBestInstallment(priceVariant?.installments);
 
   return (
     <ThemedView style={styles.container}>
@@ -523,8 +538,24 @@ export default function ProductScreen() {
                       {product.productReference ? `${product.productReference}` : ''}
                     </ThemedText>
                   )}
-                  {currentListPrice !== null && currentPrice !== null && currentListPrice > currentPrice && <ThemedText style={styles.listPrice}>De {money(currentListPrice)}</ThemedText>}
-                  {currentPrice !== null && <ThemedText type="subtitle" style={styles.bestPrice}>{money(currentPrice)}</ThemedText>}
+									<View style={styles.listPriceContainer}>
+										{currentDiscountPercentage !== null && (
+											<View style={styles.listPriceRow}>
+												<ThemedText style={[styles.listPrice, styles.listPriceValue]}>{money(currentListPrice)}{' '}</ThemedText>
+												<ThemedText style={styles.discountPercentage}>(-{currentDiscountPercentage}%)</ThemedText>
+											</View>
+										)}
+										{currentPrice !== null && (
+											<View style={styles.priceRow}>
+												<ThemedText type="subtitle" style={styles.bestPrice}>{money(currentPrice)}</ThemedText>
+												{currentInstallment && (
+													<ThemedText style={styles.installmentText}>
+														ou {currentInstallment.count}x de {money(currentInstallment.value)}{currentInstallment.interestRate === 0 ? '' : ''}
+													</ThemedText>
+												)}
+											</View>
+										)}
+									</View>
                 </View>
                 <Pressable accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} disabled={favoriteLoading} onPress={changeFavorite} style={styles.favoriteButton}>
                   <HeartIcon size={26} color={favorite ? '#C62828' : '#000000'} filled={favorite} />

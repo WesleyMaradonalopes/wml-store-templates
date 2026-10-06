@@ -11,8 +11,15 @@ export type ProductVariant = {
   images: string[];
   price: number | null;
   listPrice: number | null;
+  installments: ProductInstallment[];
   available: boolean;
   variations: Record<string, string>;
+};
+
+export type ProductInstallment = {
+  count: number;
+  value: number;
+  interestRate: number;
 };
 
 export type ProductKitItem = ProductVariant & {
@@ -110,6 +117,12 @@ type FacetPayload = {
   }>;
 };
 
+type ProductInstallmentPayload = {
+  NumberOfInstallments?: number;
+  Value?: number;
+  InterestRate?: number;
+};
+
 type ProductItemPayload = {
   itemId?: string;
   name?: string;
@@ -122,7 +135,13 @@ type ProductItemPayload = {
   kitItems?: Array<{ itemId?: string; amount?: number }>;
   sellers?: Array<{
     sellerId?: string;
-    commertialOffer?: { Price?: number; ListPrice?: number; AvailableQuantity?: number; IsAvailable?: boolean };
+    commertialOffer?: {
+      Price?: number;
+      ListPrice?: number;
+      AvailableQuantity?: number;
+      IsAvailable?: boolean;
+      Installments?: ProductInstallmentPayload[];
+    };
   }>;
   [key: string]: unknown;
 };
@@ -552,6 +571,16 @@ function normalizeVariantVariations(variant: ProductItemPayload) {
     .filter(([, value]) => value));
 }
 
+function normalizeInstallments(installments?: ProductInstallmentPayload[]): ProductInstallment[] {
+  return (installments ?? [])
+    .map((installment) => ({
+      count: installment.NumberOfInstallments ?? 0,
+      value: installment.Value ?? 0,
+      interestRate: installment.InterestRate ?? 0,
+    }))
+    .filter((installment) => installment.count > 0 && installment.value > 0);
+}
+
 function normalizeProduct(product: ProductPayload): Product {
   const variants = (product.items ?? []).map((variant) => {
     const seller = variant.sellers?.find((item) => item.commertialOffer?.IsAvailable !== false && (item.commertialOffer?.AvailableQuantity ?? 1) > 0) ?? variant.sellers?.[0];
@@ -564,6 +593,7 @@ function normalizeProduct(product: ProductPayload): Product {
       images: variantImages,
       price: typeof variantOffer?.Price === 'number' ? variantOffer.Price : null,
       listPrice: typeof variantOffer?.ListPrice === 'number' ? variantOffer.ListPrice : null,
+      installments: normalizeInstallments(variantOffer?.Installments),
       available: variantOffer?.IsAvailable !== false && (variantOffer?.AvailableQuantity ?? 1) > 0,
       variations,
     };
