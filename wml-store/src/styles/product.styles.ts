@@ -79,7 +79,7 @@ export const styles = StyleSheet.create({
   variantOptionText: { fontSize: 12, lineHeight: 16 },
   selectedVariant: { backgroundColor: '#0a0a0a', borderColor: '#0a0a0a' },
   selectedVariantText: { color: '#FFFFFF', fontWeight: '700' },
-  unavailableVariant: { opacity: 0.35, backgroundColor: '#eeeae4' },
+  unavailableVariant: { opacity: 0.35, backgroundColor: '#eeeae4', borderWidth: 1, borderColor: '#a29b93' },
   unavailableVariantText: { textDecorationLine: 'line-through' },
   selectionMessage: { marginTop: -Spacing.two, color: '#ed6560', fontWeight: '600' },
   hiddenMainAddButton: { display: 'none' },
