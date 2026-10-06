@@ -598,7 +598,7 @@ export default function ProductScreen() {
                     {values.map((value) => {
                       const available = optionAvailable(name, value);
                       const selected = selectedOptions[name] === value;
-                      return <Pressable key={value} disabled={!available} accessibilityState={{ disabled: !available, selected }} onPress={() => { setSelectionMessage(''); setCartMessage(null); setSelectedOptions((current) => ({ ...current, [name]: value })); }} style={[styles.variantOption, selected && styles.selectedVariant, !available && styles.unavailableVariant]}><ThemedText style={[selected && styles.selectedVariantText, !available && styles.unavailableVariantText]}>{value}</ThemedText></Pressable>;
+                      return <Pressable key={value} disabled={!available} accessibilityState={{ disabled: !available, selected }} onPress={() => { setSelectionMessage(''); setCartMessage(null); setSelectedOptions((current) => ({ ...current, [name]: value })); }} style={[styles.variantOption, selected && styles.selectedVariant, !available && styles.unavailableVariant]}><ThemedText style={[styles.variantOptionText, selected && styles.selectedVariantText, !available && styles.unavailableVariantText]}>{value}</ThemedText></Pressable>;
                     })}
                   </View>
                 </View>
@@ -1016,10 +1016,10 @@ function CompleteLook({ products, onFeedback }: { products: Product[]; onFeedbac
                   return (
                     <View key={group.productId} style={[styles.lookSelectorWrap, openSize === selectorKey && styles.lookSelectorOpen]}>
                       <Pressable onPress={() => setOpenSize(openSize === selectorKey ? null : selectorKey)} style={[styles.lookSelect, selectionErrors[product.id] && styles.lookSelectError]}>
-                        <ThemedText>{selectedItem ? kitItemSize(selectedItem) : 'Tamanho'}</ThemedText>
+                        <ThemedText style={styles.lookSelectedValue}>{selectedItem ? kitItemSize(selectedItem) : 'Tamanho'}</ThemedText>
                         <DropdownChevron open={openSize === selectorKey} />
                       </Pressable>
-                      {openSize === selectorKey && <View style={styles.lookOptions}>{options.map((option) => <Pressable key={option.itemId} disabled={!option.available} onPress={() => selectKitSize(product.id, group.productId, option.itemId)} style={[styles.lookOption, !option.available && styles.lookUnavailable]}><ThemedText style={!option.available && styles.lookUnavailableText}>{option.value}</ThemedText></Pressable>)}</View>}
+                      {openSize === selectorKey && <View style={styles.lookOptions}>{options.map((option) => <Pressable key={option.itemId} disabled={!option.available} onPress={() => selectKitSize(product.id, group.productId, option.itemId)} style={[styles.lookOption, !option.available && styles.lookUnavailable]}><ThemedText style={[styles.lookOptionText, !option.available && styles.lookUnavailableText]}>{option.value}</ThemedText></Pressable>)}</View>}
                     </View>
                   );
                 })}
@@ -1028,10 +1028,10 @@ function CompleteLook({ products, onFeedback }: { products: Product[]; onFeedbac
             ) : !!size.name && (
               <View style={styles.lookSelectorWrap}>
                 <Pressable onPress={() => setOpenSize(openSize === product.id ? null : product.id)} style={[styles.lookSelect, selectionErrors[product.id] && styles.lookSelectError]}>
-                  <ThemedText>{selectedSizes[product.id] || 'Tamanho'}</ThemedText>
+                  <ThemedText style={styles.lookSelectedValue}>{selectedSizes[product.id] || 'Tamanho'}</ThemedText>
                   <DropdownChevron open={openSize === product.id} />
                 </Pressable>
-                {openSize === product.id && <View style={styles.lookOptions}>{size.options.map((option) => <Pressable key={option.value} disabled={!option.available} onPress={() => { setSelectedSizes((current) => ({ ...current, [product.id]: option.value })); setSelectionErrors((current) => { const next = { ...current }; delete next[product.id]; return next; }); setOpenSize(null); setMessage(''); }} style={[styles.lookOption, !option.available && styles.lookUnavailable]}><ThemedText style={!option.available && styles.lookUnavailableText}>{option.value}</ThemedText></Pressable>)}</View>}
+                {openSize === product.id && <View style={styles.lookOptions}>{size.options.map((option) => <Pressable key={option.value} disabled={!option.available} onPress={() => { setSelectedSizes((current) => ({ ...current, [product.id]: option.value })); setSelectionErrors((current) => { const next = { ...current }; delete next[product.id]; return next; }); setOpenSize(null); setMessage(''); }} style={[styles.lookOption, !option.available && styles.lookUnavailable]}><ThemedText style={[styles.lookOptionText, !option.available && styles.lookUnavailableText]}>{option.value}</ThemedText></Pressable>)}</View>}
                 {!!selectionErrors[product.id] && <ThemedText style={styles.lookSelectionError}>{selectionErrors[product.id]}</ThemedText>}
               </View>
             )}

@@ -246,7 +246,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                     ) : variationNames.map((name) => (
                       <View key={name} style={styles.variationGroup}>
                         <ThemedText type="smallBold">
-                          {name}:{selectedOptions[name] ? <ThemedText> {selectedOptions[name]}</ThemedText> : null}
+                          {name}:{selectedOptions[name] ? <ThemedText style={styles.selectedVariationText}> {selectedOptions[name]}</ThemedText> : null}
                         </ThemedText>
                         <View style={styles.options}>
                           {variationGroups[name].map((value) => {
@@ -259,7 +259,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                                 accessibilityState={{ disabled: !available, selected }}
                                 onPress={() => { setMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }}
                                 style={[styles.option, selected && styles.selectedOption, !available && styles.unavailableOption]}>
-                                <ThemedText style={[selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
+                                <ThemedText style={[styles.optionText, selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
                               </Pressable>
                             );
                           })}
@@ -336,7 +336,9 @@ const styles = StyleSheet.create({
   favoriteButton: { marginLeft: 'auto', width: 30, height: 30, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 0, borderColor: '#d6d0c8' },
   variationGroup: { gap: Spacing.two},
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, paddingBottom: 5 },
-  option: { minWidth: 38, minHeight: 38, borderRadius: 21, borderWidth: 1, borderColor: '#d6d0c8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  selectedVariationText: { fontSize: 12, lineHeight: 16 },
+  option: { minWidth: 35, height: 35, paddingHorizontal: Spacing.two, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  optionText: { fontSize: 12, lineHeight: 16 },
   selectedOption: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
   selectedOptionText: { color: '#FFFFFF', fontWeight: '700' },
   unavailableOption: { opacity: 0.35, backgroundColor: '#eeeae4' },
