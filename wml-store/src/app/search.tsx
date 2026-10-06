@@ -16,7 +16,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { subscribeAccountSession } from '@/services/auth';
-import { getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
+import { DEFAULT_SEARCH_SORT, getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
 import { parseCmsRouteFacets } from '@/services/cms-actions';
 import { getCmsPage, type CmsPage } from '@/services/cms';
 import { EMPTY_CART_RECENT_PRODUCTS_SHELF } from '@/utils/checkout';
@@ -97,7 +97,7 @@ export default function SearchScreen() {
   const { q, facets: facetsParam, sort: sortParam, title: titleParam, collectionCatalogTitle: collectionCatalogTitleParam } = useLocalSearchParams<{ q?: string; facets?: string; sort?: string; title?: string; collectionCatalogTitle?: string }>();
   const initialQuery = paramText(q).trim();
   const initialFacets = parseCmsRouteFacets(paramText(facetsParam));
-  const initialSort = paramText(sortParam) || 'score:desc';
+  const initialSort = paramText(sortParam) || (initialQuery ? DEFAULT_SEARCH_SORT : 'score:desc');
   const configuredTitle = paramText(collectionCatalogTitleParam).trim() || paramText(titleParam).trim();
   const initialTitle = configuredTitle;
   const initialHasListingContext = Boolean(initialQuery || initialFacets.length > 0 || initialTitle);
@@ -152,7 +152,7 @@ export default function SearchScreen() {
     setSearchOpen(!(nextQuery || nextFacets.length > 0 || nextTitle));
     setContextFacets(nextFacets);
     setSelectedFacets([]);
-    setSort(paramText(sortParam) || 'score:desc');
+    setSort(paramText(sortParam) || (nextQuery ? DEFAULT_SEARCH_SORT : 'score:desc'));
     setListingTitle(nextTitle);
     setSuggestions([]);
     setListingResolution(null);
@@ -234,7 +234,7 @@ export default function SearchScreen() {
     const timer = setTimeout(() => {
       setContextFacets([]);
       setSelectedFacets([]);
-      setSort('score:desc');
+      setSort(DEFAULT_SEARCH_SORT);
       setListingTitle('');
       setActiveQuery(value);
       setListingResolution(null);
@@ -304,7 +304,7 @@ export default function SearchScreen() {
     void trackEvent({ name: 'search', search_length: value.length });
     setContextFacets([]);
     setSelectedFacets([]);
-    setSort('score:desc');
+    setSort(DEFAULT_SEARCH_SORT);
     setListingTitle('');
     setActiveQuery(value);
     setSuggestions([]);
@@ -362,7 +362,7 @@ export default function SearchScreen() {
     }
     setTerm('');
     setSelectedFacets([]);
-    setSort('score:desc');
+    setSort(DEFAULT_SEARCH_SORT);
     setListingTitle('');
     setActiveQuery('');
     setMessage(null);
@@ -374,7 +374,7 @@ export default function SearchScreen() {
     setTerm(value);
     setContextFacets([]);
     setSelectedFacets([]);
-    setSort('score:desc');
+    setSort(DEFAULT_SEARCH_SORT);
     setListingTitle('');
     setActiveQuery(value);
     setSuggestions([]);
@@ -386,7 +386,7 @@ export default function SearchScreen() {
     setTerm(value);
     setContextFacets([]);
     setSelectedFacets([]);
-    setSort('score:desc');
+    setSort(DEFAULT_SEARCH_SORT);
     setListingTitle('');
     setActiveQuery(value);
     setSuggestions([]);

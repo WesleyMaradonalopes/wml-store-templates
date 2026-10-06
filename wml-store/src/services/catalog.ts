@@ -201,6 +201,11 @@ export type SearchSuggestion = {
 
 export type SmartSearchSource = 'intelligent' | 'facet' | 'catalog-fulltext' | 'collection';
 
+// A busca da loja web apresenta os resultados textuais pelos lançamentos mais
+// recentes. Manter esse valor em um único lugar evita que a tela e o filtro
+// voltem para uma ordenação diferente ao iniciar ou limpar uma busca.
+export const DEFAULT_SEARCH_SORT = 'release:desc';
+
 export type SmartProductSearchResult = ProductSearchResult & {
   facets: CatalogFacet[];
   resolvedQuery: string;
@@ -865,6 +870,34 @@ export async function getRecentProducts(count = 10): Promise<Product[]> {
 function exactSearchFacet(query: string, facets: CatalogFacet[]) {
   const target = normalizedSearchText(query);
   if (target.length < 3) return null;
+
+  const categoryCandidates = facets.flatMap((facet) => facet.values.flatMap((value) => {
+    const key = facet.key.toLowerCase();
+    if (!/^category-\d+$/.test(key)) return [];
+
+    const normalizedValue = normalizedSearchText(value.value);
+    const normalizedName = normalizedSearchText(value.name);
+    const exactMatch = normalizedValue === target || normalizedName === target;
+    const containsToken = [normalizedValue, normalizedName].some((candidate) => candidate
+      .split(' ')
+      .some((token) => token === target || token.startsWith(target)));
+    if (!exactMatch && !containsToken) return [];
+
+    return [{
+      facet: { key: value.key || facet.key, value: value.value },
+      level: Number(key.replace('category-', '')),
+      exact: exactMatch,
+      quantity: value.quantity,
+    }];
+  }));
+
+  // The web storefront resolves an exact search term through VTEX's category
+  // hierarchy. Prefer the shallowest matching category so a parent category
+  // is not narrowed to a child category with the same term.
+  if (categoryCandidates.length > 0) {
+    return categoryCandidates
+      .sort((left, right) => left.level - right.level || Number(right.exact) - Number(left.exact) || right.quantity - left.quantity)[0]?.facet ?? null;
+  }
 
   const candidates = facets.flatMap((facet) => facet.values.map((value) => {
     const valueMatch = normalizedSearchText(value.value) === target;

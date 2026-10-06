@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
-import { searchSmartProductListing, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
+import { DEFAULT_SEARCH_SORT, searchSmartProductListing, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
 
 import { BottomSheetHandle } from './bottom-sheet-handle';
 import { ThemedText } from './themed-text';
@@ -80,7 +80,7 @@ export function ProductFilterModal({ visible, query, facets, baseFacets = [], se
 
   function clearFilters() {
     setDraftFacets([]);
-    setDraftSort('score:desc');
+    setDraftSort(query.trim() ? DEFAULT_SEARCH_SORT : 'score:desc');
   }
 
   return (
