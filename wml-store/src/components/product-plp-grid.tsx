@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
@@ -47,7 +48,7 @@ type ProductGridRowViewProps = {
   showAddedModal?: boolean;
 };
 
-export function ProductGridRowView({ row, favoriteIds, onFavoriteChange, onAdded, showAddedModal = true }: ProductGridRowViewProps) {
+export const ProductGridRowView = memo(function ProductGridRowView({ row, favoriteIds, onFavoriteChange, onAdded, showAddedModal = true }: ProductGridRowViewProps) {
   return (
     <View style={styles.row}>
       {row.products.map((product) => (
@@ -63,7 +64,7 @@ export function ProductGridRowView({ row, favoriteIds, onFavoriteChange, onAdded
       ))}
     </View>
   );
-}
+});
 
 type ProductPlpGridProps = Omit<ProductGridRowViewProps, 'row'> & {
   products: Product[];

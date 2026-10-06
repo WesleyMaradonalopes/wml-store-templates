@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
@@ -130,6 +130,11 @@ export default function SearchScreen() {
   const showSearchCms = searchOpen && !activeQuery && activeFacets.length === 0;
   const isCollectionListing = activeFacets.some((facet) => facet.key.trim().toLowerCase() === 'productclusterids');
   const displayListingTitle = listingTitle || activeQuery || (isCollectionListing && loading ? '' : 'Produtos');
+  const handleFavoriteChange = useCallback((product: Product, favorite: boolean) => {
+    setFavoriteIds((current) => favorite
+      ? Array.from(new Set([...current, product.id]))
+      : current.filter((id) => id !== product.id));
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeAccountSession((session) => {
@@ -389,7 +394,7 @@ export default function SearchScreen() {
     setSearchOpen(false);
   }
 
-  async function loadMore() {
+  const loadMore = useCallback(async () => {
     if (loading || loadingMore || products.length >= resultCount) return;
     setLoadingMore(true);
     try {
@@ -405,7 +410,17 @@ export default function SearchScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }
+  }, [activeQuery, contextFacets, listingResolution, loading, loadingMore, products, resultCount, selectedFacets, sort]);
+
+  const renderProductRow = useCallback(({ item }: { item: ProductGridRow }) => (
+    <ProductGridRowView
+      row={item}
+      favoriteIds={favoriteIds}
+      onFavoriteChange={handleFavoriteChange}
+    />
+  ), [favoriteIds, handleFavoriteChange]);
+  const handleEndReached = useCallback(() => { void loadMore(); }, [loadMore]);
+  const keyExtractor = useCallback((item: ProductGridRow) => item.key, []);
 
   return (
     <ThemedView style={styles.container}>
@@ -458,11 +473,16 @@ export default function SearchScreen() {
         <FlatList<ProductGridRow>
           style={styles.body}
           data={loading ? [] : productRows}
-          keyExtractor={(item) => item.key}
+          keyExtractor={keyExtractor}
           contentContainerStyle={styles.list}
           onScroll={onScroll}
-          onEndReached={() => { void loadMore(); }}
+          onEndReached={handleEndReached}
           onEndReachedThreshold={0.4}
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          updateCellsBatchingPeriod={50}
+          windowSize={7}
+          removeClippedSubviews
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
@@ -497,14 +517,13 @@ export default function SearchScreen() {
               {!loading && (activeQuery || activeFacets.length > 0) && products.length === 0 && !message && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
             </View>
           }
-          ListFooterComponent={loadingMore ? <ProductGridSkeleton variant="plp" /> : null}
-          renderItem={({ item }) => (
-            <ProductGridRowView
-              row={item}
-              favoriteIds={favoriteIds}
-              onFavoriteChange={(product, favorite) => setFavoriteIds((current) => favorite ? Array.from(new Set([...current, product.id])) : current.filter((id) => id !== product.id))}
-            />
-          )}
+          ListFooterComponent={loadingMore ? (
+            <View style={styles.loadMoreFooter}>
+              <ActivityIndicator size="small" color="#0a0a0a" />
+              <ProductGridSkeleton variant="plp" />
+            </View>
+          ) : null}
+          renderItem={renderProductRow}
           />
 
         <ProductFilterModal
@@ -560,11 +579,12 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12 },
   listingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   listingHeading: { flex: 1 },
-  listingTitle: { fontSize: 18 },
+  listingTitle: { fontSize: 16, lineHeight: 18, color: '#0a0a0a' },
   resultCount: { fontSize: 12 },
   filterButton: { minHeight: 38, paddingHorizontal: Spacing.three, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.two, backgroundColor: '#FFFFFF' },
   filterText: { fontSize: 12 },
   list: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, paddingBottom: 120, gap: Spacing.three },
+  loadMoreFooter: { alignItems: 'center', gap: Spacing.two },
   successText: { color: '#26734d', fontWeight: '600' },
   messageText: { color: '#ed6560' },
   searchProductShelfTitle: { fontSize: 16, lineHeight: 20 },
