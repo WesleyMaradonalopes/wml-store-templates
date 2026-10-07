@@ -22,7 +22,7 @@ export function LoginRequiredModal({ visible, onClose, onLogin }: LoginRequiredM
         <Pressable accessibilityLabel="Fechar aviso de favoritos" onPress={onClose} style={StyleSheet.absoluteFill} />
         <View style={styles.card}>
           <View style={styles.header}>
-            <ThemedText type="subtitle" style={styles.title}>Favoritos</ThemedText>
+            <ThemedText type="subtitle" style={styles.titleFavorito}>Favoritos</ThemedText>
             <Pressable accessibilityLabel="Fechar aviso de favoritos" onPress={onClose} style={styles.closeButton}>
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </Pressable>
@@ -41,10 +41,10 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, backgroundColor: 'rgba(0, 0, 0, 0.52)' },
   card: { width: '100%', maxWidth: 380, gap: Spacing.three, padding: Spacing.five, borderRadius: 18, backgroundColor: '#FFFFFF', elevation: 8, shadowColor: '#0a0a0a', shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   header: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { flex: 1 },
-  closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  closeText: { color: '#0a0a0a', fontSize: 24, lineHeight: 28, fontWeight: '400' },
-  message: { color: '#393531', fontSize: 15, lineHeight: 23 },
+  titleFavorito: { flex: 1, color: '#0a0a0a', fontSize: 20, lineHeight: 24, fontWeight: '600' },
+  closeButton: { position: 'absolute', top: -25, right: -25, width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 50, backgroundColor: '#ffffff' },
+  closeText: { color: '#0a0a0a', fontSize: 20, lineHeight: 24, fontWeight: '400' },
+  message: { color: '#0a0a0a', fontSize: 14, lineHeight: 18 },
   loginButton: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   loginText: { color: '#FFFFFF', fontWeight: '700' },
 });

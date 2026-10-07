@@ -76,6 +76,6 @@ const styles = StyleSheet.create({
     boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)',
   },
   gradientFill: { flex: 1 },
-  content: { gap: Spacing.three, paddingTop: 16, paddingBottom: 100 },
+  content: { gap: Spacing.three, paddingTop: 12, paddingHorizontal: 10, paddingBottom: 100 },
   errorText: { color: '#ed6560' },
 });
