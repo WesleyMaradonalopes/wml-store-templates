@@ -57,7 +57,7 @@ export default function OrdersScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Meus Pedidos" />
+        <ScreenHeader title="Meus Pedidos" showSearch={false} showAssistant={false} variant="checkout" />
         {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
         {!!error && <ThemedText style={[styles.orderText, styles.errorText]}>{error}</ThemedText>}
         <FlatList

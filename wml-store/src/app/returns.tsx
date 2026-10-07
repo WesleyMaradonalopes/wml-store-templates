@@ -83,9 +83,7 @@ export default function ReturnsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <ScreenHeader title="Trocas e devoluções" onBack={() => router.back()} showSearch={false} />
-        </View>
+        <ScreenHeader title="Trocas e devoluções" onBack={() => router.back()} showSearch={false} variant="checkout" />
         <View style={styles.body}>
           <ScrollView
             ref={scrollRef}

@@ -25,7 +25,7 @@ export default function StoresScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader back={false} /><ThemedText type="subtitle">Nossas lojas</ThemedText>
+        <ScreenHeader title="Nossas lojas" showSearch={false} variant="checkout" />
         {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
         {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
         {!loading && !error && stores.length === 0 && (
