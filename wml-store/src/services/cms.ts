@@ -13,6 +13,7 @@ export type CmsPage = {
   name?: string;
   sections: CmsSection[];
   settings?: Record<string, unknown>;
+  tema?: Record<string, unknown>;
 };
 
 const cacheTtl = 24 * 60 * 60 * 1000;
@@ -20,6 +21,7 @@ const cacheTtl = 24 * 60 * 60 * 1000;
 export type CmsPageOptions = {
   cacheTtl?: number;
   forceRefresh?: boolean;
+  onRefresh?: (page: CmsPage) => void;
 };
 
 type CachedPage = CmsPage & { cachedAt: number };
@@ -33,7 +35,7 @@ function normalizePage(payload: unknown): CmsPage | null {
 
   if (!candidate || typeof candidate !== 'object') return null;
 
-  const page = candidate as { sections?: unknown; settings?: unknown; id?: string; name?: string };
+  const page = candidate as { sections?: unknown; settings?: unknown; tema?: unknown; id?: string; name?: string };
   return {
     id: page.id,
     name: page.name,
@@ -45,6 +47,10 @@ function normalizePage(payload: unknown): CmsPage | null {
     settings:
       page.settings && typeof page.settings === 'object'
         ? (page.settings as Record<string, unknown>)
+        : undefined,
+    tema:
+      page.tema && typeof page.tema === 'object'
+        ? (page.tema as Record<string, unknown>)
         : undefined,
   };
 }
@@ -84,7 +90,11 @@ export async function getCmsPage(
 
   if (!options.forceRefresh && cached && Date.now() - cached.cachedAt < ttl) {
     fetchPage(contentType, documentId)
-      .then((page) => page && setStoredJson(cacheKey, { ...page, cachedAt: Date.now() }))
+      .then(async (page) => {
+        if (!page) return;
+        await setStoredJson(cacheKey, { ...page, cachedAt: Date.now() });
+        options.onRefresh?.(page);
+      })
       .catch(() => undefined);
     return cached;
   }

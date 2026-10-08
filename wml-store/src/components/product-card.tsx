@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/context/theme-context';
+import { usePageTheme } from '@/context/page-theme-context';
 import { useTheme } from '@/hooks/use-theme';
 import { type Product } from '@/services/catalog';
 
@@ -36,9 +36,9 @@ function discountPercentage(product: Product) {
 
 export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true, onSimilar, similarLoading = false }: Props) {
   const router = useRouter();
-  const { colorScheme } = useAppTheme();
+  const pageTheme = usePageTheme();
   const theme = useTheme();
-  const dark = colorScheme === 'dark';
+  const dark = pageTheme.isDark;
   const discount = discountPercentage(product);
 
   return (

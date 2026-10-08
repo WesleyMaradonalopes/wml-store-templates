@@ -4,6 +4,47 @@
 
 O app lê o conteúdo publicado do projeto definido por `EXPO_PUBLIC_VTEX_CMS_PROJECT_ID` no VTEX Headless CMS. Portanto, editar este arquivo local não publica nem altera o CMS; ele serve como contrato das seções que o app sabe renderizar.
 
+## Tema individual por página
+
+Cada tipo de página (`home`, `categories`, `landingPage` e `search`) expõe o grupo
+`Tema` no Headless CMS. A configuração é lida de `tema.pageTheme.theme` (com
+fallback para `settings.pageTheme.theme`) e aceita:
+
+- `default`: mantém o visual atual;
+- `black`: paleta preta para campanhas como Black Friday;
+- `terracotta`, `rose` e `sage`: paletas de campanha alternativas.
+- `custom`: permite escolher as cores da página nos campos de `customColors`.
+
+No modo `custom`, o CMS exibe um seletor de cor para fundo, superfícies/cartões,
+texto principal, texto secundário, destaque/botões, texto sobre o destaque e
+bordas. As cores são informadas em hexadecimal (`#RGB`, `#RGBA`, `#RRGGBB` ou
+`#RRGGBBAA`). Exemplo:
+
+```json
+{
+  "tema": {
+    "pageTheme": {
+      "theme": "custom",
+      "customColors": {
+        "background": "#120E1A",
+        "surface": "#241C32",
+        "text": "#FFFFFF",
+        "textSecondary": "#D4C9E8",
+        "primary": "#C084FC",
+        "onPrimary": "#180D24",
+        "border": "#70449B"
+      }
+    }
+  }
+}
+```
+
+Campos personalizados não preenchidos usam uma paleta segura baseada na cor de
+fundo. Valores inválidos são descartados e não alteram o tema padrão.
+
+O tema é aplicado somente à página que o CMS configurou. Um documento sem tema
+ou com valor inválido continua usando `default`, sem alterar as demais telas.
+
 ## Carrossel de produtos por coleção e cor na Home
 
 Adicione a seção `ProductCollectionCarousel` ao documento `home` para exibir os produtos informados no carrossel principal. Ao trocar o produto principal, o app consulta a mesma coleção e a mesma cor exata para montar o carrossel de miniaturas abaixo:

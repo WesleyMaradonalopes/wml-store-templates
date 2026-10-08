@@ -3,10 +3,8 @@
  * https://docs.expo.dev/guides/color-schemes/
  */
 
-import { Colors } from '@/constants/theme';
-import { useAppTheme } from '@/context/theme-context';
+import { usePageTheme } from '@/context/page-theme-context';
 
 export function useTheme() {
-  const { colorScheme } = useAppTheme();
-  return Colors[colorScheme];
+  return usePageTheme().palette;
 }

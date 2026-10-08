@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleProp, StyleSheet, ViewStyle } from 'react-native';
 
-import { useAppTheme } from '@/context/theme-context';
+import { usePageTheme } from '@/context/page-theme-context';
 import { useTheme } from '@/hooks/use-theme';
 import { getAccountSession, subscribeAccountSession } from '@/services/auth';
 import { type Product } from '@/services/catalog';
@@ -21,9 +21,9 @@ type ProductFavoriteButtonProps = {
 
 export function ProductFavoriteButton({ product, favorite: controlledFavorite, onFavoriteChange, buttonStyle, iconSize = 28 }: ProductFavoriteButtonProps) {
   const router = useRouter();
-  const { colorScheme } = useAppTheme();
+  const pageTheme = usePageTheme();
   const theme = useTheme();
-  const dark = colorScheme === 'dark';
+  const dark = pageTheme.isDark;
   const [localFavorite, setLocalFavorite] = useState(Boolean(controlledFavorite));
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);

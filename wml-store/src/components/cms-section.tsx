@@ -27,6 +27,8 @@ import { ThemedView } from './themed-view';
 import { ProductCollectionCarousel } from './product-collection-carousel';
 import { WiddeHomeVideoCarousel } from './widde-home-video-carousel';
 import { styles } from './cms-section.styles';
+import { usePageTheme } from '@/context/page-theme-context';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean; searchPresentation?: boolean };
 
@@ -291,6 +293,9 @@ type ProductShelfProps = {
 
 export function ProductShelf({ data, isHome = false, titleStyle, onAdded, onFavoriteChange, showAddedModal = true }: ProductShelfProps) {
   const router = useRouter();
+  const pageTheme = usePageTheme();
+  const theme = useTheme();
+  const dark = pageTheme.isDark;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState(0);
@@ -347,7 +352,7 @@ export function ProductShelf({ data, isHome = false, titleStyle, onAdded, onFavo
   }, []);
 
   return (
-    <ThemedView style={[styles.section, isHome ? styles.homeProductShelfSection : styles.productShelfSection]}>
+    <ThemedView style={[styles.section, isHome ? styles.homeProductShelfSection : styles.productShelfSection, dark && { backgroundColor: theme.background }]}>
       <View style={styles.sectionHeader}>
         <ThemedText type="subtitle" style={[isHome && styles.homeShelfTitle, titleStyle]}>{text(data.title) || 'Produtos'}</ThemedText>
         {data.showSeeAll !== false && (
@@ -365,8 +370,8 @@ export function ProductShelf({ data, isHome = false, titleStyle, onAdded, onFavo
           style={isHome ? styles.homeTabViewport : undefined}
           contentContainerStyle={[styles.tabList, isHome && styles.homeTabList]}
           renderItem={({ item: tab, index }) => (
-            <Pressable onPress={() => setSelectedTab(index)} style={[styles.tab, isHome && styles.homeTab, selectedTab === index && styles.selectedTab]}>
-              <ThemedText style={[isHome && styles.homeTabText, selectedTab === index && styles.selectedTabText]}>{text(tab.label) || `Opcao ${index + 1}`}</ThemedText>
+            <Pressable onPress={() => setSelectedTab(index)} style={[styles.tab, isHome && styles.homeTab, selectedTab === index && styles.selectedTab, dark && { borderColor: theme.borderStrong, backgroundColor: selectedTab === index ? theme.primary : theme.backgroundElement }]}>
+              <ThemedText style={[isHome && styles.homeTabText, selectedTab === index && styles.selectedTabText, dark && { color: selectedTab === index ? theme.onPrimary : theme.text }]}>{text(tab.label) || `Opcao ${index + 1}`}</ThemedText>
             </Pressable>
           )}
         />
@@ -404,6 +409,9 @@ function configuredFacets(value: unknown): SelectedFacet[] {
 }
 
 function ProductListingSection({ data }: { data: Record<string, unknown> }) {
+  const pageTheme = usePageTheme();
+  const theme = useTheme();
+  const dark = pageTheme.isDark;
   const query = text(data.term) || text(data.query);
   const baseFacets = configuredFacets(data.facets);
   const baseSignature = JSON.stringify(baseFacets);
@@ -462,13 +470,13 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
   }
 
   return (
-    <ThemedView style={styles.plpSection}>
+    <ThemedView style={[styles.plpSection, dark && { backgroundColor: theme.background }]}>
       <View style={styles.plpHeader}>
         <View style={styles.plpHeading}>
           <ThemedText style={styles.plpTitle}>{text(data.title) || query || 'Produtos'}</ThemedText>
           <ThemedText themeColor="textSecondary" style={styles.plpCount}>{resultCount} {resultCount === 1 ? 'peça' : 'peças'}</ThemedText>
         </View>
-        <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
+        <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph color={dark ? theme.text : undefined} backgroundColor={dark ? theme.backgroundElement : undefined} /><ThemedText type="smallBold" style={styles.filterButtonText}>Filtrar e Ordenar</ThemedText></Pressable>
       </View>
       {loading && <ProductGridSkeleton variant="plp" />}
       {!loading && products.length === 0 && <ThemedText themeColor="textSecondary">Nenhum produto encontrado.</ThemedText>}
@@ -496,6 +504,8 @@ function ProductListingSection({ data }: { data: Record<string, unknown> }) {
 
 function ContentCard({ title, description, imageUrl, action }: { title?: string; description?: string; imageUrl?: string; action?: { type?: string; value?: string } }) {
   const router = useRouter();
+  const pageTheme = usePageTheme();
+  const theme = useTheme();
   function open() {
     if (!action?.value) return;
     if (action.type === 'product') router.push(`/product/${action.value}`);
@@ -507,7 +517,7 @@ function ContentCard({ title, description, imageUrl, action }: { title?: string;
       else void openCmsExternalLink(action.value);
     }
   }
-  return <Pressable onPress={open}><ThemedView style={styles.contentCard}>{!!imageUrl && <Image source={{ uri: imageUrl }} style={styles.contentCardImage} contentFit="cover" />}<ThemedText type="smallBold">{title || 'Conteúdo'}</ThemedText>{!!description && <ThemedText themeColor="textSecondary" numberOfLines={3}>{description}</ThemedText>}</ThemedView></Pressable>;
+  return <Pressable onPress={open}><ThemedView style={[styles.contentCard, pageTheme.isDark && { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>{!!imageUrl && <Image source={{ uri: imageUrl }} style={styles.contentCardImage} contentFit="cover" />}<ThemedText type="smallBold">{title || 'Conteúdo'}</ThemedText>{!!description && <ThemedText themeColor="textSecondary" numberOfLines={3}>{description}</ThemedText>}</ThemedView></Pressable>;
 }
 
 function StreamShopBanner({ data }: { data: Record<string, unknown> }) {
@@ -745,6 +755,9 @@ function CategoryGroup({
 
 export function CmsSectionView({ section, categoryPageSlug, isHome = false, searchPresentation = false }: Props) {
   const router = useRouter();
+  const pageTheme = usePageTheme();
+  const theme = useTheme();
+  const dark = pageTheme.isDark;
   const [heroIndex, setHeroIndex] = useState(0);
   const heroRef = useRef<ScrollView | null>(null);
   const data = section.data ?? {};
@@ -1047,8 +1060,8 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, sear
     };
 
     return (
-      <View style={isFullScreenHero ? styles.heroSection : [styles.bannerSection, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle]}>
-        {!!text(data.mainTitle) && <ThemedText type="subtitle" style={[styles.bannerSectionTitle, isHome && homeBannerTitleStyle, searchPresentation && styles.searchBannerSectionTitle]}>{text(data.mainTitle)}</ThemedText>}
+      <View style={[isFullScreenHero ? styles.heroSection : [styles.bannerSection, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle], dark && { backgroundColor: theme.background }]}>
+        {!!text(data.mainTitle) && <ThemedText type="subtitle" style={[styles.bannerSectionTitle, isHome && homeBannerTitleStyle, searchPresentation && styles.searchBannerSectionTitle, dark && { color: theme.text }]}>{text(data.mainTitle)}</ThemedText>}
         {renderModeContent()}
       </View>
     );

@@ -13,12 +13,16 @@ import { ProductGridRowView, buildProductGridRows, type ProductGridRow } from '@
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { getPageThemePalette } from '@/constants/page-theme';
 import { Fonts, Spacing } from '@/constants/theme';
+import { PageThemeProvider } from '@/context/page-theme-context';
+import { useAppTheme } from '@/context/theme-context';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { subscribeAccountSession } from '@/services/auth';
 import { DEFAULT_SEARCH_SORT, getSearchSuggestions, getTopSearchTerms, resolveCategoryFacets, searchCatalogProductListing, searchProductListing, searchSmartProductListing, type CatalogFacet, type Product, type SearchSuggestion, type SelectedFacet, type SmartSearchSource } from '@/services/catalog';
 import { parseCmsRouteFacets } from '@/services/cms-actions';
 import { getCmsPage, type CmsPage } from '@/services/cms';
+import { resolvePageTheme, resolvePageThemeColors } from '@/services/cms-page-theme';
 import { EMPTY_CART_RECENT_PRODUCTS_SHELF } from '@/utils/checkout';
 import { isFavorite } from '@/services/favorites';
 import { trackEvent } from '@/services/telemetry';
@@ -93,6 +97,7 @@ type ListingResolution = {
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { colorScheme } = useAppTheme();
   const onScroll = useTabBarScroll();
   const { q, facets: facetsParam, sort: sortParam, title: titleParam, collectionCatalogTitle: collectionCatalogTitleParam } = useLocalSearchParams<{ q?: string; facets?: string; sort?: string; title?: string; collectionCatalogTitle?: string }>();
   const initialQuery = paramText(q).trim();
@@ -184,7 +189,10 @@ export default function SearchScreen() {
 
   useEffect(() => {
     let active = true;
-    getCmsPage('search', SEARCH_CMS_DOCUMENT, { forceRefresh: true })
+    getCmsPage('search', SEARCH_CMS_DOCUMENT, {
+      forceRefresh: true,
+      onRefresh: (page) => { if (active) setSearchCmsPage(page); },
+    })
       .then((page) => { if (active) setSearchCmsPage(page); })
       .catch(() => { if (active) setSearchCmsPage(null); });
     return () => { active = false; };
@@ -421,18 +429,23 @@ export default function SearchScreen() {
   ), [favoriteIds, handleFavoriteChange]);
   const handleEndReached = useCallback(() => { void loadMore(); }, [loadMore]);
   const keyExtractor = useCallback((item: ProductGridRow) => item.key, []);
+  const searchPageTheme = resolvePageTheme(searchCmsPage);
+  const searchPageThemeColors = resolvePageThemeColors(searchCmsPage);
+  const pagePalette = getPageThemePalette(searchPageTheme, colorScheme, searchPageThemeColors);
+  const hasCustomPageTheme = searchPageTheme !== 'default';
 
   return (
-    <ThemedView style={styles.container}>
+    <PageThemeProvider theme={searchPageTheme} customColors={searchPageThemeColors}>
+    <ThemedView style={[styles.container, hasCustomPageTheme && { backgroundColor: pagePalette.background }]}>
       <SafeAreaView style={styles.safeArea}>
         {searchOpen ? (
-          <View style={styles.searchHeader}>
+          <View style={[styles.searchHeader, hasCustomPageTheme && { backgroundColor: pagePalette.background, borderBottomColor: pagePalette.border }]}>
             <Pressable accessibilityLabel="Voltar" onPress={() => router.back()} style={styles.backButton}>
-              <ArrowLeftIAIcon color="#4b4743" size={19} />
+              <ArrowLeftIAIcon color={hasCustomPageTheme ? pagePalette.text : '#4b4743'} size={19} />
             </Pressable>
-            <View style={styles.searchInputWrap}>
-              <SearchIcon size={17} color="#8b8782" />
-              <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder={isListening ? 'Ouvindo...' : 'O que você procura?'} returnKeyType="search" style={styles.searchInput} />
+            <View style={[styles.searchInputWrap, hasCustomPageTheme && { backgroundColor: pagePalette.inputBackground }]}>
+              <SearchIcon size={17} color={hasCustomPageTheme ? pagePalette.textSecondary : '#8b8782'} />
+              <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder={isListening ? 'Ouvindo...' : 'O que você procura?'} placeholderTextColor={pagePalette.textSecondary} returnKeyType="search" style={[styles.searchInput, hasCustomPageTheme && { color: pagePalette.text }]} />
               {!!term && <Pressable accessibilityLabel="Limpar busca" onPress={clearSearch} style={styles.clearButton}><ThemedText style={styles.clearText}>✕</ThemedText></Pressable>}
             </View>
             <Pressable
@@ -445,22 +458,22 @@ export default function SearchScreen() {
               style={[styles.voiceButton, isListening && styles.voiceButtonActive]}
               testID="voice-search-button"
             >
-              <MicrophoneIcon size={20} color={isListening ? '#b42318' : '#4b4743'} />
+              <MicrophoneIcon size={20} color={isListening ? '#b42318' : hasCustomPageTheme ? pagePalette.text : '#4b4743'} />
             </Pressable>
             <Pressable accessibilityLabel="Fechar busca" onPress={() => router.back()} style={styles.closeButton}>
-              <ThemedText style={styles.closeText}>✕</ThemedText>
+              <ThemedText style={[styles.closeText, hasCustomPageTheme && { color: pagePalette.text }]}>✕</ThemedText>
             </Pressable>
           </View>
         ) : (
           <ScreenHeader onSearch={() => setSearchOpen(true)} />
         )}
         {searchOpen && suggestions.length > 0 && (
-          <View style={styles.suggestionsPanel}>
+          <View style={[styles.suggestionsPanel, hasCustomPageTheme && { backgroundColor: pagePalette.backgroundElement, borderColor: pagePalette.border }]}>
             {suggestions.slice(0, 6).map((suggestion) => {
               const attributes = suggestion.attributes.map((attribute) => attribute.labelValue).filter(Boolean).slice(0, 2).join(' · ');
               return (
                 <Pressable key={suggestion.term} onPress={() => selectSuggestion(suggestion.term)} style={styles.suggestionRow}>
-                  <SearchIcon size={15} color="#8b8782" />
+                  <SearchIcon size={15} color={hasCustomPageTheme ? pagePalette.textSecondary : '#8b8782'} />
                   <View style={styles.suggestionCopy}>
                     <ThemedText style={styles.suggestionText}>{suggestion.term}</ThemedText>
                     {!!attributes && <ThemedText themeColor="textSecondary" style={styles.suggestionMeta}>{attributes}</ThemedText>}
@@ -488,10 +501,10 @@ export default function SearchScreen() {
           ListHeaderComponent={
             <View style={styles.listHeaderContent}>
               {!activeQuery && activeFacets.length === 0 && popularTerms.length > 0 && (
-                <ThemedView style={styles.trending}>
+                <ThemedView style={[styles.trending, hasCustomPageTheme && { backgroundColor: pagePalette.backgroundElement, borderColor: pagePalette.border }]}>
                   <ThemedText type="smallBold" style={styles.trendingTitle}>Em alta</ThemedText>
                   <View style={styles.chips}>
-                    {popularTerms.map((popular) => <Pressable key={popular} onPress={() => openPopular(popular)} style={styles.chip}><ThemedText style={styles.chipText}>{popular}</ThemedText></Pressable>)}
+                    {popularTerms.map((popular) => <Pressable key={popular} onPress={() => openPopular(popular)} style={[styles.chip, hasCustomPageTheme && { borderColor: pagePalette.borderStrong }]}><ThemedText style={styles.chipText}>{popular}</ThemedText></Pressable>)}
                   </View>
                 </ThemedView>
               )}
@@ -505,10 +518,10 @@ export default function SearchScreen() {
               {(!!activeQuery || activeFacets.length > 0) && (
                 <View style={styles.listingHeader}>
                   <View style={styles.listingHeading}>
-                    <ThemedText style={styles.listingTitle}>{displayListingTitle}</ThemedText>
+                    <ThemedText style={[styles.listingTitle, hasCustomPageTheme && { color: pagePalette.text }]}>{displayListingTitle}</ThemedText>
                     <ThemedText themeColor="textSecondary" style={styles.resultCount}>{resultCount} {resultCount === 1 ? 'peça' : 'peças'}</ThemedText>
                   </View>
-                  <Pressable onPress={() => setFiltersVisible(true)} style={styles.filterButton}><FilterGlyph /><ThemedText type="smallBold" style={styles.filterText}>Filtrar e Ordenar</ThemedText></Pressable>
+                  <Pressable onPress={() => setFiltersVisible(true)} style={[styles.filterButton, hasCustomPageTheme && { borderColor: pagePalette.borderStrong, backgroundColor: pagePalette.backgroundElement }]}><FilterGlyph color={hasCustomPageTheme ? pagePalette.text : undefined} backgroundColor={hasCustomPageTheme ? pagePalette.backgroundElement : undefined} /><ThemedText type="smallBold" style={styles.filterText}>Filtrar e Ordenar</ThemedText></Pressable>
                 </View>
               )}
 
@@ -519,7 +532,7 @@ export default function SearchScreen() {
           }
           ListFooterComponent={loadingMore ? (
             <View style={styles.loadMoreFooter}>
-              <ActivityIndicator size="small" color="#0a0a0a" />
+              <ActivityIndicator size="small" color={hasCustomPageTheme ? pagePalette.text : '#0a0a0a'} />
               <ProductGridSkeleton variant="plp" />
             </View>
           ) : null}
@@ -550,6 +563,7 @@ export default function SearchScreen() {
         />
       </SafeAreaView>
     </ThemedView>
+    </PageThemeProvider>
   );
 }
 

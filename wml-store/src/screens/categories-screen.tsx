@@ -2,10 +2,12 @@ import { CmsSectionView } from '@/components/cms-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/context/theme-context';
+import { isDarkThemeColor } from '@/constants/page-theme';
+import { PageThemeProvider, usePageTheme } from '@/context/page-theme-context';
 import { useTheme } from '@/hooks/use-theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { CmsPage, getCmsPage } from '@/services/cms';
+import { resolvePageTheme, resolvePageThemeColors } from '@/services/cms-page-theme';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
@@ -16,22 +18,43 @@ export default function CategoriesScreen() {
   const [cmsPage, setCmsPage] = useState<CmsPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const onScroll = useTabBarScroll();
-  const insets = useSafeAreaInsets();
-  const { colorScheme } = useAppTheme();
-  const theme = useTheme();
-  const dark = colorScheme === 'dark';
 
   useEffect(() => {
-    getCmsPage('categories', 'categorias')
-      .then(setCmsPage)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+    let active = true;
+    getCmsPage('categories', 'categorias', {
+      onRefresh: (page) => {
+        if (active) setCmsPage(page);
+      },
+    })
+      .then((page) => { if (active) setCmsPage(page); })
+      .catch(() => { if (active) setError(true); })
+      .finally(() => { if (active) setLoading(false); });
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const pageTheme = resolvePageTheme(cmsPage);
+  const customColors = resolvePageThemeColors(cmsPage);
+
+  return (
+    <PageThemeProvider theme={pageTheme} customColors={customColors}>
+      <CategoriesScreenContent cmsPage={cmsPage} loading={loading} error={error} />
+    </PageThemeProvider>
+  );
+}
+
+function CategoriesScreenContent({ cmsPage, loading, error }: { cmsPage: CmsPage | null; loading: boolean; error: boolean }) {
+  const onScroll = useTabBarScroll();
+  const insets = useSafeAreaInsets();
+  const pageTheme = usePageTheme();
+  const theme = useTheme();
+  const dark = pageTheme.isDark;
 
   return (
 				<LinearGradient
-          colors={dark ? [theme.background, theme.background, theme.background] : ['#ffffff', '#ffffff', '#ffffff']}
+          colors={[theme.background, theme.background, theme.background]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.container, styles.gradientFill]}>
@@ -41,7 +64,7 @@ export default function CategoriesScreen() {
 							<View style={styles.headerSurface}>
 								<ScreenHeader back={false} />
 							</View>
-							<BlurView intensity={24} tint={dark ? 'dark' : 'light'} style={[styles.glassPanel, dark && { borderColor: theme.border }]}>
+							<BlurView intensity={24} tint={isDarkThemeColor(theme.background) ? 'dark' : 'light'} style={[styles.glassPanel, { backgroundColor: theme.backgroundElement }, dark && { borderColor: theme.border }]}>
 									<ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
 										{loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
 										{error && <ThemedText style={styles.errorText}>Nao foi possivel carregar as categorias.</ThemedText>}

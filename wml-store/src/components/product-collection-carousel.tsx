@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
+import { usePageTheme } from '@/context/page-theme-context';
+import { useTheme } from '@/hooks/use-theme';
 import { getCompleteLookProducts, getProduct, type Product } from '@/services/catalog';
 
 import ShoppingBagIcon from './icons/ShoppingBagIcon';
@@ -134,6 +136,9 @@ function ProductCollectionCarouselSkeleton({
 export function ProductCollectionCarousel({ data }: ProductCollectionCarouselProps) {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
+  const pageTheme = usePageTheme();
+  const theme = useTheme();
+  const dark = pageTheme.isDark;
   const [products, setProducts] = useState<Product[]>([]);
   const [relatedProductsById, setRelatedProductsById] = useState<Record<string, Product[]>>({});
   const [activeIndex, setActiveIndex] = useState(0);
@@ -147,7 +152,7 @@ export function ProductCollectionCarousel({ data }: ProductCollectionCarouselPro
   const enabled = enabledFromData(data.enabled);
   const title = text(data.title).trim() || 'Produtos em destaque';
   const showTitle = data.showTitle !== false;
-  const backgroundColor = cmsColor(data.backgroundColor, '#FFFFFF');
+  const backgroundColor = dark ? theme.background : cmsColor(data.backgroundColor, '#FFFFFF');
   const mainCardWidth = Math.max(220, Math.round(screenWidth * MAIN_CARD_WIDTH_RATIO));
   const mainImageHeight = Math.min(520, Math.max(300, Math.round(mainCardWidth / 0.75)));
   const thumbnailWidth = Math.min(126, Math.max(92, Math.round(screenWidth * 0.25)));
@@ -316,10 +321,10 @@ export function ProductCollectionCarousel({ data }: ProductCollectionCarouselPro
               <ProductFavoriteButton product={product} buttonStyle={styles.favoriteButton} />
               <ProductQuickViewButton
                 product={product}
-                icon={<ShoppingBagIcon size={22} color="#0a0a0a" />}
+                icon={<ShoppingBagIcon size={22} color={dark ? theme.text : '#0a0a0a'} />}
                 accessibilityLabel="Adicionar à sacola"
                 disabled={!product.itemId}
-                buttonStyle={styles.addButton}
+                buttonStyle={[styles.addButton, dark && { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
               />
             </View>
             <ThemedText numberOfLines={2} style={styles.mainProductName}>{product.collection.trim() || product.name}</ThemedText>

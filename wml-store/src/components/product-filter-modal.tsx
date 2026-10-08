@@ -151,8 +151,8 @@ export function ProductFilterModal({ visible, query, facets, baseFacets = [], se
   );
 }
 
-export function FilterGlyph() {
-  return <View style={styles.glyph}><View style={[styles.glyphLine, styles.glyphLineOne]} /><View style={[styles.glyphDot, styles.glyphDotOne]} /><View style={[styles.glyphLine, styles.glyphLineTwo]} /><View style={[styles.glyphDot, styles.glyphDotTwo]} /></View>;
+export function FilterGlyph({ color = '#413d39', backgroundColor = '#FFFFFF' }: { color?: string; backgroundColor?: string } = {}) {
+  return <View style={styles.glyph}><View style={[styles.glyphLine, styles.glyphLineOne, { backgroundColor: color }]} /><View style={[styles.glyphDot, styles.glyphDotOne, { borderColor: color, backgroundColor }]} /><View style={[styles.glyphLine, styles.glyphLineTwo, { backgroundColor: color }]} /><View style={[styles.glyphDot, styles.glyphDotTwo, { borderColor: color, backgroundColor }]} /></View>;
 }
 
 const styles = StyleSheet.create({

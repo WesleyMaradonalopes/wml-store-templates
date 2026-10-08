@@ -4,26 +4,174 @@
     "name": "Home",
     "scopes": ["home"],
     "isSingleton": true,
-    "configurationSchemaSets": []
+    "configurationSchemaSets": [
+      {
+        "name": "Tema",
+        "configurations": [
+          {
+            "name": "pageTheme",
+            "schema": {
+              "title": "Tema da página",
+              "description": "Escolha a identidade visual da página. O padrão mantém o visual atual.",
+              "type": "object",
+              "properties": {
+                "theme": {
+                  "title": "Tema",
+                  "type": "string",
+                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "default": "default"
+                },
+                "customColors": {
+                  "title": "Cores personalizadas",
+                  "description": "Usado quando o tema for Personalizado. Os campos preenchidos substituem as cores correspondentes.",
+                  "type": "object",
+                  "properties": {
+                    "background": { "title": "Cor de fundo", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "surface": { "title": "Cor das superfícies e cartões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "text": { "title": "Cor do texto principal", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "textSecondary": { "title": "Cor do texto secundário", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "primary": { "title": "Cor de destaque e botões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "onPrimary": { "title": "Cor do texto sobre o destaque", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "border": { "title": "Cor das bordas", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "categories",
     "name": "Página de Categorias",
     "scopes": ["categories"],
     "isSingleton": true,
-    "configurationSchemaSets": []
+    "configurationSchemaSets": [
+      {
+        "name": "Tema",
+        "configurations": [
+          {
+            "name": "pageTheme",
+            "schema": {
+              "title": "Tema da página",
+              "description": "Escolha a identidade visual da página. O padrão mantém o visual atual.",
+              "type": "object",
+              "properties": {
+                "theme": {
+                  "title": "Tema",
+                  "type": "string",
+                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "default": "default"
+                },
+                "customColors": {
+                  "title": "Cores personalizadas",
+                  "description": "Usado quando o tema for Personalizado. Os campos preenchidos substituem as cores correspondentes.",
+                  "type": "object",
+                  "properties": {
+                    "background": { "title": "Cor de fundo", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "surface": { "title": "Cor das superfícies e cartões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "text": { "title": "Cor do texto principal", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "textSecondary": { "title": "Cor do texto secundário", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "primary": { "title": "Cor de destaque e botões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "onPrimary": { "title": "Cor do texto sobre o destaque", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "border": { "title": "Cor das bordas", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "landingPage",
     "name": "Landing Page",
     "scopes": ["landing"],
-    "configurationSchemaSets": []
+    "configurationSchemaSets": [
+      {
+        "name": "Tema",
+        "configurations": [
+          {
+            "name": "pageTheme",
+            "schema": {
+              "title": "Tema da página",
+              "description": "Escolha a identidade visual da página. O padrão mantém o visual atual.",
+              "type": "object",
+              "properties": {
+                "theme": {
+                  "title": "Tema",
+                  "type": "string",
+                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "default": "default"
+                },
+                "customColors": {
+                  "title": "Cores personalizadas",
+                  "description": "Usado quando o tema for Personalizado. Os campos preenchidos substituem as cores correspondentes.",
+                  "type": "object",
+                  "properties": {
+                    "background": { "title": "Cor de fundo", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "surface": { "title": "Cor das superfícies e cartões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "text": { "title": "Cor do texto principal", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "textSecondary": { "title": "Cor do texto secundário", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "primary": { "title": "Cor de destaque e botões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "onPrimary": { "title": "Cor do texto sobre o destaque", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "border": { "title": "Cor das bordas", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "search",
     "name": "Busca",
     "scopes": ["search"],
-    "configurationSchemaSets": []
+    "configurationSchemaSets": [
+      {
+        "name": "Tema",
+        "configurations": [
+          {
+            "name": "pageTheme",
+            "schema": {
+              "title": "Tema da página",
+              "description": "Escolha a identidade visual da página. O padrão mantém o visual atual.",
+              "type": "object",
+              "properties": {
+                "theme": {
+                  "title": "Tema",
+                  "type": "string",
+                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "default": "default"
+                },
+                "customColors": {
+                  "title": "Cores personalizadas",
+                  "description": "Usado quando o tema for Personalizado. Os campos preenchidos substituem as cores correspondentes.",
+                  "type": "object",
+                  "properties": {
+                    "background": { "title": "Cor de fundo", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "surface": { "title": "Cor das superfícies e cartões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "text": { "title": "Cor do texto principal", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "textSecondary": { "title": "Cor do texto secundário", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "primary": { "title": "Cor de destaque e botões", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "onPrimary": { "title": "Cor do texto sobre o destaque", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } },
+                    "border": { "title": "Cor das bordas", "type": "string", "pattern": "^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", "widget": { "ui:widget": "color" } }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "appSettings",

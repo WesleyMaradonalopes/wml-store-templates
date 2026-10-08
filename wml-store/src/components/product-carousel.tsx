@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, useWindowDimensions } from 'react-native';
 
-import { useAppTheme } from '@/context/theme-context';
+import { usePageTheme } from '@/context/page-theme-context';
 import type { Product } from '@/services/catalog';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -38,9 +38,9 @@ export function ProductCarousel({
   rightInset = 16,
 }: ProductCarouselProps) {
   const { width: screenWidth } = useWindowDimensions();
-  const { colorScheme } = useAppTheme();
+  const pageTheme = usePageTheme();
   const theme = useTheme();
-  const dark = colorScheme === 'dark';
+  const dark = pageTheme.isDark;
   const isHome = variant === 'home';
   const [activeIndex, setActiveIndex] = useState(0);
   const cardWidth = productCarouselCardWidth(screenWidth);
@@ -75,7 +75,7 @@ export function ProductCarousel({
         disableIntervalMomentum
         showsHorizontalScrollIndicator={false}
         keyExtractor={(product) => product.id}
-        style={viewportStyle}
+        style={[viewportStyle, dark && { backgroundColor: theme.background }]}
         contentContainerStyle={contentContainerStyle}
         onMomentumScrollEnd={(event) => updateActiveIndex(event.nativeEvent.contentOffset.x)}
         renderItem={({ item }) => (
