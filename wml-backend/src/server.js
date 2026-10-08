@@ -2045,43 +2045,15 @@ async function updateCheckoutOffering(request, response, remove = false) {
 app.post('/checkout/order-form/:orderFormId/items/:itemIndex/offerings', (request, response) => updateCheckoutOffering(request, response));
 app.post('/checkout/order-form/:orderFormId/items/:itemIndex/offerings/:offeringId/remove', (request, response) => updateCheckoutOffering(request, response, true));
 
-function authenticatorPasswordFailed(body) {
+function passwordSetupFailed(body) {
   const status = String(body?.authStatus || '').toLowerCase().trim();
   return body?.ok === false || Boolean(body?.error) || ['failed', 'error', 'invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials', 'unexpectederror'].includes(status);
 }
 
-function authenticatorPasswordMessage(body) {
+function passwordSetupMessage(body) {
   const status = String(body?.authStatus || '').toLowerCase().trim();
   const invalidCode = ['invalidemail', 'invalidpassword', 'invalidaccesskey', 'invalidcode', 'wrongcredentials'].includes(status);
   return vtexErrorMessage(body, invalidCode ? 'O código ou e-mail não é válido.' : 'Não foi possível criar ou alterar a senha.');
-}
-
-async function startAuthenticatorPasswordSession(email) {
-  const accountName = encodeURIComponent(account);
-  const startUrls = [
-    `${vtexBaseUrl}/api/authenticator/v1/pub/authentication/start?an=${accountName}`,
-    `${vtexBaseUrl}/api/authenticator/pub/authentication/start?an=${accountName}`,
-  ];
-  let lastResponse;
-  let lastBody;
-
-  for (const url of startUrls) {
-    const form = new FormData();
-    form.append('user', email);
-    form.append('scope', account);
-    form.append('accountName', account);
-    form.append('returnUrl', '/');
-    const result = await fetch(url, { method: 'POST', headers: { Accept: 'application/json' }, body: form });
-    const body = await readResponseBody(result);
-    lastResponse = result;
-    lastBody = body;
-    if (![404, 405].includes(result.status)) {
-      if (!result.ok) throw new Error(vtexErrorMessage(body, 'Não foi possível iniciar a recuperação de senha.'));
-      return { cookieHeader: normalizeCookieHeader(extractSetCookie(result)) };
-    }
-  }
-
-  throw new Error(vtexErrorMessage(lastBody, `VTEX Authenticator retornou HTTP ${lastResponse?.status || 502}.`));
 }
 
 app.post('/auth/set-password', async (request, response) => {
@@ -2089,29 +2061,18 @@ app.post('/auth/set-password', async (request, response) => {
   const accessKey = String(request.body?.accessKey || '').trim();
   const newPassword = String(request.body?.newPassword || '');
   const flow = request.body?.flow === 'register' ? 'register' : 'recovery';
-  const authenticationToken = flow === 'register' ? String(request.body?.authenticationToken || '').trim() : '';
-  if (!email || !accessKey || !newPassword || (flow === 'register' && !authenticationToken)) {
-    return response.status(400).json({ ok: false, message: 'Dados para criação da senha incompletos.' });
+  const authenticationToken = String(request.body?.authenticationToken || '').trim();
+  if (!email || !accessKey || !newPassword || !authenticationToken) {
+    return response.status(400).json({ ok: false, message: 'A sessão expirou. Solicite um novo código.' });
   }
 
   try {
     const accountName = encodeURIComponent(account);
-    let sessionCookie = '';
-    let endpoints;
-    if (flow === 'register') {
-      // No cadastro, o access key foi emitido dentro desta sessão VTEX ID.
-      // Reutilizar o _vss é necessário para que a VTEX associe o código ao
-      // e-mail recebido, em vez de abrir uma nova sessão Authenticator.
-      sessionCookie = `_vss=${authenticationToken}`;
-      endpoints = [`${vtexBaseUrl}/api/vtexid/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`];
-    } else {
-      const authenticatorSession = await startAuthenticatorPasswordSession(email);
-      sessionCookie = authenticatorSession.cookieHeader;
-      endpoints = [
-        `${vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
-        `${vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`,
-      ];
-    }
+    // O access key é emitido dentro da sessão VTEX ID. Reutilizar o _vss
+    // mantém o código associado à mesma sessão tanto no cadastro quanto na
+    // recuperação.
+    const sessionCookie = `_vss=${authenticationToken}`;
+    const endpoints = [`${vtexBaseUrl}/api/vtexid/pub/authentication/classic/setpassword?expireSessions=true&an=${accountName}`];
     let result;
     let body;
 
@@ -2131,10 +2092,10 @@ app.post('/auth/set-password', async (request, response) => {
       if (![404, 405].includes(nextResult.status)) break;
     }
 
-    if (!result || !result.ok || authenticatorPasswordFailed(body)) {
+    if (!result || !result.ok || passwordSetupFailed(body)) {
       const statusCode = result && result.status >= 400 && result.status <= 599 ? result.status : 400;
       const safeBody = body && typeof body === 'object' && !Array.isArray(body) && !body.raw ? body : {};
-      return response.status(statusCode).json({ ...safeBody, ok: false, message: authenticatorPasswordMessage(body) });
+      return response.status(statusCode).json({ ...safeBody, ok: false, message: passwordSetupMessage(body) });
     }
 
     const safeBody = body && typeof body === 'object' && !Array.isArray(body) && !body.raw ? body : {};

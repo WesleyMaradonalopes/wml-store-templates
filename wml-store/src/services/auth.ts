@@ -280,31 +280,13 @@ export async function sendVtexAccessKey(email: string, authenticationToken: stri
   if (!response.ok) throw new Error('Não foi possível enviar o código de acesso.');
 }
 
-async function startAuthenticatorPasswordFlow(email: string) {
-  const account = encodeURIComponent(storeConfig.account);
-  const form = new FormData();
-  form.append('user', email);
-  form.append('scope', storeConfig.account);
-  form.append('accountName', storeConfig.account);
-  form.append('returnUrl', '/');
-  const response = await fetch(`${storeConfig.vtexBaseUrl}/api/authenticator/v1/pub/authentication/start?an=${account}`, {
-    method: 'POST',
-    headers: { Accept: 'application/json' },
-    credentials: 'include',
-    body: form,
-  });
-  if (!response.ok) throw new Error('Não foi possível iniciar a recuperação de senha.');
-}
-
 export async function setVtexPassword(email: string, accessKey: string, newPassword: string, authenticationToken = '', flow: PasswordSetupFlow = 'recovery') {
-  // Em apps nativos, o fetch não mantém de forma confiável o cookie criado
-  // pelo Authenticator entre duas chamadas. O backend faz as duas etapas na
-  // mesma sessão e deixa o fallback direto disponível para desenvolvimento
-  // sem backend ou para versões antigas da API.
+  // Reaproveita a sessão VTEX ID que emitiu o código e a encaminha ao backend,
+  // para que o código seja validado no mesmo contexto em que foi solicitado.
   const backendResponse = await fetch(`${storeConfig.backendUrl}/auth/set-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, accessKey, newPassword, flow, ...(flow === 'register' ? { authenticationToken } : {}) }),
+    body: JSON.stringify({ email, accessKey, newPassword, flow, authenticationToken }),
   }).catch(() => null);
   if (backendResponse && ![404, 405].includes(backendResponse.status)) {
     const data = await backendResponse.json().catch(() => ({})) as SetPasswordResponse;
@@ -320,18 +302,10 @@ export async function setVtexPassword(email: string, accessKey: string, newPassw
   }
 
   const account = encodeURIComponent(storeConfig.account);
-  // O cadastro mantém o token _vss criado junto com o envio do código. A
-  // recuperação usa a sessão Authenticator, que é iniciada imediatamente
-  // antes do setpassword.
-  if (flow === 'register' && !authenticationToken) throw new Error('A sessão de cadastro expirou. Solicite um novo código.');
-  if (flow !== 'register') await startAuthenticatorPasswordFlow(email);
-  const endpoints = flow === 'register'
-    ? [`${authUrl('classic/setpassword')}?expireSessions=true&an=${account}`]
-    : [
-      `${storeConfig.vtexBaseUrl}/api/authenticator/v1/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
-      `${storeConfig.vtexBaseUrl}/api/authenticator/pub/authentication/classic/setpassword?expireSessions=true&an=${account}`,
-      `${authUrl('classic/setpassword')}?expireSessions=true&an=${account}`,
-    ];
+  // O access key é emitido na sessão VTEX ID iniciada no envio do código.
+  // Validá-lo em outra sessão faz a VTEX rejeitar o código.
+  if (!authenticationToken) throw new Error('A sessão expirou. Solicite um novo código.');
+  const endpoints = [`${authUrl('classic/setpassword')}?expireSessions=true&an=${account}`];
   let lastMessage = 'Não foi possível criar ou alterar a senha.';
 
   for (const endpoint of endpoints) {
@@ -342,9 +316,7 @@ export async function setVtexPassword(email: string, accessKey: string, newPassw
     form.append('accesskey', accessKey);
     form.append('recaptcha', '');
     const headers: Record<string, string> = { Accept: 'application/json' };
-    // Não sobrescreva o cookie criado pelo Authenticator; o token antigo só
-    // é necessário no fallback legado do VTEX ID.
-    if (authenticationToken && endpoint.includes('/api/vtexid/')) headers.Cookie = `_vss=${authenticationToken}`;
+    headers.Cookie = `_vss=${authenticationToken}`;
     const response = await fetch(endpoint, { method: 'POST', headers, credentials: 'include', body: form });
     const data = await response.json().catch(() => ({})) as SetPasswordResponse;
     const status = String(data.authStatus || '').toLowerCase().trim();

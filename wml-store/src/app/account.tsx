@@ -399,11 +399,11 @@ export default function AccountScreen() {
     }
   }
 
-  async function resendAccessCode() {
+  async function resendAccessCode(): Promise<boolean> {
     const normalizedEmail = email.trim().toLowerCase();
     if (!isValidEmail(normalizedEmail)) {
       setAuthMessage('Informe um e-mail válido.');
-      return;
+      return false;
     }
     try {
       setAuthMessage(null);
@@ -414,8 +414,10 @@ export default function AccountScreen() {
       setAuthToken(token);
       setAccessCode('');
       setCodeSentAt(Date.now());
+      return true;
     } catch (error) {
       setAuthMessage(error instanceof Error ? error.message : 'Não foi possível reenviar o código.');
+      return false;
     } finally {
       setAccessCodeLoading(false);
     }
@@ -435,6 +437,7 @@ export default function AccountScreen() {
       setEmail(normalizedEmail);
       setAuthToken(token);
       setAccessCode('');
+      setCodeSentAt(Date.now());
       setNewPassword('');
       setNewPasswordConfirmation('');
       setView('recovery-password');
@@ -600,7 +603,7 @@ export default function AccountScreen() {
     {view === 'register-code' && <RegisterCodeView email={email} code={accessCode} setCode={setAccessCode} sentAt={codeSentAt} onValidate={validateAccessCode} onResend={resendAccessCode} loading={codeLoading} resendLoading={accessCodeLoading} message={authMessage} onBack={() => setView('register')} />}
     {view === 'register-password' && <PasswordSetupView mode="register" email={email} code={accessCode} setCode={setAccessCode} newPassword={newPassword} setNewPassword={setNewPassword} newPasswordConfirmation={newPasswordConfirmation} setNewPasswordConfirmation={setNewPasswordConfirmation} onSubmit={completePasswordSetup} loading={codeLoading} message={authMessage} onBack={() => setView('register')} />}
     {view === 'recovery-email' && <RecoveryEmailView email={email} setEmail={setEmail} onSend={sendRecoveryCode} loading={accessCodeLoading} message={authMessage} onBack={() => setView('password')} />}
-    {view === 'recovery-password' && <PasswordSetupView mode="recovery" email={email} code={accessCode} setCode={setAccessCode} newPassword={newPassword} setNewPassword={setNewPassword} newPasswordConfirmation={newPasswordConfirmation} setNewPasswordConfirmation={setNewPasswordConfirmation} onSubmit={completePasswordSetup} loading={codeLoading} message={authMessage} onBack={() => setView('recovery-email')} />}
+    {view === 'recovery-password' && <PasswordSetupView mode="recovery" email={email} code={accessCode} setCode={setAccessCode} sentAt={codeSentAt} onResend={resendAccessCode} resendLoading={accessCodeLoading} newPassword={newPassword} setNewPassword={setNewPassword} newPasswordConfirmation={newPasswordConfirmation} setNewPasswordConfirmation={setNewPasswordConfirmation} onSubmit={completePasswordSetup} loading={codeLoading} message={authMessage} onBack={() => setView('recovery-email')} />}
   </ScrollView></SafeAreaView></ThemedView>;
 }
 
@@ -716,7 +719,7 @@ function PasswordView({ email, setEmail, password, setPassword, onLogin, loading
             hitSlop={8}
             onPress={() => setShowPassword((current) => !current)}
             style={styles.passwordToggle}>
-            <EyeIcon color="#5d5955" size={20} off={!showPassword} />
+            <EyeIcon color="#0a0a0a" size={20} off={!showPassword} />
           </Pressable>
         </View>
         <Pressable disabled={loading} onPress={onForgot} style={styles.forgotButton}><ThemedText type="smallBold" style={styles.linkText}>Esqueceu a senha?</ThemedText></Pressable>
@@ -805,7 +808,7 @@ function CodeAccessView({ title, email, code, setCode, sentAt, showEmailInput = 
       {loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>Login</ThemedText>}
     </Pressable>
     <Pressable disabled={resendDisabled} onPress={() => { void onResend(); }} style={[styles.resendButton, resendDisabled && styles.disabled]}>
-      {resendLoading ? <ActivityIndicator size="small" color="#5d5955" /> : <ThemedText style={styles.resendText}>{secondsLeft > 0 ? `Reenviar código (${secondsLeft})` : 'Reenviar código'}</ThemedText>}
+      {resendLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.resendText}>{secondsLeft > 0 ? `Reenviar código (${secondsLeft})` : 'Reenviar código'}</ThemedText>}
     </Pressable>
     <Pressable disabled={loading || resendLoading} onPress={onBack} style={styles.outlineButton}><ThemedText type="smallBold">Voltar</ThemedText></Pressable>
   </ThemedView>;
@@ -849,29 +852,71 @@ function PasswordRules({ value }: { value: string }) {
   </View>;
 }
 
-function PasswordSetupView({ mode, email, code, setCode, newPassword, setNewPassword, newPasswordConfirmation, setNewPasswordConfirmation, onSubmit, loading, message, onBack }: { mode: 'register' | 'recovery'; email: string; code: string; setCode: (value: string) => void; newPassword: string; setNewPassword: (value: string) => void; newPasswordConfirmation: string; setNewPasswordConfirmation: (value: string) => void; onSubmit: () => void; loading: boolean; message: string | null; onBack: () => void }) {
+function PasswordSetupView({ mode, email, code, setCode, sentAt, onResend, resendLoading = false, newPassword, setNewPassword, newPasswordConfirmation, setNewPasswordConfirmation, onSubmit, loading, message, onBack }: { mode: 'register' | 'recovery'; email: string; code: string; setCode: (value: string) => void; sentAt?: number | null; onResend?: () => Promise<boolean> | boolean; resendLoading?: boolean; newPassword: string; setNewPassword: (value: string) => void; newPasswordConfirmation: string; setNewPasswordConfirmation: (value: string) => void; onSubmit: () => void; loading: boolean; message: string | null; onBack: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [resendNoticeVisible, setResendNoticeVisible] = useState(false);
+  const isRecovery = mode === 'recovery';
   const title = mode === 'register' ? 'Validar e-mail e criar nova senha' : 'Validar e alterar senha';
-  const submitLabel = mode === 'register' ? 'Criar conta' : 'Alterar senha';
-  return <ThemedView style={styles.card}>
-    <ThemedText type="subtitle" style={styles.authTitle}>{title}</ThemedText>
-    <ThemedText themeColor="textSecondary">Insira o código que enviamos para o e-mail {email} e crie uma nova senha.</ThemedText>
-    <TextInput value={code} onChangeText={setCode} placeholder="Código enviado por e-mail" keyboardType="number-pad" style={styles.input} />
-    <View style={styles.passwordInputWrap}>
-      <TextInput value={newPassword} onChangeText={setNewPassword} placeholder="Nova senha" secureTextEntry={!showPassword} autoCapitalize="none" style={[styles.input, styles.passwordInput]} />
-      <Pressable accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowPassword((current) => !current)} style={styles.passwordToggle}><EyeIcon color="#5d5955" size={20} off={!showPassword} /></Pressable>
+  const submitLabel = mode === 'register' ? 'Criar conta' : 'Entrar';
+
+  useEffect(() => {
+    if (!isRecovery || !sentAt) {
+      setSecondsLeft(0);
+      return undefined;
+    }
+    const updateRemaining = () => setSecondsLeft(Math.max(0, 60 - Math.floor((Date.now() - sentAt) / 1000)));
+    updateRemaining();
+    const timer = setInterval(updateRemaining, 1000);
+    return () => clearInterval(timer);
+  }, [isRecovery, sentAt]);
+
+  useEffect(() => {
+    if (!resendNoticeVisible) return undefined;
+    const timeout = setTimeout(() => setResendNoticeVisible(false), 2400);
+    return () => clearTimeout(timeout);
+  }, [resendNoticeVisible]);
+
+  async function resendCode() {
+    if (!onResend || secondsLeft > 0 || resendLoading) return;
+    const sent = await onResend();
+    if (sent !== false) setResendNoticeVisible(true);
+  }
+
+  return <ThemedView style={[styles.card, isRecovery && styles.passwordSetupCard]}>
+    {isRecovery ? <ThemedText style={styles.passwordSetupTitle}>Esqueceu a senha?</ThemedText> : <ThemedText type="subtitle" style={styles.authTitle}>{title}</ThemedText>}
+    {isRecovery
+      ? <ThemedText style={styles.passwordSetupDescription}>Digite o código de 6 dígitos enviado para{`\n`}{email}</ThemedText>
+      : <ThemedText themeColor="textSecondary">Insira o código que enviamos para o e-mail {email} e crie uma nova senha.</ThemedText>}
+    <TextInput value={code} onChangeText={setCode} placeholder={isRecovery ? 'Digite o código de acesso' : 'Código enviado por e-mail'} placeholderTextColor={isRecovery ? '#0a0a0a' : undefined} keyboardType="number-pad" style={isRecovery ? [styles.input, styles.passwordSetupInput] : styles.input} />
+    <View style={isRecovery ? [styles.passwordInputWrap, styles.passwordSetupPasswordWrap] : styles.passwordInputWrap}>
+      <TextInput value={newPassword} onChangeText={setNewPassword} placeholder={isRecovery ? 'Digite sua senha' : 'Nova senha'} placeholderTextColor={isRecovery ? '#0a0a0a' : undefined} secureTextEntry={!showPassword} autoCapitalize="none" style={isRecovery ? [styles.input, styles.passwordSetupPasswordInput] : [styles.input, styles.passwordInput]} />
+      <Pressable accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowPassword((current) => !current)} style={styles.passwordToggle}><EyeIcon color="#0a0a0a" size={20} off={!showPassword} /></Pressable>
     </View>
-    <View style={styles.passwordInputWrap}>
+    {!isRecovery && <View style={styles.passwordInputWrap}>
       <TextInput value={newPasswordConfirmation} onChangeText={setNewPasswordConfirmation} placeholder="Confirme a nova senha" secureTextEntry={!showConfirmation} autoCapitalize="none" style={[styles.input, styles.passwordInput]} />
-      <Pressable accessibilityLabel={showConfirmation ? 'Ocultar confirmação da senha' : 'Mostrar confirmação da senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowConfirmation((current) => !current)} style={styles.passwordToggle}><EyeIcon color="#5d5955" size={20} off={!showConfirmation} /></Pressable>
-    </View>
+      <Pressable accessibilityLabel={showConfirmation ? 'Ocultar confirmação da senha' : 'Mostrar confirmação da senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowConfirmation((current) => !current)} style={styles.passwordToggle}><EyeIcon color="#0a0a0a" size={20} off={!showConfirmation} /></Pressable>
+    </View>}
     <PasswordRules value={newPassword} />
+    {isRecovery && <View style={[styles.passwordInputWrap, styles.passwordSetupPasswordWrap]}>
+      <TextInput value={newPasswordConfirmation} onChangeText={setNewPasswordConfirmation} placeholder="Confirme sua senha" placeholderTextColor="#0a0a0a" secureTextEntry={!showConfirmation} autoCapitalize="none" style={[styles.input, styles.passwordSetupPasswordInput]} />
+      <Pressable accessibilityLabel={showConfirmation ? 'Ocultar confirmação da senha' : 'Mostrar confirmação da senha'} accessibilityRole="button" hitSlop={8} onPress={() => setShowConfirmation((current) => !current)} style={styles.passwordToggle}><EyeIcon color="#0a0a0a" size={20} off={!showConfirmation} /></Pressable>
+    </View>}
+    {isRecovery && <View style={styles.passwordResendSection}>
+      <ThemedText style={styles.passwordResendQuestion}>Precisa de outro código?</ThemedText>
+      {secondsLeft > 0
+        ? <ThemedText style={styles.passwordResendHint}>Pode solicitar outro após {secondsLeft} {secondsLeft === 1 ? 'segundo' : 'segundos'}.</ThemedText>
+        : <Pressable disabled={resendLoading} onPress={() => { void resendCode(); }}><ThemedText style={styles.passwordResendLink}>{resendLoading ? 'Enviando...' : 'Reenviar código'}</ThemedText></Pressable>}
+    </View>}
     {!!message && <ThemedText style={styles.errorMessage}>{message}</ThemedText>}
-    <View style={styles.authFooter}>
-      <Pressable disabled={loading} onPress={onBack} style={[styles.outlineButton, styles.authFooterButton]}><ThemedText type="smallBold">Voltar</ThemedText></Pressable>
-      <Pressable disabled={loading} onPress={onSubmit} style={[styles.primaryButton, styles.authFooterButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>{submitLabel}</ThemedText>}</Pressable>
-    </View>
+    {!isRecovery
+      ? <View style={styles.authFooter}>
+        <Pressable disabled={loading} onPress={onBack} style={[styles.outlineButton, styles.authFooterButton]}><ThemedText type="smallBold">Voltar</ThemedText></Pressable>
+        <Pressable disabled={loading} onPress={onSubmit} style={[styles.primaryButton, styles.authFooterButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>{submitLabel}</ThemedText>}</Pressable>
+      </View>
+      : <Pressable disabled={loading} onPress={onSubmit} style={[styles.primaryButton, styles.passwordSetupSubmitButton, loading && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#ffffff" /> : <ThemedText style={styles.primaryText}>{submitLabel}</ThemedText>}</Pressable>}
+    {isRecovery && resendNoticeVisible && <View pointerEvents="none" style={styles.passwordResendToast}><ThemedText style={styles.passwordResendToastText}>Código enviado</ThemedText></View>}
   </ThemedView>;
 }
 const logoutButtonStyles = StyleSheet.create({
