@@ -56,7 +56,7 @@ export default function OrdersScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, !loading && !error && orders.length === 0 && styles.emptyOrdersSafeArea]}>
         <ScreenHeader title="Meus Pedidos" showSearch={false} showAssistant={false} variant="checkout" />
         {loading && <ActivityIndicator color="#0a0a0a" style={styles.loader} />}
         {!!error && <ThemedText style={[styles.orderText, styles.errorText]}>{error}</ThemedText>}
@@ -67,7 +67,15 @@ export default function OrdersScreen() {
           keyExtractor={(item, index) => item.orderId || String(index)}
           contentContainerStyle={[styles.list, orders.length === 0 && styles.emptyList]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadOrders(true)} tintColor="#0a0a0a" colors={['#0a0a0a']} />}
-          ListEmptyComponent={!loading && !error ? <ThemedText style={styles.orderText} themeColor="textSecondary">Você ainda não possui pedidos.</ThemedText> : null}
+          ListEmptyComponent={!loading && !error ? (
+            <View style={styles.emptyOrdersCard}>
+              <ThemedText style={styles.emptyOrdersTitle}>Você não possui nenhum pedido</ThemedText>
+              <ThemedText style={styles.emptyOrdersDescription}>Quando você fizer uma compra, ela será listada aqui.</ThemedText>
+              <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.emptyOrdersButton}>
+                <ThemedText style={styles.emptyOrdersButtonText}>Ver produtos</ThemedText>
+              </Pressable>
+            </View>
+          ) : null}
           renderItem={({ item }) => (
             <OrderCard
               order={item}
@@ -125,9 +133,15 @@ function OrderCard({ order, onDetails }: { order: CustomerOrder; onDetails: () =
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: Spacing.four, backgroundColor: '#eeeeee' },
+  emptyOrdersSafeArea: { backgroundColor: '#f7f7f7' },
   loader: { marginTop: Spacing.two },
   list: { gap: Spacing.three, paddingVertical: Spacing.three, paddingBottom: 100 },
   emptyList: { flexGrow: 1 },
+  emptyOrdersCard: { gap: 16, marginHorizontal: 0, padding: 20, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e6e2dc' },
+  emptyOrdersTitle: { color: '#0a0a0a', fontFamily: Fonts.medium, fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  emptyOrdersDescription: { color: '#5d5955', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  emptyOrdersButton: { minHeight: 46, marginTop: 2, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e9e6df' },
+  emptyOrdersButtonText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 16, fontWeight: '700' },
   card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e2dc' },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.two },
   orderIdentity: { flex: 1, minWidth: 0 },
