@@ -631,7 +631,7 @@ function LoggedAccount({ email, notifications, setNotifications, onLogout, onPer
 function UtilityGrid({ onRegister, onCoupons, onReturns, onPrivacy }: { onRegister: () => void; onCoupons: () => void; onReturns: () => void; onPrivacy: () => void }) {
   const theme = useTheme();
   const tiles: AccountTileData[] = [
-    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={16} />, onPress: onCoupons },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={15} />, onPress: onCoupons },
     { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color={theme.text} size={18} />, onPress: onReturns },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color={theme.text} size={18} />, onPress: onPrivacy },
     { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={18} />, onPress: onRegister },
@@ -887,8 +887,8 @@ function LoggedAccountV2({ email, notifications, onNotificationsChange, notifica
     { label: 'Favoritos', icon: <HeartIcon color={theme.text} size={20} />, onPress: onFavorites },
     { label: 'Trocas e devoluções', icon: <HomeUtilityReturnsIcon color={theme.text} size={16} />, onPress: onReturns },
     { label: 'Redefinição de senha', icon: <LockIcon color={theme.text} size={18} />, onPress: onPasswordReset },
-    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={18} />, onPress: onCoupons },
-    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={18} /> },
+    { label: 'Cupons de desconto', icon: <HomeUtilityDiscountIcon color={theme.text} size={15} />, onPress: onCoupons },
+    { label: 'Nossas lojas', icon: <HomeUtilityStoresIcon color={theme.text} size={17} /> },
     { label: 'Política de privacidade', icon: <HomeUtilityPrivacyIcon color={theme.text} size={18} />, onPress: onPrivacy },
   ];
   return <><ThemedText style={styles.loggedGreeting}>Olá,</ThemedText><ThemedText style={styles.email}>{email}</ThemedText><View style={styles.tileGrid}>{tiles.map((tile) => <AccountTile key={tile.label} {...tile} />)}</View><Preference value={notifications} onChange={onNotificationsChange} disabled={notificationsLoading} message={notificationsMessage} /><View style={styles.logoutDivider} /><Pressable disabled={logoutLoading} onPress={onLogout} style={[styles.logout, { borderColor: theme.border }, logoutLoading && styles.disabled]}><View style={logoutButtonStyles.content}>{logoutLoading ? <ActivityIndicator size="small" color={theme.text} /> : <><LogoutIcon color={theme.text} size={16} /><ThemedText style={[logoutButtonStyles.label, { color: theme.text }]}>Sair</ThemedText></>}</View></Pressable><View style={styles.logoutDivider} /><ThemedText type="subtitle" style={styles.helpTitle}>Ficou com alguma dúvida?</ThemedText><Pressable accessibilityRole="button" accessibilityLabel="Abrir Central de Ajuda no WhatsApp" onPress={onHelp} style={[styles.helpButton, { borderColor: theme.borderStrong }]}><ThemedText type="smallBold">Central de Ajuda</ThemedText></Pressable><ThemedText style={styles.powered}>Powered by WML</ThemedText></>;

@@ -489,7 +489,7 @@ export default function SearchScreen() {
             <View style={styles.listHeaderContent}>
               {!activeQuery && activeFacets.length === 0 && popularTerms.length > 0 && (
                 <ThemedView style={styles.trending}>
-                  <ThemedText type="smallBold">Em alta</ThemedText>
+                  <ThemedText type="smallBold" style={styles.trendingTitle}>Em alta</ThemedText>
                   <View style={styles.chips}>
                     {popularTerms.map((popular) => <Pressable key={popular} onPress={() => openPopular(popular)} style={styles.chip}><ThemedText style={styles.chipText}>{popular}</ThemedText></Pressable>)}
                   </View>
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   searchHeader: { minHeight: 58, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderBottomWidth: 1, borderBottomColor: '#e7e3de', backgroundColor: '#FFFFFF' },
   backButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   searchInputWrap: { flex: 1, minHeight: 42, borderRadius: 22, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, backgroundColor: '#f1f1f3' },
-  searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#3c3936', fontFamily: Fonts.sans },
+  searchInput: { flex: 1, minHeight: 40, paddingVertical: 0, fontSize: 14, color: '#0a0a0a', fontFamily: Fonts.sans },
   clearButton: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   clearText: { fontSize: 14, lineHeight: 18, color: '#625d57', fontWeight: '500' },
   voiceButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -572,11 +572,12 @@ const styles = StyleSheet.create({
   suggestionText: { fontSize: 14 },
   suggestionMeta: { fontSize: 11 },
   body: { flex: 1 },
-  listHeaderContent: { gap: Spacing.three },
-  trending: { gap: Spacing.two, padding: Spacing.three, borderRadius: 16, borderWidth: 1, borderColor: '#ebe7e1', backgroundColor: '#FFFFFF' },
+  listHeaderContent: { gap: 20 },
+  trending: { gap: Spacing.two, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#0a0a0a', backgroundColor: '#FFFFFF' },
+	trendingTitle: { fontSize: 14, fontFamily: Fonts.medium, fontWeight: '500' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: 18, borderWidth: 1, borderColor: '#d7d3cc' },
-  chipText: { fontSize: 12 },
+  chip: { paddingHorizontal: Spacing.three, paddingVertical: 2, borderRadius: 50, borderWidth: 1, borderColor: '#0a0a0a' },
+  chipText: { fontSize: 14 },
   listingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   listingHeading: { flex: 1 },
   listingTitle: { fontSize: 16, lineHeight: 18, color: '#0a0a0a' },

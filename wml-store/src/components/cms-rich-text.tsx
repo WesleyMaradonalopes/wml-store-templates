@@ -212,5 +212,5 @@ const styles = StyleSheet.create({
   title: { fontFamily: Fonts.bold, fontSize: 16, lineHeight: 22 },
   blocks: { gap: 0 },
   block: { fontFamily: Fonts.light, fontSize: 14, lineHeight: 21 },
-  link: { color: '#2563eb', textDecorationLine: 'underline' },
+  link: { color: '#2563eb', fontFamily: Fonts.sans, textDecorationLine: 'underline' },
 });

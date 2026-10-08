@@ -29,6 +29,7 @@ import { ProductCard } from '@/components/product-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TabBarContext } from '@/context/tab-bar-context';
+import { Fonts } from '@/constants/theme';
 import { useAppTheme } from '@/context/theme-context';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
   composer: { borderWidth: 1, borderRadius: 25, paddingVertical: 0, paddingHorizontal: 5, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 2 },
   composerIconButton: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
   listeningButton: { backgroundColor: '#F4D8D8', borderRadius: 20 },
-  input: { flex: 1, maxHeight: 50, paddingHorizontal: 5, paddingTop: 10, paddingBottom: 9, fontSize: 14 },
+  input: { flex: 1, maxHeight: 50, paddingHorizontal: 5, paddingTop: 10, paddingBottom: 9, fontFamily: Fonts.sans, fontSize: 14 },
   sendButton: { width: 32, height: 32, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: AI_COLOR },
   disabledButton: { opacity: 0.45 },
   imagePickerBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'rgba(0, 0, 0, 0.52)' },

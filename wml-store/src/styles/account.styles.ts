@@ -97,7 +97,7 @@ export const styles = StyleSheet.create({
 	registerButtonText: { color: '#0a0a0a', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18, fontWeight: '500' },
 	registerButtonTextDisabled: { color: '#9e9991' },
 	privacyCreateLink: { fontFamily: Fonts.medium, fontSize: 13, lineHeight: 16, fontWeight: '500', color: '#0a0a0a', textDecorationLine: 'underline' },
-  privacyLink: { color: '#0a0a0a', textDecorationLine: 'underline', fontSize: 12, lineHeight: 14, fontWeight: '400' },
+  privacyLink: { color: '#0a0a0a', fontFamily: Fonts.sans, textDecorationLine: 'underline', fontSize: 12, lineHeight: 14, fontWeight: '400' },
 	logoutDivider: { borderWidth: 0, borderColor: '#dedbd5' },
   accountTile: { minHeight: 96, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'stretch' },
   tileHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

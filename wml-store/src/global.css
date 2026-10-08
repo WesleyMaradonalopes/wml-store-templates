@@ -3,7 +3,7 @@
     'Montserrat_400Regular', Montserrat, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji,
     Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+    'Montserrat_400Regular', Montserrat, ui-sans-serif, system-ui, sans-serif;
   --font-rounded: 'Montserrat_400Regular', Montserrat, sans-serif;
   --font-serif: 'Montserrat_400Regular', Montserrat, sans-serif;
 }
