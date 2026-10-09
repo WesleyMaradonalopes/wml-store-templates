@@ -19,6 +19,7 @@ import HangerStrokeRoundedIcon from '@/components/icons/HangerStrokeRoundedIcon'
 import HeartIcon from '@/components/icons/HeartIcon';
 import HopeLogoIcon from '@/components/icons/HopeLogoIcon';
 import SearchIcon from '@/components/icons/SearchIcon';
+import SimilarAiIcon from '@/components/icons/SimilarAiIcon';
 import ShoppingBagIcon from '@/components/icons/ShoppingBagIcon';
 import TapeMeasureStrokeRoundedIcon from '@/components/icons/TapeMeasureStrokeRoundedIcon';
 import { emptyKitSelection, KitSelector, type KitSelection } from '@/components/kit-selector';
@@ -27,6 +28,7 @@ import { ProductCarousel } from '@/components/product-carousel';
 import { ProductCarouselSkeleton } from '@/components/product-carousel-skeleton';
 import { ProductQuickView } from '@/components/product-quick-view';
 import { SizebayModal } from '@/components/sizebay-modal';
+import { SimilarProductsModal } from '@/components/similar-products-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WiddeVideo } from '@/components/widde-video';
@@ -141,6 +143,7 @@ export default function ProductScreen() {
   const [sizebayModal, setSizebayModal] = useState<'vfr' | 'chart' | null>(null);
   const [selectionMessage, setSelectionMessage] = useState('');
   const [quickViewVisible, setQuickViewVisible] = useState(false);
+  const [similarModalVisible, setSimilarModalVisible] = useState(false);
   const [colorsVisible, setColorsVisible] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -187,6 +190,7 @@ export default function ProductScreen() {
     setProduct(null);
     setColorProducts([]);
     setSimilarProducts([]);
+    setSimilarLoading(true);
     setLookProducts([]);
     setSelectedOptions({});
     setKitSelection(emptyKitSelection());
@@ -194,6 +198,7 @@ export default function ProductScreen() {
     setSizebayModal(null);
     setSelectionMessage('');
     setQuickViewVisible(false);
+    setSimilarModalVisible(false);
     setColorsVisible(false);
     setImageIndex(0);
     setImageViewerVisible(false);
@@ -238,6 +243,7 @@ export default function ProductScreen() {
       })
       .catch((loadError) => {
         if (!active) return;
+        setSimilarLoading(false);
         setError(loadError instanceof ProductLoadError ? loadError.kind : 'unavailable');
       })
       .finally(() => { if (active) setLoading(false); });
@@ -518,9 +524,22 @@ export default function ProductScreen() {
                       <ThemedText numberOfLines={2} style={styles.heroProductName}>{product.name}</ThemedText>
                       {currentPrice !== null && <ThemedText style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
                     </View>
-                    <Pressable accessibilityLabel="Adicionar à sacola" disabled={adding} onPress={handleFloatingAdd} style={[styles.heroBuyButton, adding && styles.disabled]}>
-                      {adding ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold" style={styles.heroBuyButtonText}>Adicionar</ThemedText>}
-                    </Pressable>
+                    <View style={styles.heroActions}>
+                      {similarLoading ? (
+                        <View style={styles.heroSimilarButton}>
+                          <ActivityIndicator size="small" color="#0a0a0a" />
+                          <ThemedText type="smallBold" style={styles.heroSimilarButtonText}>Similares</ThemedText>
+                        </View>
+                      ) : similarProducts.length > 0 && (
+                        <Pressable accessibilityRole="button" accessibilityLabel="Ver produtos similares" onPress={() => setSimilarModalVisible(true)} style={styles.heroSimilarButton}>
+                          <SimilarAiIcon color="#0a0a0a" size={16} />
+                          <ThemedText type="smallBold" style={styles.heroSimilarButtonText}>Similares</ThemedText>
+                        </Pressable>
+                      )}
+                      <Pressable accessibilityLabel="Adicionar à sacola" disabled={adding} onPress={handleFloatingAdd} style={[styles.heroBuyButton, adding && styles.disabled]}>
+                        {adding ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold" style={styles.heroBuyButtonText}>Adicionar</ThemedText>}
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
                 <WiddeVideo product={product} />
@@ -710,6 +729,17 @@ export default function ProductScreen() {
             setKitSelection(nextSelection);
             setSelectionMessage('');
             setCartMessage(null);
+          }}
+        />}
+        {product && <SimilarProductsModal
+          currentProduct={product}
+          products={similarProducts}
+          loading={similarLoading}
+          visible={similarModalVisible}
+          onClose={() => setSimilarModalVisible(false)}
+          onProductPress={(similarProduct) => {
+            setSimilarModalVisible(false);
+            router.push(`/product/${similarProduct.id}`);
           }}
         />}
         <ColorOptionsModal

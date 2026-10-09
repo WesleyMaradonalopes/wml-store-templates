@@ -23,6 +23,7 @@ type Props = {
   showAddedModal?: boolean;
   onSimilar?: () => void;
   similarLoading?: boolean;
+  onPress?: (product: Product) => void;
 };
 
 function money(value: number) {
@@ -34,7 +35,7 @@ function discountPercentage(product: Product) {
   return Math.round((1 - product.price / product.listPrice) * 100);
 }
 
-export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true, onSimilar, similarLoading = false }: Props) {
+export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true, onSimilar, similarLoading = false, onPress }: Props) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = useTheme();
@@ -43,7 +44,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
 
   return (
     <ThemedView style={[styles.card, style]}>
-      <Pressable onPress={() => router.push(`/product/${product.id}`)} style={styles.productLink}>
+      <Pressable onPress={() => onPress ? onPress(product) : router.push(`/product/${product.id}`)} style={styles.productLink}>
         <View style={styles.imageArea}>
           {!!product.imageUrl && <Image source={{ uri: product.imageUrl }} style={[styles.image, dark && { backgroundColor: theme.surfaceMuted }]} contentFit="cover" />}
           {(product.isNewProduct || discount > 0) && (
