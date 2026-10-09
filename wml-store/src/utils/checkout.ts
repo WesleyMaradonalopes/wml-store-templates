@@ -4,7 +4,7 @@ import { BEST_SELLING_PRODUCTS_SHELF, RECENT_PRODUCTS_SHELF } from '@/constants/
 import { OrderForm, type CartItem, type CartOffering, type GiftCard } from '@/services/cart';
 import { type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { type PaymentAppData } from '@/services/orders';
-import { formatPhoneInput } from '@/utils/customer-formatters';
+import { formatCpf, formatPhoneInput } from '@/utils/customer-formatters';
 
 export type Step = 'cart' | 'email' | 'customer' | 'address' | 'shipping' | 'payment' | 'card' | 'installments' | 'review';
 export type CustomerCheckoutData = { profile: CustomerProfile | null; addresses: CustomerAddress[] };
@@ -94,13 +94,6 @@ export function formatOrderDate(date = new Date()) {
 export function formatPhone(value: string) {
   const normalized = formatPhoneInput(value);
   return normalized ? '+55' + normalized : '';
-}
-export function formatCpf(value: string) {
-  const valueDigits = digits(value).slice(0, 11);
-  if (valueDigits.length <= 3) return valueDigits;
-  if (valueDigits.length <= 6) return valueDigits.slice(0, 3) + '.' + valueDigits.slice(3);
-  if (valueDigits.length <= 9) return valueDigits.slice(0, 3) + '.' + valueDigits.slice(3, 6) + '.' + valueDigits.slice(6);
-  return valueDigits.slice(0, 3) + '.' + valueDigits.slice(3, 6) + '.' + valueDigits.slice(6, 9) + '-' + valueDigits.slice(9);
 }
 export function formatPostalCode(value: string) {
   const valueDigits = digits(value).slice(0, 8);

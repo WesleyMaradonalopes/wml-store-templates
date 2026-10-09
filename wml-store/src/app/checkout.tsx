@@ -24,7 +24,7 @@ import { addCouponToCart, addGiftCardToCart, addItemOffering, checkGiftCardAvail
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult } from '@/services/orders';
 import { trackEvent, type TrackingItem } from '@/services/telemetry';
-import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
+import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatCpf, formatGenderLabel, formatPhoneWithoutCountryCode } from '@/utils/customer-formatters';
 import {
   mergeCustomerProfiles,
   isGiftCardOwnershipError,
@@ -39,7 +39,6 @@ import {
   validCpf,
   money,
   formatPhone,
-  formatCpf,
   formatPostalCode,
   formatCardNumber,
   formatExpiry,
@@ -1850,7 +1849,7 @@ export default function CheckoutScreen() {
             <Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={customerValidationAttempted ? customerErrors.email : ''} variant="personal" trailingAction={<Pressable accessibilityRole="button" accessibilityLabel="Verificar e-mail" disabled={saving} onPress={verifyCustomerEmail} style={[styles.emailVerifyButton, saving && styles.emailVerifyButtonDisabled]}>{saving ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.emailVerifyButtonText}>OK</ThemedText>}</Pressable>} />
             <Field label="Nome" value={firstName} setValue={setFirstName} required placeholder="Nome" error={customerValidationAttempted ? customerErrors.firstName : ''} variant="personal" />
             <Field label="Sobrenome" value={lastName} setValue={setLastName} required placeholder="Sobrenome" error={customerValidationAttempted ? customerErrors.lastName : ''} variant="personal" />
-            <Field label="Telefone com DDD" value={formatPhoneWithoutCountryCode(phone)} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11999999999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} variant="personal" />
+            <Field label="Telefone com DDD" value={formatPhoneWithoutCountryCode(phone)} setValue={(value) => setPhone(formatPhone(value))} required placeholder="11 99999-9999" keyboardType="phone-pad" error={customerValidationAttempted ? customerErrors.phone : ''} variant="personal" />
             <Field label="Data de nascimento" value={birthDate} setValue={(value) => setBirthDate(formatBirthDateInput(value))} placeholder="DD/MM/AAAA" keyboardType="numeric" variant="personal" />
             <Field label="CPF" value={document} setValue={(value) => setDocument(formatCpf(value))} required placeholder="000.000.000-00" keyboardType="numeric" error={customerValidationAttempted ? customerErrors.document : ''} variant="personal" />
             <View style={[styles.field, styles.personalField]}>

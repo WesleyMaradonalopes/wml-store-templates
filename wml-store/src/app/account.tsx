@@ -20,7 +20,7 @@ import { getOrderForm, type OrderForm } from '@/services/cart';
 import { getCustomerProfileFromMasterData, updateCustomerProfile } from '@/services/customer';
 import { getGoogleLoginFailure, GoogleLoginError, signInWithNativeGoogle } from '@/services/google-login';
 import { disableNotifications, enableNotifications, initializeNotifications, NotificationModuleUnavailableError, NotificationPermissionError } from '@/services/notifications';
-import { birthDateToApi, formatBirthDate, formatBirthDateInput, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode, phoneToApi } from '@/utils/customer-formatters';
+import { birthDateToApi, cpfToApi, formatBirthDate, formatBirthDateInput, formatCpf, formatGenderLabel, formatPhoneInput, formatPhoneWithoutCountryCode, phoneToApi } from '@/utils/customer-formatters';
 
 import AppleLogoIcon from '@/components/icons/AppleLogoIcon';
 import Box01Icon from '@/components/icons/Box01Icon';
@@ -943,13 +943,14 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
   const { colorScheme } = useAppTheme();
   const theme = useTheme();
   const dark = colorScheme === 'dark';
+  const editedFields = useRef(new Set<string>());
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccessVisible, setSaveSuccessVisible] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [firstName, setFirstName] = useState(profile.firstName ?? '');
   const [lastName, setLastName] = useState(profile.lastName ?? '');
-  const [document, setDocument] = useState(profile.document ?? '');
+  const [document, setDocument] = useState(formatCpf(profile.document ?? ''));
   const [phone, setPhone] = useState(formatPhoneWithoutCountryCode(profile.phone ?? profile.homePhone ?? ''));
   const [birthDate, setBirthDate] = useState(formatBirthDate(profile.birthDate ?? ''));
   const [gender, setGender] = useState(profile.gender ?? '');
@@ -959,12 +960,12 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
   const genders = ['Feminino', 'Masculino', 'Prefiro não informar', 'Outro'];
 
   useEffect(() => {
-    setFirstName(profile.firstName ?? '');
-    setLastName(profile.lastName ?? '');
-    setDocument(profile.document ?? '');
-    setPhone(formatPhoneWithoutCountryCode(profile.phone ?? profile.homePhone ?? ''));
-    setBirthDate(formatBirthDate(profile.birthDate ?? ''));
-    setGender(profile.gender ?? '');
+    if (!editedFields.current.has('firstName')) setFirstName(profile.firstName ?? '');
+    if (!editedFields.current.has('lastName')) setLastName(profile.lastName ?? '');
+    if (!editedFields.current.has('document')) setDocument(formatCpf(profile.document ?? ''));
+    if (!editedFields.current.has('phone')) setPhone(formatPhoneWithoutCountryCode(profile.phone ?? profile.homePhone ?? ''));
+    if (!editedFields.current.has('birthDate')) setBirthDate(formatBirthDate(profile.birthDate ?? ''));
+    if (!editedFields.current.has('gender')) setGender(profile.gender ?? '');
     setNewsletterOptIn(profile.isNewsletterOptIn ?? true);
   }, [profile]);
 
@@ -978,7 +979,8 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
     try {
       setSaving(true); setMessage(null); setSaveSuccessVisible(false);
       const normalizedBirthDate = birthDateToApi(birthDate);
-      const updated = await updateCustomerProfile(email, { email, firstName, lastName, document, phone: phoneToApi(phone), gender, ...(normalizedBirthDate ? { birthDate: normalizedBirthDate } : {}), isNewsletterOptIn: newsletterOptIn });
+      const updated = await updateCustomerProfile(email, { email, firstName, lastName, document: cpfToApi(document), phone: phoneToApi(phone), gender, ...(normalizedBirthDate ? { birthDate: normalizedBirthDate } : {}), isNewsletterOptIn: newsletterOptIn });
+      editedFields.current.clear();
       onSaved(updated);
       setEditing(false);
       setSaveSuccessVisible(true);
@@ -1002,7 +1004,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
     }
   }
 
-  const fields = [{ label: 'Nome', value: firstName, set: setFirstName }, { label: 'Sobrenome', value: lastName, set: setLastName }, { label: 'CPF', value: document, set: setDocument }, { label: 'Data de nascimento', value: birthDate, set: (value: string) => setBirthDate(formatBirthDateInput(value)) }, { label: 'Telefone com DDD', value: phone, displayValue: formatPhoneWithoutCountryCode(phone), set: (value: string) => setPhone(formatPhoneInput(value)) }];
+  const fields = [{ key: 'firstName', label: 'Nome', value: firstName, set: setFirstName }, { key: 'lastName', label: 'Sobrenome', value: lastName, set: setLastName }, { key: 'document', label: 'CPF', value: document, displayValue: formatCpf(document), set: (value: string) => setDocument(formatCpf(value)) }, { key: 'birthDate', label: 'Data de nascimento', value: birthDate, set: (value: string) => setBirthDate(formatBirthDateInput(value)) }, { key: 'phone', label: 'Telefone com DDD', value: phone, displayValue: formatPhoneWithoutCountryCode(phone), set: (value: string) => setPhone(formatPhoneInput(value)) }];
   const feedbackMessage = message || profileMessage;
 
   return (
@@ -1028,7 +1030,9 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
                   {editing ? (
                     <TextInput
                       value={field.label === 'Telefone com DDD' ? formatPhoneWithoutCountryCode(field.value) : field.value}
-                      onChangeText={field.set}
+                      onChangeText={(value) => { editedFields.current.add(field.key); field.set(value); }}
+                      keyboardType={field.key === 'phone' ? 'phone-pad' : field.key === 'birthDate' || field.key === 'document' ? 'numeric' : 'default'}
+                      placeholder={field.key === 'phone' ? '11 99999-9999' : field.key === 'birthDate' ? 'DD/MM/AAAA' : undefined}
                       style={[styles.personalDataInput, dark && { backgroundColor: theme.inputBackground, color: theme.text }]}
                     />
                   ) : (
@@ -1047,7 +1051,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
                         <ChevronRightIcon color={dark ? theme.textSecondary : '#625d57'} size={16} />
                       </View>
                     </Pressable>
-                    {genderOpen && <View style={[styles.personalDataDropdown, dark && { backgroundColor: theme.backgroundElement }]}>{genders.map((option) => <Pressable key={option} onPress={() => { setGender(option); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option}</ThemedText></Pressable>)}</View>}
+                    {genderOpen && <View style={[styles.personalDataDropdown, dark && { backgroundColor: theme.backgroundElement }]}>{genders.map((option) => <Pressable key={option} onPress={() => { editedFields.current.add('gender'); setGender(option); setGenderOpen(false); }} style={styles.personalDataOption}><ThemedText style={styles.personalDataSelectText}>{option}</ThemedText></Pressable>)}</View>}
                   </>
                 ) : (
                   <ThemedText style={styles.personalDataValue}>{formatGenderLabel(gender) || 'Não informado'}</ThemedText>
@@ -1065,7 +1069,7 @@ function PersonalData({ email, profile, profileMessage, onSaved, onBack, onPriva
                   {saving ? <ActivityIndicator size="small" color={dark ? theme.onPrimary : '#ffffff'} /> : <ThemedText style={[styles.primaryText, dark && { color: theme.onPrimary }]}>Confirmar</ThemedText>}
                 </Pressable>
               ) : (
-                <Pressable onPress={() => setEditing(true)}>
+                <Pressable onPress={() => { editedFields.current.clear(); setEditing(true); }}>
                   <ThemedText style={styles.personalDataEditLink}>Editar dados pessoais</ThemedText>
                 </Pressable>
               )}

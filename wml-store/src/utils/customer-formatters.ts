@@ -2,6 +2,18 @@ function digits(value: string) {
   return String(value || '').replace(/\D/g, '');
 }
 
+export function formatCpf(value: string) {
+  const valueDigits = digits(value).slice(0, 11);
+  if (valueDigits.length <= 3) return valueDigits;
+  if (valueDigits.length <= 6) return `${valueDigits.slice(0, 3)}.${valueDigits.slice(3)}`;
+  if (valueDigits.length <= 9) return `${valueDigits.slice(0, 3)}.${valueDigits.slice(3, 6)}.${valueDigits.slice(6)}`;
+  return `${valueDigits.slice(0, 3)}.${valueDigits.slice(3, 6)}.${valueDigits.slice(6, 9)}-${valueDigits.slice(9)}`;
+}
+
+export function cpfToApi(value: string) {
+  return digits(value).slice(0, 11);
+}
+
 export function formatPhoneInput(value: string) {
   const rawValue = String(value || '').trim();
   const valueDigits = digits(rawValue);
@@ -15,7 +27,15 @@ export function formatPhoneInput(value: string) {
 }
 
 export function formatPhoneWithoutCountryCode(value: string) {
-  return formatPhoneInput(value);
+  const localDigits = formatPhoneInput(value);
+  if (localDigits.length <= 2) return localDigits;
+
+  const areaCode = localDigits.slice(0, 2);
+  const subscriberNumber = localDigits.slice(2);
+  const prefixLength = subscriberNumber.startsWith('9') ? 5 : 4;
+  const prefix = subscriberNumber.slice(0, prefixLength);
+  const suffix = subscriberNumber.slice(prefixLength, prefixLength + 4);
+  return `${areaCode} ${prefix}${suffix ? `-${suffix}` : ''}`;
 }
 
 export function phoneToApi(value: string) {
