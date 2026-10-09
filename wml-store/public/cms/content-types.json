@@ -18,8 +18,8 @@
                 "theme": {
                   "title": "Tema",
                   "type": "string",
-                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
-                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "enum": ["default", "black", "terracotta", "rose", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Personalizado"],
                   "default": "default"
                 },
                 "customColors": {
@@ -62,8 +62,8 @@
                 "theme": {
                   "title": "Tema",
                   "type": "string",
-                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
-                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "enum": ["default", "black", "terracotta", "rose", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Personalizado"],
                   "default": "default"
                 },
                 "customColors": {
@@ -105,8 +105,8 @@
                 "theme": {
                   "title": "Tema",
                   "type": "string",
-                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
-                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "enum": ["default", "black", "terracotta", "rose", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Personalizado"],
                   "default": "default"
                 },
                 "customColors": {
@@ -148,8 +148,8 @@
                 "theme": {
                   "title": "Tema",
                   "type": "string",
-                  "enum": ["default", "black", "terracotta", "rose", "sage", "custom"],
-                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Verde", "Personalizado"],
+                  "enum": ["default", "black", "terracotta", "rose", "custom"],
+                  "enumNames": ["Padrão", "Black", "Terracota", "Rosa", "Personalizado"],
                   "default": "default"
                 },
                 "customColors": {

@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, marginHorizontal: -Spacing.four, paddingHorizontal: Spacing.four, backgroundColor: '#f7f7f7' },
   content: { paddingTop: Spacing.four, paddingBottom: 70 },
   inner: { width: '100%', maxWidth: 360, alignSelf: 'center', gap: Spacing.three },
-  hero: { height: 262, overflow: 'hidden', borderRadius: 16, backgroundColor: '#a49a8e' },
+  hero: { height: 200, overflow: 'hidden', borderRadius: 16, backgroundColor: '#a49a8e' },
   heroFallback: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: '#a49a8e' },
   heroImage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   heroOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(15, 8, 5, 0.45)' },

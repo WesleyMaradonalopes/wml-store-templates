@@ -133,7 +133,7 @@ function OrderCard({ order, onDetails }: { order: CustomerOrder; onDetails: () =
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: Spacing.four, backgroundColor: '#eeeeee' },
-  emptyOrdersSafeArea: { backgroundColor: '#f7f7f7' },
+  emptyOrdersSafeArea: { backgroundColor: '#eeeeee' },
   loader: { marginTop: Spacing.two },
   list: { gap: Spacing.three, paddingVertical: Spacing.three, paddingBottom: 100 },
   emptyList: { flexGrow: 1 },
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   emptyOrdersTitle: { color: '#0a0a0a', fontFamily: Fonts.medium, fontSize: 14, lineHeight: 20, fontWeight: '500' },
   emptyOrdersDescription: { color: '#5d5955', fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
   emptyOrdersButton: { minHeight: 46, marginTop: 2, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e9e6df' },
-  emptyOrdersButtonText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  emptyOrdersButtonText: { color: '#0a0a0a', fontFamily: Fonts.bold, fontSize: 13, lineHeight: 16, fontWeight: '700' },
   card: { gap: Spacing.three, padding: Spacing.three, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e2dc' },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.two },
   orderIdentity: { flex: 1, minWidth: 0 },

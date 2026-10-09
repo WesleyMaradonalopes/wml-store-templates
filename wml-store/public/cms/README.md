@@ -12,7 +12,7 @@ fallback para `settings.pageTheme.theme`) e aceita:
 
 - `default`: mantém o visual atual;
 - `black`: paleta preta para campanhas como Black Friday;
-- `terracotta`, `rose` e `sage`: paletas de campanha alternativas.
+- `terracotta` e `rose`: paletas de campanha alternativas.
 - `custom`: permite escolher as cores da página nos campos de `customColors`.
 
 No modo `custom`, o CMS exibe um seletor de cor para fundo, superfícies/cartões,
