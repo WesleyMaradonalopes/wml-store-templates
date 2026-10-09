@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts, Spacing } from '@/constants/theme';
@@ -18,7 +18,7 @@ export type AddedProductInfo = {
 };
 
 type AddedToCartModalProps = {
-  item: AddedProductInfo | null;
+  item: AddedProductInfo | AddedProductInfo[] | null;
   visible: boolean;
   onClose: () => void;
   onViewCart: () => void;
@@ -37,12 +37,13 @@ function variationLabel(item: AddedProductInfo) {
 }
 
 export function AddedToCartModal({ item, visible, onClose, onViewCart, viewCartLabel = 'Ver a sacola' }: AddedToCartModalProps) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const items = item ? (Array.isArray(item) ? item : [item]) : [];
 
   useEffect(() => {
-    if (!visible || !item) {
+    if (!visible || items.length === 0) {
       setFeedbackVisible(false);
       return;
     }
@@ -52,11 +53,7 @@ export function AddedToCartModal({ item, visible, onClose, onViewCart, viewCartL
     return () => clearTimeout(timeout);
   }, [item, visible]);
 
-  if (!item) return null;
-
-  const imageUrl = item.variant?.images?.[0] ?? item.product.imageUrl ?? item.product.images[0];
-  const details = variationLabel(item);
-  const price = item.variant?.price ?? item.price ?? item.product.price;
+  if (items.length === 0) return null;
   const horizontalPadding = width < 420 ? 20 : 28;
 
   return (
@@ -72,20 +69,33 @@ export function AddedToCartModal({ item, visible, onClose, onViewCart, viewCartL
           <View style={[styles.sheet, { paddingHorizontal: horizontalPadding }]}>
             <BottomSheetHandle />
             <View style={styles.header}>
-              <ThemedText style={styles.title}>Adicionado à sacola</ThemedText>
+              <ThemedText style={styles.title}>{items.length === 1 ? 'Adicionado à sacola' : 'Adicionados à sacola'}</ThemedText>
               <Pressable accessibilityLabel="Fechar confirmação de adição" onPress={onClose} style={styles.closeButton}>
                 <CloseIcon color="#0a0a0a" size={24} />
               </Pressable>
             </View>
 
-            <View style={styles.productRow}>
-              {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.productImage} contentFit="cover" /> : <View style={[styles.productImage, styles.productImagePlaceholder]} />}
-              <View style={styles.productCopy}>
-                <ThemedText numberOfLines={3} style={styles.productName}>{item.product.name}</ThemedText>
-                {!!details && <ThemedText numberOfLines={2} style={styles.productDetails}>{details}</ThemedText>}
-                {!!money(price) && <ThemedText style={styles.productPrice}>{money(price)}</ThemedText>}
-              </View>
-            </View>
+            {items.length > 1 && <ThemedText style={styles.quantityText}>{items.length} produtos adicionados</ThemedText>}
+            <ScrollView
+              style={[styles.productList, { maxHeight: Math.min(height * 0.45, 340) }]}
+              contentContainerStyle={styles.productListContent}
+              showsVerticalScrollIndicator={items.length > 2}>
+              {items.map((addedItem, index) => {
+                const imageUrl = addedItem.variant?.images?.[0] ?? addedItem.product.imageUrl ?? addedItem.product.images[0];
+                const details = variationLabel(addedItem);
+                const price = addedItem.variant?.price ?? addedItem.price ?? addedItem.product.price;
+                return (
+                  <View key={`${addedItem.product.id}-${addedItem.variant?.itemId ?? index}`} style={[styles.productRow, index < items.length - 1 && styles.productRowDivider]}>
+                    {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.productImage} contentFit="cover" /> : <View style={[styles.productImage, styles.productImagePlaceholder]} />}
+                    <View style={styles.productCopy}>
+                      <ThemedText numberOfLines={3} style={styles.productName}>{addedItem.product.name}</ThemedText>
+                      {!!details && <ThemedText numberOfLines={2} style={styles.productDetails}>{details}</ThemedText>}
+                      {!!money(price) && <ThemedText style={styles.productPrice}>{money(price)}</ThemedText>}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
 
             <View style={styles.actions}>
               <Pressable
@@ -156,7 +166,11 @@ const styles = StyleSheet.create({
   header: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   title: { flex: 1, fontSize: 20, lineHeight: 25, fontFamily: Fonts.semibold },
   closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  productRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three, paddingTop: 14, paddingBottom: 18 },
+  quantityText: { color: '#625d57', fontSize: 13, lineHeight: 18, fontFamily: Fonts.medium },
+  productList: { flexGrow: 0 },
+  productListContent: { paddingTop: 8 },
+  productRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three, paddingTop: 8, paddingBottom: 14 },
+  productRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e5e0d9' },
   productImage: { width: 96, height: 126, borderRadius: 8, backgroundColor: '#e9e4dd' },
   productImagePlaceholder: { borderWidth: 1, borderColor: '#ded7cf' },
   productCopy: { flex: 1, minWidth: 0, paddingTop: 2, gap: 5 },

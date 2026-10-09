@@ -1355,17 +1355,14 @@ export async function getSimilarProducts(productOrId: Product | string, count = 
   return allProducts.slice(0, targetCount);
 }
 
-export async function getCompleteLookProducts(product: Product, count = 2): Promise<Product[]> {
-  const targetCount = Math.max(1, count);
+async function loadCompleteLookProducts(product: Product, maxResults: number): Promise<Product[]> {
   const targetCollection = normalizedSearchText(product.collection);
   const targetColor = normalizedSearchText(product.color || product.colorFilter);
-  const targetGender = normalizedSearchText(product.gender);
   if (!targetCollection || !targetColor) return [];
 
   const facetAliases = {
     collection: ['colecao', 'collection'],
     color: ['cor em atributo de produto', 'cor-em-atributo-de-produto', 'color'],
-    gender: ['genero', 'gender'],
   };
 
   function findProductFacet(facets: CatalogFacet[], aliases: string[], values: string[]) {
@@ -1384,7 +1381,7 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
     return value ? { key: value.key || facet.key, value: value.value } : null;
   }
 
-  let strategies: SelectedFacet[][] = [];
+  let exactFacets: SelectedFacet[] = [];
   try {
     // A rota de facetas retorna o slug publicado pela VTEX (por exemplo,
     // `colab-hr---mari-gonzalez`), que não pode ser reconstruído com
@@ -1392,16 +1389,12 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
     const facets = await getProductFacets({ query: product.name, hideUnavailableItems: false });
     const collectionFacet = findProductFacet(facets, facetAliases.collection, [product.collection]);
     const colorFacet = findProductFacet(facets, facetAliases.color, [product.color, product.colorFilter || '']);
-    const genderFacet = findProductFacet(facets, facetAliases.gender, [product.gender]);
     if (!collectionFacet || !colorFacet) return [];
-    strategies = [
-      [collectionFacet, colorFacet, genderFacet],
-      [collectionFacet, colorFacet],
-    ].map((filters) => filters.filter((filter): filter is SelectedFacet => Boolean(filter)))
-      .filter((filters) => filters.length > 0);
+    exactFacets = [collectionFacet, colorFacet];
   } catch {
     // Sem as facetas exatas, não exibe produtos potencialmente diferentes.
   }
+  if (exactFacets.length === 0) return [];
 
   async function hydrate(products: Product[]) {
     return Promise.all(products.map(async (item) => {
@@ -1422,34 +1415,59 @@ export async function getCompleteLookProducts(product: Product, count = 2): Prom
   function matchesExactLook(candidate: Product) {
     const candidateCollection = normalizedSearchText(candidate.collection);
     const candidateColor = normalizedSearchText(candidate.color || candidate.colorFilter);
-    const candidateGender = normalizedSearchText(candidate.gender);
     return candidateCollection === targetCollection
-      && candidateColor === targetColor
-      && (!targetGender || !candidateGender || candidateGender === targetGender);
+      && candidateColor === targetColor;
   }
 
-  async function validate(products: Product[]) {
-    const validated: Product[] = [];
-    for (const candidate of await hydrate(dedupe(products).slice(0, targetCount * 4))) {
-      if (validated.length >= targetCount) break;
-      if (!matchesExactLook(candidate)) continue;
-      // Conjuntos devem completar o look com outro conjunto; não misture as
-      // peças avulsas que a mesma coleção também costuma retornar.
-      if (product.isKit && !candidate.isKit) continue;
-      if (candidate.variants.length === 0 || candidate.variants.some((variant) => variant.available)) validated.push(candidate);
-    }
-    return validated;
-  }
+  const pageSize = 24;
+  const validated: Product[] = [];
+  const seenIds = new Set<string>();
 
-  for (const facets of strategies) {
+  for (let page = 1; page <= 100; page += 1) {
+    let result: ProductSearchResult;
     try {
-      const result = await searchProductListing({ facets, count: 24, hideUnavailableItems: true, sort: 'orders:desc' });
-      const validated = await validate(result.products);
-      if (validated.length > 0) return validated;
+      result = await searchProductListing({
+        facets: exactFacets,
+        page,
+        count: pageSize,
+        hideUnavailableItems: true,
+        sort: 'orders:desc',
+      });
     } catch {
-      // Tenta a combinação seguinte de coleção, cor e gênero.
+      break;
     }
+
+    const candidates = dedupe(result.products).filter((candidate) => {
+      if (seenIds.has(candidate.id)) return false;
+      seenIds.add(candidate.id);
+      return true;
+    });
+    if (candidates.length === 0 && result.products.length > 0) break;
+    const hydrated = await hydrate(candidates);
+    for (const candidate of hydrated) {
+      if (!matchesExactLook(candidate)) continue;
+      if (candidate.variants.length === 0 || candidate.variants.some((variant) => variant.available)) validated.push(candidate);
+      if (validated.length >= maxResults) return validated.slice(0, maxResults);
+    }
+
+    if (result.products.length === 0) break;
+    // `searchProductListing` uses the returned page length when VTEX omits
+    // recordsFiltered. A full page in that case is ambiguous, so continue
+    // until an empty or partial page confirms the end of the result set.
+    if (result.recordsFiltered === result.products.length) {
+      if (result.products.length < pageSize) break;
+      continue;
+    }
+    if (page * pageSize >= result.recordsFiltered) break;
   }
 
-  return [];
+  return validated;
+}
+
+export async function getCompleteLookProducts(product: Product, count = 2): Promise<Product[]> {
+  return loadCompleteLookProducts(product, Math.max(1, count));
+}
+
+export async function getAllCompleteLookProducts(product: Product): Promise<Product[]> {
+  return loadCompleteLookProducts(product, Number.POSITIVE_INFINITY);
 }

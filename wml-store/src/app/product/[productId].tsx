@@ -5,12 +5,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AddToCartFeedback } from '@/components/add-to-cart-feedback';
 import { AddedToCartModal, type AddedProductInfo } from '@/components/added-to-cart-modal';
 import { AnimatedPaginationDots } from '@/components/animated-pagination-dots';
 import { AssistantHeaderButton } from '@/components/assistant-header-button';
 import { BottomSheetHandle } from '@/components/bottom-sheet-handle';
 import { CartIconButton } from '@/components/cart-icon-button';
+import { CompleteLookModal } from '@/components/complete-look-modal';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import ChevronRightIcon from '@/components/icons/ChevronRightIcon';
 import CloseIcon from '@/components/icons/CloseIcon';
@@ -35,7 +35,7 @@ import { WiddeVideo } from '@/components/widde-video';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
-import { getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductInstallment, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
+import { getAllCompleteLookProducts, getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductInstallment, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 import { getProductInformation, type SizebayProductInformation } from '@/services/sizebay';
 import { trackEvent } from '@/services/telemetry';
@@ -106,9 +106,8 @@ function getSizesInStock(product: Product) {
 }
 
 
-// Keep the feature implementation available for a future activation, but do
-// not render it or make its recommendation requests while it is disabled.
-const COMPLETE_LOOK_ENABLED = false;
+// Keep the original inline look builder ready for a future activation.
+const COMPLETE_LOOK_ENABLED = true;
 
 // Keep the inline add-to-cart action available for a future activation, while
 // using the floating action as the current PDP entry point.
@@ -132,8 +131,7 @@ export default function ProductScreen() {
   const [error, setError] = useState<ProductLoadErrorKind | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [adding, setAdding] = useState(false);
-  const [cartMessage, setCartMessage] = useState<string | null>(null);
-	const [addedItem, setAddedItem] = useState<AddedProductInfo | null>(null);
+  const [addedItem, setAddedItem] = useState<AddedProductInfo | AddedProductInfo[] | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
@@ -144,6 +142,7 @@ export default function ProductScreen() {
   const [selectionMessage, setSelectionMessage] = useState('');
   const [quickViewVisible, setQuickViewVisible] = useState(false);
   const [similarModalVisible, setSimilarModalVisible] = useState(false);
+  const [completeLookModalVisible, setCompleteLookModalVisible] = useState(false);
   const [colorsVisible, setColorsVisible] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -190,8 +189,9 @@ export default function ProductScreen() {
     setProduct(null);
     setColorProducts([]);
     setSimilarProducts([]);
-    setSimilarLoading(true);
     setLookProducts([]);
+    setLookLoading(true);
+    setSimilarLoading(true);
     setSelectedOptions({});
     setKitSelection(emptyKitSelection());
     setSizebayInfo(null);
@@ -199,12 +199,12 @@ export default function ProductScreen() {
     setSelectionMessage('');
     setQuickViewVisible(false);
     setSimilarModalVisible(false);
+    setCompleteLookModalVisible(false);
     setColorsVisible(false);
     setImageIndex(0);
     setImageViewerVisible(false);
     setViewerIndex(0);
     setScrollY(0);
-    setCartMessage(null);
     setShippingQuotes([]);
     setShippingMessage('');
     setShippingOptionsOpen(false);
@@ -233,16 +233,14 @@ export default function ProductScreen() {
           .then((items) => { if (active) setSimilarProducts(items); })
           .catch(() => undefined)
           .finally(() => { if (active) setSimilarLoading(false); });
-        if (COMPLETE_LOOK_ENABLED) {
-          setLookLoading(true);
-          getCompleteLookProducts(value, 2)
-            .then((items) => { if (active) setLookProducts([value, ...items.filter((item) => item.id !== value.id)]); })
-            .catch(() => { if (active) setLookProducts([value]); })
-            .finally(() => { if (active) setLookLoading(false); });
-        }
+        getAllCompleteLookProducts(value)
+          .then((items) => { if (active) setLookProducts([value, ...items.filter((item) => item.id !== value.id)]); })
+          .catch(() => { if (active) setLookProducts([value]); })
+          .finally(() => { if (active) setLookLoading(false); });
       })
       .catch((loadError) => {
         if (!active) return;
+        setLookLoading(false);
         setSimilarLoading(false);
         setError(loadError instanceof ProductLoadError ? loadError.kind : 'unavailable');
       })
@@ -296,11 +294,6 @@ export default function ProductScreen() {
     )) ?? false;
   }
 
-  function showCartFeedback(message: string) {
-    setCartMessage(null);
-    setTimeout(() => setCartMessage(message), 0);
-  }
-
   async function addProduct() {
     if (!product) return;
     if (product.isKit) {
@@ -309,12 +302,10 @@ export default function ProductScreen() {
       ));
       if (missing.length > 0) {
         setSelectionMessage('Por favor, selecione o tamanho de cada peça.');
-        setCartMessage(null);
         return;
       }
       setAdding(true);
       setSelectionMessage('');
-      setCartMessage(null);
       try {
         let orderForm = await getOrderForm();
         for (const group of product.kitGroups) {
@@ -330,7 +321,6 @@ export default function ProductScreen() {
         setAddedItem({ product, price: product.price });
       } catch {
         setSelectionMessage('Não foi possível adicionar o conjunto.');
-        setCartMessage(null);
       } finally {
         setAdding(false);
       }
@@ -340,31 +330,26 @@ export default function ProductScreen() {
       const hasSize = variationNames.some(isSizeVariationName);
       const selectionError = hasSize ? 'Por favor, selecione um tamanho.' : 'Por favor, selecione uma opção.';
       setSelectionMessage(selectionError);
-      setCartMessage(null);
       return;
     }
     if (!activeVariant) {
       const selectionError = 'Por favor, selecione uma opção disponível.';
       setSelectionMessage(selectionError);
-      setCartMessage(null);
       return;
     }
     if (!activeVariant.available) {
       const selectionError = 'Este tamanho está indisponível.';
       setSelectionMessage(selectionError);
-      setCartMessage(null);
       return;
     }
     setAdding(true);
     setSelectionMessage('');
-    setCartMessage(null);
     try {
       const orderForm = await getOrderForm();
       await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: activeVariant.itemId, sellerId: activeVariant.sellerId });
       setAddedItem({ product, variant: activeVariant, selectedOptions });
     } catch {
       setSelectionMessage('Não foi possível adicionar o produto.');
-      setCartMessage(null);
     } finally {
       setAdding(false);
     }
@@ -443,6 +428,7 @@ export default function ProductScreen() {
   const floatingButtonThreshold = screenHeight * 0.3;
   const showFloatingButton = Boolean(product && scrollY > floatingButtonThreshold);
   const currentPrice = activeVariant?.price ?? product?.price ?? null;
+  const completeLookRecommendations = product ? lookProducts.filter((item) => item.id !== product.id) : [];
   const currentListPrice = activeVariant?.listPrice ?? product?.listPrice ?? null;
   const currentDiscountPercentage = discountPercentage(currentListPrice, currentPrice);
   const currentInstallment = getBestInstallment(priceVariant?.installments);
@@ -525,6 +511,17 @@ export default function ProductScreen() {
                       {currentPrice !== null && <ThemedText style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
                     </View>
                     <View style={styles.heroActions}>
+                      {lookLoading ? (
+                        <View style={styles.heroLookButton}>
+                          <ActivityIndicator size="small" color="#0a0a0a" />
+                          <ThemedText type="smallBold" style={styles.heroLookButtonText}>Compre o look</ThemedText>
+                        </View>
+                      ) : completeLookRecommendations.length > 0 && (
+                        <Pressable accessibilityRole="button" accessibilityLabel="Compre o look" onPress={() => setCompleteLookModalVisible(true)} style={styles.heroLookButton}>
+                          <ShoppingBagIcon size={15} color="#0a0a0a" />
+                          <ThemedText type="smallBold" style={styles.heroLookButtonText}>Compre o look</ThemedText>
+                        </Pressable>
+                      )}
                       {similarLoading ? (
                         <View style={styles.heroSimilarButton}>
                           <ActivityIndicator size="small" color="#0a0a0a" />
@@ -606,7 +603,6 @@ export default function ProductScreen() {
                     onChange={(nextSelection) => {
                       setKitSelection(nextSelection);
                       setSelectionMessage('');
-                      setCartMessage(null);
                     }}
                   />
                 ) : <ActivityIndicator color="#0a0a0a" />
@@ -617,7 +613,7 @@ export default function ProductScreen() {
                     {values.map((value) => {
                       const available = optionAvailable(name, value);
                       const selected = selectedOptions[name] === value;
-                      return <Pressable key={value} disabled={!available} accessibilityState={{ disabled: !available, selected }} onPress={() => { setSelectionMessage(''); setCartMessage(null); setSelectedOptions((current) => ({ ...current, [name]: value })); }} style={[styles.variantOption, selected && styles.selectedVariant, !available && styles.unavailableVariant]}><ThemedText style={[styles.variantOptionText, selected && styles.selectedVariantText, !available && styles.unavailableVariantText]}>{value}</ThemedText></Pressable>;
+                      return <Pressable key={value} disabled={!available} accessibilityState={{ disabled: !available, selected }} onPress={() => { setSelectionMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }} style={[styles.variantOption, selected && styles.selectedVariant, !available && styles.unavailableVariant]}><ThemedText style={[styles.variantOptionText, selected && styles.selectedVariantText, !available && styles.unavailableVariantText]}>{value}</ThemedText></Pressable>;
                     })}
                   </View>
                 </View>
@@ -697,7 +693,7 @@ export default function ProductScreen() {
               </Accordion>
 
               {COMPLETE_LOOK_ENABLED && lookLoading && <ActivityIndicator color="#0a0a0a" />}
-              {COMPLETE_LOOK_ENABLED && !lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onFeedback={showCartFeedback} />}
+              {COMPLETE_LOOK_ENABLED && !lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onAdded={setAddedItem} />}
 
               <View style={styles.similarSection}>
                 <ThemedText style={styles.similarProducts} type="subtitle">Quem viu isso, viu também</ThemedText>
@@ -728,7 +724,15 @@ export default function ProductScreen() {
           onKitSelectionChange={(nextSelection) => {
             setKitSelection(nextSelection);
             setSelectionMessage('');
-            setCartMessage(null);
+          }}
+        />}
+        {product && <CompleteLookModal
+          products={completeLookRecommendations}
+          visible={completeLookModalVisible}
+          onClose={() => setCompleteLookModalVisible(false)}
+          onAdded={(items) => {
+            setCompleteLookModalVisible(false);
+            setAddedItem(items);
           }}
         />}
         {product && <SimilarProductsModal
@@ -783,10 +787,10 @@ export default function ProductScreen() {
           onClose={() => setAddedItem(null)}
           onViewCart={() => {
             setAddedItem(null);
+            setCompleteLookModalVisible(false);
             router.push('/checkout');
           }}
         />
-        <AddToCartFeedback message={cartMessage} />
       </SafeAreaView>
     </ThemedView>
   );
@@ -908,7 +912,7 @@ function lookKitSizeOptions(group: ProductKitGroup) {
   }).filter((option) => option.itemId);
 }
 
-function CompleteLook({ products, onFeedback }: { products: Product[]; onFeedback: (message: string) => void }) {
+function CompleteLook({ products, onAdded }: { products: Product[]; onAdded: (items: AddedProductInfo[]) => void }) {
   const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
   const [selectedKitSizes, setSelectedKitSizes] = useState<Record<string, Record<string, string>>>({});
   const [openSize, setOpenSize] = useState<string | null>(null);
@@ -948,6 +952,26 @@ function CompleteLook({ products, onFeedback }: { products: Product[]; onFeedbac
   });
   const total = variants.reduce((sum, item) => sum + (item.selectedVariant?.price ?? item.product.price ?? 0), 0);
 
+  function addedProductInfo(item: (typeof variants)[number]): AddedProductInfo {
+    const selectedOptions: Record<string, string> = {};
+    if (item.isKit) {
+      for (const group of item.product.kitGroups) {
+        const selectedItem = item.selectedKitItems.find((kitItem) => kitItem.itemId === item.kitSelections[group.productId]);
+        const sizeName = selectedItem && Object.keys(selectedItem.variations).find(isSizeVariationName);
+        if (selectedItem && sizeName) selectedOptions[group.productName] = selectedItem.variations[sizeName];
+      }
+    } else {
+      Object.assign(selectedOptions, item.selectedVariant?.variations ?? {});
+    }
+
+    return {
+      product: item.product,
+      variant: item.selectedVariant,
+      selectedOptions,
+      price: item.selectedVariant?.price ?? item.product.price,
+    };
+  }
+
   function selectKitSize(productId: string, groupId: string, itemId: string) {
     setSelectedKitSizes((current) => ({
       ...current,
@@ -981,7 +1005,7 @@ function CompleteLook({ products, onFeedback }: { products: Product[]; onFeedbac
       } else if (item.selectedVariant) {
         orderForm = await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
       }
-      onFeedback('Produto adicionado à sacola.');
+      onAdded([addedProductInfo(item)]);
     } catch {
       setMessage('Não foi possível adicionar o produto agora.');
     } finally {
@@ -1013,7 +1037,7 @@ function CompleteLook({ products, onFeedback }: { products: Product[]; onFeedbac
           orderForm = await addItemToCart({ orderFormId: orderForm.orderFormId, itemId: item.selectedVariant.itemId, sellerId: item.selectedVariant.sellerId });
         }
       }
-      onFeedback('Produtos adicionados à sacola.');
+      onAdded(variants.map(addedProductInfo));
     } catch {
       setMessage('Não foi possível adicionar o conjunto agora.');
     } finally {
