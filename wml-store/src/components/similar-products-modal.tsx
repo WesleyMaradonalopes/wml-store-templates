@@ -80,10 +80,10 @@ export function SimilarProductsModal({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { minHeight: 60, paddingHorizontal: Spacing.four, paddingVertical: Spacing.two, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderBottomWidth: 1 },
+  header: { minHeight: 40, paddingHorizontal: Spacing.four, paddingVertical: 0, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderBottomWidth: 1, boxShadow: '0px 7px 10px 1px rgba(0, 0, 0, 0.1)' },
   headerCopy: { flex: 1 },
   title: { fontSize: 20, lineHeight: 26 },
-  closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  closeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   feedback: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.five, gap: Spacing.two },
   emptyTitle: { fontSize: 16, textAlign: 'center' },
   feedbackText: { fontSize: 13, textAlign: 'center' },

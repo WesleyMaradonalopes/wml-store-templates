@@ -354,9 +354,9 @@ export function CompleteLookModal({ products, visible, onClose, onAdded }: Compl
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { minHeight: 60, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle: { fontSize: 20, lineHeight: 26, textAlign: 'center' },
-  closeButton: { position: 'absolute', right: Spacing.four, top: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  header: { minHeight: 40, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  headerTitle: { fontSize: 16, lineHeight: 20, textAlign: 'center' },
+  closeButton: { position: 'absolute', right: Spacing.four, top: 0, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   grid: { paddingHorizontal: Spacing.two, paddingTop: 10, paddingBottom: 100, gap: Spacing.three },
   gridRow: { justifyContent: 'space-between', gap: Spacing.two, alignItems: 'flex-start' },
   card: { width: '48.8%', minWidth: 0, gap: 4 },
