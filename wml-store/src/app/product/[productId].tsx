@@ -1143,7 +1143,7 @@ function PdpHeader({ scrolled, onBack, onLogo, onSearch, onCart }: { scrolled: b
       </View>
       {heroMode ? <View style={styles.logoPlaceholder} /> : <Pressable accessibilityLabel="Ir para o início" onPress={onLogo} style={styles.logoButton}><HopeLogoIcon color="#0a0a0a" width={76} height={20} /></Pressable>}
       <View style={[styles.headerSide, styles.headerActions]}>
-        <AssistantHeaderButton color="#0a0a0a" size={22} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
+        <AssistantHeaderButton color="#FFFFFF" size={22} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
         <Pressable accessibilityLabel="Buscar" onPress={onSearch} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
           <SearchIcon size={21} color="#0a0a0a" />
         </Pressable>

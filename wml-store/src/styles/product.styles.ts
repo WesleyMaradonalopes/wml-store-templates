@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
   headerSide: { width: 102, flexDirection: 'row', alignItems: 'center' },
   headerActions: { justifyContent: 'flex-end', gap: 0 },
   headerButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  heroHeaderButton: { borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.62)' },
+  heroHeaderButton: { borderRadius: 20, backgroundColor: 'transparent' },
   logoButton: { minWidth: 90, minHeight: 38, alignItems: 'center', justifyContent: 'center' },
   logoPlaceholder: { minWidth: 90, minHeight: 38 },
   loader: { marginTop: Spacing.five },
