@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { ReduceMotion, SlideInLeft, SlideInRight } from 'react-native-reanimated';
 
 import { AddedToCartModal, type AddedProductInfo } from '@/components/added-to-cart-modal';
 import { AnimatedPaginationDots } from '@/components/animated-pagination-dots';
@@ -114,6 +115,14 @@ const COMPLETE_LOOK_DATA_ENABLED = COMPLETE_LOOK_INLINE_ENABLED || COMPLETE_LOOK
 // Keep the inline add-to-cart action available for a future activation, while
 // using the floating action as the current PDP entry point.
 const INLINE_ADD_BUTTON_ENABLED = false;
+
+// Set to false to disable the PDP hero entrance animations without removing them.
+const PDP_HERO_ENTRANCE_ANIMATION_ENABLED = true;
+
+// Animate the PDP hero controls once when the product screen enters.
+const HERO_DOTS_ENTERING = SlideInLeft.duration(1000).delay(80).reduceMotion(ReduceMotion.System);
+const HERO_COPY_ENTERING = SlideInLeft.duration(1000).delay(140).reduceMotion(ReduceMotion.System);
+const HERO_ACTIONS_ENTERING = SlideInRight.duration(1000).delay(100).reduceMotion(ReduceMotion.System);
 
 export default function ProductScreen() {
   const router = useRouter();
@@ -507,14 +516,18 @@ export default function ProductScreen() {
                   locations={[0, 0.46, 1]}
                   style={styles.heroShade}
                 />
-                {galleryImages.length > 1 && <AnimatedPaginationDots count={galleryImages.length} activeIndex={imageIndex} activeWidth={28} activeColor="#FFFFFF" inactiveColor="rgba(255, 255, 255, 0.7)" accessibilityLabel={`Imagem ${imageIndex + 1} de ${galleryImages.length}`} style={styles.heroDots} />}
+                {galleryImages.length > 1 && (
+                  <Animated.View entering={PDP_HERO_ENTRANCE_ANIMATION_ENABLED ? HERO_DOTS_ENTERING : undefined} style={styles.heroDots}>
+                    <AnimatedPaginationDots count={galleryImages.length} activeIndex={imageIndex} activeWidth={28} activeColor="#FFFFFF" inactiveColor="rgba(255, 255, 255, 0.7)" accessibilityLabel={`Imagem ${imageIndex + 1} de ${galleryImages.length}`} />
+                  </Animated.View>
+                )}
                 <View style={styles.heroProductInfo}>
                   <View style={styles.heroProductRow}>
-                    <View style={styles.heroProductCopy}>
+                    <Animated.View entering={PDP_HERO_ENTRANCE_ANIMATION_ENABLED ? HERO_COPY_ENTERING : undefined} style={styles.heroProductCopy}>
                       <ThemedText numberOfLines={2} style={styles.heroProductName}>{product.name}</ThemedText>
                       {currentPrice !== null && <ThemedText style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
-                    </View>
-                    <View style={styles.heroActions}>
+                    </Animated.View>
+                    <Animated.View entering={PDP_HERO_ENTRANCE_ANIMATION_ENABLED ? HERO_ACTIONS_ENTERING : undefined} style={styles.heroActions}>
                       {COMPLETE_LOOK_MODAL_ENABLED && lookLoading && (
                         <Pressable
                           accessibilityRole="button"
@@ -547,7 +560,7 @@ export default function ProductScreen() {
                       <Pressable accessibilityLabel="Adicionar à sacola" disabled={adding} onPress={handleFloatingAdd} style={[styles.heroBuyButton, adding && styles.disabled]}>
                         {adding ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText type="smallBold" style={styles.heroBuyButtonText}>Adicionar</ThemedText>}
                       </Pressable>
-                    </View>
+                    </Animated.View>
                   </View>
                 </View>
                 <WiddeVideo product={product} />
