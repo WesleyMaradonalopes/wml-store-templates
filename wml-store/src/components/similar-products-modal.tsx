@@ -11,7 +11,6 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 type SimilarProductsModalProps = {
-  currentProduct: Product;
   products: Product[];
   loading?: boolean;
   visible: boolean;
@@ -20,7 +19,6 @@ type SimilarProductsModalProps = {
 };
 
 export function SimilarProductsModal({
-  currentProduct,
   products,
   loading = false,
   visible,
@@ -28,6 +26,9 @@ export function SimilarProductsModal({
   onProductPress,
 }: SimilarProductsModalProps) {
   const theme = useTheme();
+  const title = loading
+    ? 'Produtos similares'
+    : `${products.length} ${products.length === 1 ? 'produto similar' : 'produtos similares'}`;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
@@ -35,10 +36,7 @@ export function SimilarProductsModal({
         <SafeAreaView style={styles.safeArea}>
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.headerCopy}>
-              <ThemedText style={styles.title} type="subtitle">Similares</ThemedText>
-              <ThemedText numberOfLines={2} themeColor="textSecondary" style={styles.subtitle}>
-                Produtos parecidos com {currentProduct.name}
-              </ThemedText>
+              <ThemedText style={styles.title} type="subtitle">{title}</ThemedText>
             </View>
             <Pressable accessibilityLabel="Fechar produtos similares" onPress={onClose} style={styles.closeButton}>
               <CloseIcon color={theme.text} size={22} />
@@ -82,15 +80,14 @@ export function SimilarProductsModal({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { minHeight: 76, paddingHorizontal: Spacing.four, paddingVertical: Spacing.two, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderBottomWidth: 1 },
-  headerCopy: { flex: 1, gap: 2 },
-  title: { fontSize: 22, lineHeight: 28 },
-  subtitle: { fontSize: 12, lineHeight: 17 },
+  header: { minHeight: 60, paddingHorizontal: Spacing.four, paddingVertical: Spacing.two, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderBottomWidth: 1 },
+  headerCopy: { flex: 1 },
+  title: { fontSize: 20, lineHeight: 26 },
   closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   feedback: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.five, gap: Spacing.two },
   emptyTitle: { fontSize: 16, textAlign: 'center' },
   feedbackText: { fontSize: 13, textAlign: 'center' },
-  grid: { padding: Spacing.three, paddingBottom: Spacing.five, gap: Spacing.four },
-  gridRow: { justifyContent: 'space-between', gap: Spacing.three },
-  card: { width: '48%' },
+  grid: { padding: 8, paddingBottom: Spacing.five, gap: Spacing.four },
+  gridRow: { justifyContent: 'space-between', gap: 8 },
+  card: { width: '49%' },
 });

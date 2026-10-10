@@ -35,7 +35,7 @@ import { WiddeVideo } from '@/components/widde-video';
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
 import { Spacing } from '@/constants/theme';
 import { addItemToCart, getOrderForm, simulateProductShipping, type ShippingQuote } from '@/services/cart';
-import { getAllCompleteLookProducts, getCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductInstallment, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
+import { getAllCompleteLookProducts, getProduct, getProductColorOptions, getSimilarProducts, ProductLoadError, type Product, type ProductInstallment, type ProductKitGroup, type ProductKitItem, type ProductLoadErrorKind, type ProductVariant } from '@/services/catalog';
 import { canSaveFavorites, getKnownFavoriteAuthState, isFavorite, toggleFavorite } from '@/services/favorites';
 import { getProductInformation, type SizebayProductInformation } from '@/services/sizebay';
 import { trackEvent } from '@/services/telemetry';
@@ -106,8 +106,10 @@ function getSizesInStock(product: Product) {
 }
 
 
-// Keep the original inline look builder ready for a future activation.
-const COMPLETE_LOOK_ENABLED = true;
+// Toggle the PDP section and the button/modal independently.
+const COMPLETE_LOOK_INLINE_ENABLED = false;
+const COMPLETE_LOOK_MODAL_ENABLED = true;
+const COMPLETE_LOOK_DATA_ENABLED = COMPLETE_LOOK_INLINE_ENABLED || COMPLETE_LOOK_MODAL_ENABLED;
 
 // Keep the inline add-to-cart action available for a future activation, while
 // using the floating action as the current PDP entry point.
@@ -190,7 +192,7 @@ export default function ProductScreen() {
     setColorProducts([]);
     setSimilarProducts([]);
     setLookProducts([]);
-    setLookLoading(true);
+    setLookLoading(COMPLETE_LOOK_DATA_ENABLED);
     setSimilarLoading(true);
     setSelectedOptions({});
     setKitSelection(emptyKitSelection());
@@ -233,10 +235,12 @@ export default function ProductScreen() {
           .then((items) => { if (active) setSimilarProducts(items); })
           .catch(() => undefined)
           .finally(() => { if (active) setSimilarLoading(false); });
-        getAllCompleteLookProducts(value)
-          .then((items) => { if (active) setLookProducts([value, ...items.filter((item) => item.id !== value.id)]); })
-          .catch(() => { if (active) setLookProducts([value]); })
-          .finally(() => { if (active) setLookLoading(false); });
+        if (COMPLETE_LOOK_DATA_ENABLED) {
+          getAllCompleteLookProducts(value)
+            .then((items) => { if (active) setLookProducts([value, ...items.filter((item) => item.id !== value.id)]); })
+            .catch(() => { if (active) setLookProducts([value]); })
+            .finally(() => { if (active) setLookLoading(false); });
+        }
       })
       .catch((loadError) => {
         if (!active) return;
@@ -511,25 +515,32 @@ export default function ProductScreen() {
                       {currentPrice !== null && <ThemedText style={styles.heroProductPrice}>{money(currentPrice)}</ThemedText>}
                     </View>
                     <View style={styles.heroActions}>
-                      {lookLoading ? (
-                        <View style={styles.heroLookButton}>
-                          <ActivityIndicator size="small" color="#0a0a0a" />
+                      {COMPLETE_LOOK_MODAL_ENABLED && lookLoading && (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Compre o look, carregando produtos"
+                          accessibilityState={{ disabled: true }}
+                          disabled
+                          style={[styles.heroLookButton, styles.heroActionLoading]}>
                           <ThemedText type="smallBold" style={styles.heroLookButtonText}>Compre o look</ThemedText>
-                        </View>
-                      ) : completeLookRecommendations.length > 0 && (
+                        </Pressable>
+                      )}
+                      {COMPLETE_LOOK_MODAL_ENABLED && !lookLoading && completeLookRecommendations.length > 0 && (
                         <Pressable accessibilityRole="button" accessibilityLabel="Compre o look" onPress={() => setCompleteLookModalVisible(true)} style={styles.heroLookButton}>
-                          <ShoppingBagIcon size={15} color="#0a0a0a" />
                           <ThemedText type="smallBold" style={styles.heroLookButtonText}>Compre o look</ThemedText>
                         </Pressable>
                       )}
                       {similarLoading ? (
-                        <View style={styles.heroSimilarButton}>
-                          <ActivityIndicator size="small" color="#0a0a0a" />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Similares, carregando produtos"
+                          accessibilityState={{ disabled: true }}
+                          disabled
+                          style={[styles.heroSimilarButton, styles.heroActionLoading]}>
                           <ThemedText type="smallBold" style={styles.heroSimilarButtonText}>Similares</ThemedText>
-                        </View>
+                        </Pressable>
                       ) : similarProducts.length > 0 && (
                         <Pressable accessibilityRole="button" accessibilityLabel="Ver produtos similares" onPress={() => setSimilarModalVisible(true)} style={styles.heroSimilarButton}>
-                          <SimilarAiIcon color="#0a0a0a" size={16} />
                           <ThemedText type="smallBold" style={styles.heroSimilarButtonText}>Similares</ThemedText>
                         </Pressable>
                       )}
@@ -692,8 +703,8 @@ export default function ProductScreen() {
                 <ThemedText style={styles.accordionText}>{product.care || 'Informações não cadastradas.'}</ThemedText>
               </Accordion>
 
-              {COMPLETE_LOOK_ENABLED && lookLoading && <ActivityIndicator color="#0a0a0a" />}
-              {COMPLETE_LOOK_ENABLED && !lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onAdded={setAddedItem} />}
+              {COMPLETE_LOOK_INLINE_ENABLED && lookLoading && <ActivityIndicator color="#0a0a0a" />}
+              {COMPLETE_LOOK_INLINE_ENABLED && !lookLoading && lookProducts.length > 1 && <CompleteLook products={lookProducts} onAdded={setAddedItem} />}
 
               <View style={styles.similarSection}>
                 <ThemedText style={styles.similarProducts} type="subtitle">Quem viu isso, viu também</ThemedText>
@@ -726,7 +737,7 @@ export default function ProductScreen() {
             setSelectionMessage('');
           }}
         />}
-        {product && <CompleteLookModal
+        {COMPLETE_LOOK_MODAL_ENABLED && product && <CompleteLookModal
           products={completeLookRecommendations}
           visible={completeLookModalVisible}
           onClose={() => setCompleteLookModalVisible(false)}
@@ -736,7 +747,6 @@ export default function ProductScreen() {
           }}
         />}
         {product && <SimilarProductsModal
-          currentProduct={product}
           products={similarProducts}
           loading={similarLoading}
           visible={similarModalVisible}

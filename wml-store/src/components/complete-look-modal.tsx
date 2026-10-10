@@ -234,7 +234,7 @@ export function CompleteLookModal({ products, visible, onClose, onAdded }: Compl
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <View style={[styles.header, { borderBottomColor: '#dddddd', boxShadow: '0px 7px 10px 1px rgba(0, 0, 0, 0.1)' }]}>
             <ThemedText type="subtitle" style={styles.headerTitle}>COMPRE O LOOK</ThemedText>
             <Pressable accessibilityRole="button" accessibilityLabel="Fechar compre o look" onPress={onClose} style={styles.closeButton}>
               <CloseIcon color={theme.text} size={22} />
@@ -325,7 +325,7 @@ export function CompleteLookModal({ products, visible, onClose, onAdded }: Compl
             }}
           />
 
-          <View style={[styles.footer, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+          <View style={[styles.footer, { backgroundColor: theme.background, boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)', borderTopColor: theme.border }]}>
             {!!feedback && <ThemedText style={[styles.feedback, feedback.error && styles.feedbackError]}>{feedback.text}</ThemedText>}
             <ThemedText style={styles.totalLabel}>
               {selectedRows.length === 0
@@ -354,25 +354,25 @@ export function CompleteLookModal({ products, visible, onClose, onAdded }: Compl
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { minHeight: 54, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  header: { minHeight: 60, paddingHorizontal: Spacing.four, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 20, lineHeight: 26, textAlign: 'center' },
   closeButton: { position: 'absolute', right: Spacing.four, top: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  grid: { paddingHorizontal: Spacing.two, paddingTop: Spacing.two, paddingBottom: 20, gap: Spacing.three },
+  grid: { paddingHorizontal: Spacing.two, paddingTop: 10, paddingBottom: 100, gap: Spacing.three },
   gridRow: { justifyContent: 'space-between', gap: Spacing.two, alignItems: 'flex-start' },
   card: { width: '48.8%', minWidth: 0, gap: 4 },
   cardOpen: { zIndex: 20, elevation: 12 },
   imageWrap: { width: '100%', aspectRatio: 0.76, overflow: 'hidden', borderRadius: 10, backgroundColor: '#e8e8ea' },
   image: { width: '100%', height: '100%' },
-  productCheckbox: { position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 4, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 255, 255, 0.94)' },
+  productCheckbox: { position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 255, 255, 0.94)' },
   productCheckboxChecked: { borderColor: '#0a0a0a', backgroundColor: '#0a0a0a' },
-  productCheckboxMark: { color: '#FFFFFF', fontSize: 16, lineHeight: 19, fontWeight: '700' },
+  productCheckboxMark: { color: '#FFFFFF', fontSize: 12, lineHeight: 14, fontWeight: '700' },
   productName: { minHeight: 34, fontSize: 11, lineHeight: 15 },
   listPrice: { fontSize: 10, lineHeight: 13, textDecorationLine: 'line-through' },
   price: { fontSize: 14, lineHeight: 18 },
-  installment: { fontSize: 10, lineHeight: 13 },
+  installment: { display: 'none', fontSize: 10, lineHeight: 13 },
   selectorWrap: { position: 'relative', zIndex: 2, marginTop: 2 },
   selectorWrapOpen: { zIndex: 30, elevation: 12 },
-  sizeSelect: { minHeight: 34, paddingHorizontal: 10, borderWidth: 1, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sizeSelect: { minHeight: 32, paddingHorizontal: 10, borderWidth: 1, borderRadius: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sizeSelectError: { borderColor: '#ed6560' },
   sizeSelectText: { fontSize: 11, lineHeight: 15 },
   chevron: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '90deg' }] },
@@ -384,14 +384,14 @@ const styles = StyleSheet.create({
   unavailableOptionText: { textDecorationLine: 'line-through' },
   kitSelector: { marginTop: 3, padding: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#dedbd5', borderRadius: 8 },
   selectionError: { color: '#ed6560', fontSize: 10, lineHeight: 13 },
-  addButton: { minHeight: 34, paddingHorizontal: 5, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  addButtonText: { fontSize: 9, lineHeight: 12, textAlign: 'center' },
+  addButton: { minHeight: 34, paddingHorizontal: 5, borderRadius: 5, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  addButtonText: { fontSize: 11, lineHeight: 13, textAlign: 'center' },
   disabledButton: { opacity: 0.5 },
-  footer: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, paddingBottom: Spacing.two, alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth },
+  footer: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, paddingBottom: Spacing.two, alignItems: 'center', gap: 3, borderTopWidth: StyleSheet.hairlineWidth },
   feedback: { fontSize: 11, lineHeight: 14, textAlign: 'center' },
   feedbackError: { color: '#ed6560' },
-  totalLabel: { fontSize: 13, lineHeight: 17 },
-  total: { fontSize: 22, lineHeight: 29 },
-  buyTogetherButton: { width: '100%', minHeight: 42, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  totalLabel: { fontSize: 12, lineHeight: 17 },
+  total: { fontSize: 20, lineHeight: 24 },
+  buyTogetherButton: { width: '100%', minHeight: 42, borderRadius: 5, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   buyTogetherText: { fontSize: 11, lineHeight: 14 },
 });
