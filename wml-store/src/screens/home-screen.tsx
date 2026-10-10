@@ -89,7 +89,7 @@ function HomeScreenContent({ cmsPage, cmsLoading, cmsError }: { cmsPage: CmsPage
             <HopeLogoIcon color={theme.text} width={76} height={20} />
           </Pressable>
           <View style={styles.headerActions}>
-            <AssistantHeaderButton color='#ffffff' size={22} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction)]} />
+            <AssistantHeaderButton color='#ffffff' size={22} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.assistantHeaderAction]} />
             <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction)]}><SearchIcon size={20} color={theme.text} /></Pressable>
             <CartIconButton color={theme.text} style={[styles.headerAction, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction)]} />
           </View>
@@ -108,6 +108,7 @@ const styles = StyleSheet.create({
   brandButton: { minWidth: 90, minHeight: 38, justifyContent: 'center' },
   brand: { fontSize: 22, fontWeight: '700' }, headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   headerAction: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#ffffff' },
+  assistantHeaderAction: { backgroundColor: 'transparent' },
   heroHeaderAction: { backgroundColor: 'rgba(255, 255, 255, 0.62)' },
   blackHeroHeaderAction: { backgroundColor: 'rgba(0, 0, 0, 0.42)' },
   content: { gap: Spacing.three, paddingVertical: Spacing.five },
