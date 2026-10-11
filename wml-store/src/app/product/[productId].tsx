@@ -118,7 +118,7 @@ const INLINE_ADD_BUTTON_ENABLED = false;
 
 // Set to false to disable the PDP hero entrance animations without removing them.
 const PDP_HERO_ENTRANCE_ANIMATION_ENABLED = true;
-const PDP_HERO_ENTRY_DURATION_MS = 1000;
+const PDP_HERO_ENTRY_DURATION_MS = 1500;
 
 // Animate the PDP hero controls once when the product screen enters.
 const HERO_DOTS_ENTERING = SlideInLeft.duration(PDP_HERO_ENTRY_DURATION_MS).reduceMotion(ReduceMotion.System);

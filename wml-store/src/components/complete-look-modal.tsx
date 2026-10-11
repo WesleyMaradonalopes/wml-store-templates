@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, View } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { isSizeVariationName, sortVariationValues } from '@/constants/sizes';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addItemToCart, getOrderForm } from '@/services/cart';
 import type { Product, ProductInstallment, ProductKitItem } from '@/services/catalog';
@@ -327,15 +327,17 @@ export function CompleteLookModal({ products, visible, onClose, onAdded }: Compl
 
           <View style={[styles.footer, { backgroundColor: theme.background, boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)', borderTopColor: theme.border }]}>
             {!!feedback && <ThemedText style={[styles.feedback, feedback.error && styles.feedbackError]}>{feedback.text}</ThemedText>}
-            <ThemedText style={styles.totalLabel}>
-              {selectedRows.length === 0
-                ? 'Nenhum produto selecionado'
-                : selectedRows.length === 1
-                  ? 'Leve 1 produto por:'
-                  : `Leve os ${selectedRows.length} produtos por:`}
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.total}>{money(total)}</ThemedText>
-            <Pressable
+							<View style={styles.totalLabelTotal}>
+								<ThemedText style={styles.totalLabel}>
+									{selectedRows.length === 0
+										? 'Nenhum produto selecionado'
+										: selectedRows.length === 1
+											? 'Leve 1 produto por:'
+											: `Leve os ${selectedRows.length} produtos por:`}
+								</ThemedText>
+								<ThemedText type="subtitle" style={styles.total}>{money(total)}</ThemedText>
+							</View>
+						<Pressable
               accessibilityRole="button"
               disabled={busy || selectedRows.length === 0}
               onPress={() => void buyTogether()}
@@ -390,8 +392,9 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, paddingBottom: Spacing.two, alignItems: 'center', gap: 3, borderTopWidth: StyleSheet.hairlineWidth },
   feedback: { fontSize: 11, lineHeight: 14, textAlign: 'center' },
   feedbackError: { color: '#ed6560' },
-  totalLabel: { fontSize: 12, lineHeight: 17 },
-  total: { fontSize: 20, lineHeight: 24 },
+	totalLabelTotal: { display: 'flex', marginBottom: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, backgroundColor: '#fff', width: '100%' },
+  totalLabel: { fontSize: 16, lineHeight: 17 },
+  total: { fontSize: 18, lineHeight: 20 },
   buyTogetherButton: { width: '100%', minHeight: 42, borderRadius: 5, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  buyTogetherText: { fontSize: 11, lineHeight: 14 },
+  buyTogetherText: { fontSize: 11, lineHeight: 14, fontFamily: Fonts.bold, fontWeight: '600' },
 });
