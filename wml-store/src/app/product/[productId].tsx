@@ -118,11 +118,14 @@ const INLINE_ADD_BUTTON_ENABLED = false;
 
 // Set to false to disable the PDP hero entrance animations without removing them.
 const PDP_HERO_ENTRANCE_ANIMATION_ENABLED = true;
+const PDP_HERO_ENTRY_DURATION_MS = 1000;
 
 // Animate the PDP hero controls once when the product screen enters.
-const HERO_DOTS_ENTERING = SlideInLeft.duration(1000).delay(80).reduceMotion(ReduceMotion.System);
-const HERO_COPY_ENTERING = SlideInLeft.duration(1000).delay(140).reduceMotion(ReduceMotion.System);
-const HERO_ACTIONS_ENTERING = SlideInRight.duration(1000).delay(100).reduceMotion(ReduceMotion.System);
+const HERO_DOTS_ENTERING = SlideInLeft.duration(PDP_HERO_ENTRY_DURATION_MS).reduceMotion(ReduceMotion.System);
+const HERO_COPY_ENTERING = SlideInLeft.duration(PDP_HERO_ENTRY_DURATION_MS).reduceMotion(ReduceMotion.System);
+const HERO_ACTIONS_ENTERING = SlideInRight.duration(PDP_HERO_ENTRY_DURATION_MS).reduceMotion(ReduceMotion.System);
+const HERO_HEADER_BACK_ENTERING = SlideInLeft.duration(PDP_HERO_ENTRY_DURATION_MS).reduceMotion(ReduceMotion.System);
+const HERO_HEADER_ACTIONS_ENTERING = SlideInRight.duration(PDP_HERO_ENTRY_DURATION_MS).reduceMotion(ReduceMotion.System);
 
 export default function ProductScreen() {
   const router = useRouter();
@@ -728,7 +731,7 @@ export default function ProductScreen() {
           </ScrollView>
         )}
 
-        <PdpHeader scrolled={!product || scrollY > 24} onBack={() => router.back()} onLogo={() => router.replace('/')} onSearch={() => router.push('/search')} onCart={() => router.push('/checkout')} />
+        <PdpHeader key={product ? `loaded-${product.id}` : 'loading'} entranceAnimationEnabled={Boolean(product) && PDP_HERO_ENTRANCE_ANIMATION_ENABLED} scrolled={!product || scrollY > 24} onBack={() => router.back()} onLogo={() => router.replace('/')} onSearch={() => router.push('/search')} onCart={() => router.push('/checkout')} />
         {showFloatingButton && product && (
           <View style={styles.floatingBar}>
             <View style={styles.floatingInfo}>
@@ -1131,24 +1134,24 @@ function CompleteLook({ products, onAdded }: { products: Product[]; onAdded: (it
   );
 }
 
-function PdpHeader({ scrolled, onBack, onLogo, onSearch, onCart }: { scrolled: boolean; onBack: () => void; onLogo: () => void; onSearch: () => void; onCart: () => void }) {
+function PdpHeader({ entranceAnimationEnabled, scrolled, onBack, onLogo, onSearch, onCart }: { entranceAnimationEnabled: boolean; scrolled: boolean; onBack: () => void; onLogo: () => void; onSearch: () => void; onCart: () => void }) {
   const insets = useSafeAreaInsets();
   const heroMode = !scrolled;
   return (
     <View style={[styles.header, { paddingTop: insets.top, minHeight: 52 + insets.top }, heroMode ? styles.heroHeader : styles.scrolledHeader]}>
-      <View style={styles.headerSide}>
+      <Animated.View entering={entranceAnimationEnabled ? HERO_HEADER_BACK_ENTERING : undefined} style={styles.headerSide}>
         <Pressable accessibilityLabel="Voltar" onPress={onBack} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
           <ArrowLeftIAIcon color="#0a0a0a" size={21} />
         </Pressable>
-      </View>
+      </Animated.View>
       {heroMode ? <View style={styles.logoPlaceholder} /> : <Pressable accessibilityLabel="Ir para o início" onPress={onLogo} style={styles.logoButton}><HopeLogoIcon color="#0a0a0a" width={76} height={20} /></Pressable>}
-      <View style={[styles.headerSide, styles.headerActions]}>
+      <Animated.View entering={entranceAnimationEnabled ? HERO_HEADER_ACTIONS_ENTERING : undefined} style={[styles.headerSide, styles.headerActions]}>
         <AssistantHeaderButton color="#FFFFFF" size={22} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
         <Pressable accessibilityLabel="Buscar" onPress={onSearch} style={[styles.headerButton, heroMode && styles.heroHeaderButton]}>
-          <SearchIcon size={21} color="#0a0a0a" />
+          <SearchIcon size={22} color="#0a0a0a" />
         </Pressable>
         <CartIconButton color="#0a0a0a" onPress={onCart} style={[styles.headerButton, heroMode && styles.heroHeaderButton]} />
-      </View>
+      </Animated.View>
     </View>
   );
 }

@@ -63,6 +63,7 @@ function HomeScreenContent({ cmsPage, cmsLoading, cmsError }: { cmsPage: CmsPage
   const firstSectionIsHero = firstSection?.name === 'MultipleImageBanner' && firstSectionMode === 'SliderHero';
   const transparentHeader = firstSectionIsHero && scrollY <= 8;
   const isBlackTheme = pageTheme.name === 'black';
+  const headerForegroundColor = transparentHeader ? '#FFFFFF' : theme.text;
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -86,12 +87,12 @@ function HomeScreenContent({ cmsPage, cmsLoading, cmsError }: { cmsPage: CmsPage
         </ScrollView>
         <View style={[styles.header, { paddingTop: insets.top, minHeight: 48 + insets.top }, transparentHeader ? styles.heroHeader : [styles.scrolledHeader, dark && { backgroundColor: theme.background, borderBottomColor: theme.border }], isBlackTheme && styles.blackHeader]}>
           <Pressable accessibilityLabel="Voltar ao topo" onPress={() => { scrollRef.current?.scrollTo({ y: 0, animated: true }); setHidden(false); }} style={styles.brandButton}>
-            <HopeLogoIcon color={theme.text} width={76} height={20} />
+            <HopeLogoIcon color={headerForegroundColor} width={76} height={20} />
           </Pressable>
           <View style={styles.headerActions}>
-            <AssistantHeaderButton color='#ffffff' size={22} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.assistantHeaderAction]} />
-            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction)]}><SearchIcon size={20} color={theme.text} /></Pressable>
-            <CartIconButton color={theme.text} style={[styles.headerAction, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction)]} />
+            <AssistantHeaderButton color='#ffffff' size={22} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.headerActionNoBackground]} />
+            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.headerActionNoBackground]}><SearchIcon size={22} color={headerForegroundColor} /></Pressable>
+            <CartIconButton color={headerForegroundColor} style={[styles.headerAction, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.headerActionNoBackground]} />
           </View>
         </View>
       </SafeAreaView>
@@ -108,7 +109,7 @@ const styles = StyleSheet.create({
   brandButton: { minWidth: 90, minHeight: 38, justifyContent: 'center' },
   brand: { fontSize: 22, fontWeight: '700' }, headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   headerAction: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#ffffff' },
-  assistantHeaderAction: { backgroundColor: 'transparent' },
+  headerActionNoBackground: { backgroundColor: 'transparent' },
   heroHeaderAction: { backgroundColor: 'rgba(255, 255, 255, 0.62)' },
   blackHeroHeaderAction: { backgroundColor: 'rgba(0, 0, 0, 0.42)' },
   content: { gap: Spacing.three, paddingVertical: Spacing.five },
