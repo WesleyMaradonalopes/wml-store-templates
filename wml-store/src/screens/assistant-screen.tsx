@@ -188,7 +188,7 @@ export default function AssistantScreen() {
   const [imagePickerVisible, setImagePickerVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const sendMessageRef = useRef<(value: string) => void>(() => undefined);
-  const chatBackground = colorScheme === 'dark' ? '#252b30' : '#eaeef2';
+  const chatBackground = colorScheme === 'dark' ? '#0a0a0a' : '#eaeef2';
   const assistantBubbleBackground = colorScheme === 'dark' ? theme.backgroundElement : '#FFFFFF';
   const assistantTextColor = colorScheme === 'dark' ? theme.text : AI_COLOR;
   const initialState = messages.length === 0;
@@ -545,7 +545,7 @@ export default function AssistantScreen() {
               <View style={styles.headerLogo}>
                 <SmartAiIcon color="#FFFFFF" size={20} />
               </View>
-              <ThemedText style={[styles.headerTitleText, { color: theme.text }]}>Hope Resort AI</ThemedText>
+              <ThemedText style={[styles.headerTitleText, { color: theme.text }]}>Hope AI</ThemedText>
             </View>
           </View>
           <View style={styles.headerActions}>
@@ -599,7 +599,7 @@ export default function AssistantScreen() {
                     message.imageUri && styles.imageBubble,
                   ]}>
                     {message.imageUri && <Image source={{ uri: message.imageUri }} contentFit="cover" style={styles.userImage} />}
-                    {!!message.text && <ThemedText style={message.role === 'user' ? styles.userText : { color: assistantTextColor }}>{message.text}</ThemedText>}
+                    {!!message.text && <ThemedText style={message.role === 'user' ? styles.userText : [styles.assistantText, { color: assistantTextColor }]}>{message.text}</ThemedText>}
                     <MessageMeta timestamp={message.timestamp} user={message.role === 'user'} />
                   </View>
                 )}
@@ -610,6 +610,7 @@ export default function AssistantScreen() {
                         <View key={`${message.id}-${item.id}`} style={[styles.productCard, { width: recommendationCardWidth }]}>
                           <ProductCard
                             product={item.product}
+                            productNameStyle={styles.aiProductName}
                             showAddedModal
                             onSimilar={() => void loadSimilarProducts(item.product)}
                             similarLoading={loading}
@@ -755,9 +756,9 @@ const styles = StyleSheet.create({
   messages: { flexGrow: 1, gap: 10, paddingHorizontal: 14, paddingTop: 16, paddingBottom: 14 },
   emptyMessages: { paddingTop: 20 },
   welcome: { alignItems: 'center', width: '100%', paddingTop: 4 },
-  welcomeLogo: { width: 50, height: 50, borderRadius: 32, backgroundColor: AI_COLOR, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  welcomeTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 5 },
-  welcomeSubtitle: { maxWidth: 310, fontSize: 14, lineHeight: 21, textAlign: 'center', paddingBottom: 15 },
+  welcomeLogo: { width: 50, height: 50, borderRadius: 32, backgroundColor: AI_COLOR, alignItems: 'center', justifyContent: 'center', marginBottom: 5 },
+  welcomeTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 5 },
+  welcomeSubtitle: { maxWidth: 310, fontSize: 12, lineHeight: 16, textAlign: 'center', paddingBottom: 15 },
   assistantRow: { alignItems: 'flex-start', gap: 8, width: '100%' },
   userRow: { alignItems: 'flex-end', gap: 8, width: '100%' },
   bubble: { maxWidth: '88%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
@@ -765,12 +766,14 @@ const styles = StyleSheet.create({
   userBubble: { backgroundColor: AI_COLOR, borderBottomRightRadius: 3 },
   imageBubble: { padding: 4, overflow: 'hidden' },
   userImage: { width: 184, height: 184, borderRadius: 12 },
-  userText: { color: '#FFFFFF' },
+  userText: { color: '#FFFFFF', fontSize: 14, lineHeight: 15 },
+  assistantText: { fontSize: 14, lineHeight: 18 },
+  aiProductName: { fontSize: 12, lineHeight: 14 },
   messageMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 6, minHeight: 12 },
   productMeta: { position: 'absolute', right: 12, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  messageTime: { color: '#777777', fontSize: 11, lineHeight: 12 },
+  messageTime: { color: '#777777', fontSize: 10, lineHeight: 12 },
   userMessageTime: { color: '#c9c9c9' },
-  messageStatus: { color: '#53bdeb', fontSize: 12, lineHeight: 12, letterSpacing: -2 },
+  messageStatus: { color: '#53bdeb', fontSize: 10, lineHeight: 12, letterSpacing: -2 },
   productsBubble: { width: '100%', minHeight: 170, borderRadius: 16, borderBottomLeftRadius: 0, padding: 10, paddingBottom: 30, position: 'relative' },
   productsRow: { gap: 12, paddingRight: 2 },
   productCard: { width: 170 },

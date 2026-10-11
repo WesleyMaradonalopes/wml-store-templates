@@ -602,5 +602,5 @@ const styles = StyleSheet.create({
   loadMoreFooter: { alignItems: 'center', gap: Spacing.two },
   successText: { color: '#26734d', fontWeight: '600' },
   messageText: { color: '#ed6560' },
-  searchProductShelfTitle: { fontSize: 16, lineHeight: 20 },
+  searchProductShelfTitle: { fontSize: 16, lineHeight: 20, fontFamily: Fonts.medium, fontWeight: '500', marginLeft: -15 },
 });

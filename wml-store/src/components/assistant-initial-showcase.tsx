@@ -13,11 +13,11 @@ import { ThemedText } from './themed-text';
 const AI_COLOR = '#0a0a0a';
 
 const SUGGESTIONS = [
-  { label: 'Dia a dia 🧘‍♀️', query: 'lingerie confortável' },
-  { label: 'Presentes 🎁', query: 'presente feminino' },
-  { label: 'Conjuntos 💖', query: 'conjunto feminino' },
-  { label: 'Lingerie sexy 🔥', query: 'lingerie sensual' },
-  { label: 'Verão ☀️', query: 'moda praia feminina' },
+  { label: 'Legging 🧘‍♀️', query: 'legging' },
+  { label: 'Top 🎁', query: 'top' },
+  { label: 'Body 💖', query: 'body' },
+  { label: 'Meias 🔥', query: 'meias' },
+  { label: 'Bermuda ☀️', query: 'bermuda' },
 ];
 
 type AssistantInitialShowcaseProps = {
@@ -90,6 +90,7 @@ export function AssistantInitialShowcase({
               <View style={{ width: cardWidth }}>
                 <ProductCard
                   product={product}
+                  productNameStyle={styles.aiProductName}
                   showAddedModal
                   onSimilar={() => onSimilar(product)}
                   similarLoading={similarLoading}
@@ -127,6 +128,7 @@ export function AssistantInitialShowcase({
 const styles = StyleSheet.create({
   container: { paddingBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 14, alignItems: 'flex-start' },
+  aiProductName: { fontSize: 12, lineHeight: 15 },
   empty: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 32 },
   emptyText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   errorText: { color: '#ed6560' },

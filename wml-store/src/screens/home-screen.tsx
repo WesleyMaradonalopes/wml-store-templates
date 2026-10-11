@@ -91,7 +91,7 @@ function HomeScreenContent({ cmsPage, cmsLoading, cmsError }: { cmsPage: CmsPage
           </Pressable>
           <View style={styles.headerActions}>
             <AssistantHeaderButton color='#ffffff' size={22} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.headerActionNoBackground]} />
-            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.headerActionNoBackground]}><SearchIcon size={22} color={headerForegroundColor} /></Pressable>
+            <Pressable onPress={() => router.push('/search')} style={[styles.headerAction, dark && !transparentHeader && { backgroundColor: theme.background }, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.headerActionNoBackground]}><SearchIcon size={23} color={headerForegroundColor} /></Pressable>
             <CartIconButton color={headerForegroundColor} style={[styles.headerAction, transparentHeader && (dark ? styles.blackHeroHeaderAction : styles.heroHeaderAction), styles.headerActionNoBackground]} />
           </View>
         </View>
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   blackHeader: { backgroundColor: '#0a0a0a' },
   scrolledHeader: { borderBottomWidth: 1, borderBottomColor: '#ece8e2', backgroundColor: '#ffffff' },
   brandButton: { minWidth: 90, minHeight: 38, justifyContent: 'center' },
-  brand: { fontSize: 22, fontWeight: '700' }, headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  brand: { fontSize: 22, fontWeight: '700' }, headerActions: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   headerAction: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#ffffff' },
   headerActionNoBackground: { backgroundColor: 'transparent' },
   heroHeaderAction: { backgroundColor: 'rgba(255, 255, 255, 0.62)' },

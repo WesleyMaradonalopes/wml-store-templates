@@ -321,7 +321,7 @@ export function ProductCollectionCarousel({ data }: ProductCollectionCarouselPro
               <ProductFavoriteButton product={product} buttonStyle={styles.favoriteButton} />
               <ProductQuickViewButton
                 product={product}
-                icon={<ShoppingBagIcon size={22} color={dark ? theme.text : '#0a0a0a'} />}
+                icon={<ShoppingBagIcon size={20} color={dark ? theme.text : '#0a0a0a'} />}
                 accessibilityLabel="Adicionar à sacola"
                 disabled={!product.itemId}
                 buttonStyle={[styles.addButton, dark && { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
@@ -413,14 +413,14 @@ const styles = StyleSheet.create({
   newBadge: { backgroundColor: '#0a0a0a' },
   discountBadge: { backgroundColor: '#cf242c' },
   badgeText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
-  favoriteButton: { position: 'absolute', right: 5, top: 5, width: 35, height: 35, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
+  favoriteButton: { position: 'absolute', right: 2, top: 2, width: 35, height: 35, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
   addButton: {
     position: 'absolute',
-    right: 10,
-    bottom: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    right: 5,
+    bottom: 5,
+    width: 38,
+    height: 38,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',

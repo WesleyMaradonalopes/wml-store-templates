@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, TextStyle, View, ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { usePageTheme } from '@/context/page-theme-context';
@@ -17,6 +17,7 @@ import { ThemedView } from './themed-view';
 type Props = {
   product: Product;
   style?: StyleProp<ViewStyle>;
+  productNameStyle?: StyleProp<TextStyle>;
   favorite?: boolean;
   onFavoriteChange?: (favorite: boolean) => void;
   onAdded?: (product: Product) => void;
@@ -35,7 +36,7 @@ function discountPercentage(product: Product) {
   return Math.round((1 - product.price / product.listPrice) * 100);
 }
 
-export function ProductCard({ product, style, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true, onSimilar, similarLoading = false, onPress }: Props) {
+export function ProductCard({ product, style, productNameStyle, favorite: controlledFavorite, onFavoriteChange, onAdded, showAddedModal = true, onSimilar, similarLoading = false, onPress }: Props) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = useTheme();
@@ -78,7 +79,7 @@ export function ProductCard({ product, style, favorite: controlledFavorite, onFa
             showAddedModal={showAddedModal}
           />
         </View>
-        <ThemedText numberOfLines={2} style={styles.name}>{product.name}</ThemedText>
+        <ThemedText numberOfLines={2} style={[styles.name, productNameStyle]}>{product.name}</ThemedText>
         <View style={styles.priceArea}>
           {product.listPrice !== null && product.price !== null && product.listPrice > product.price && (
             <ThemedText style={styles.listPrice}>{money(product.listPrice)}</ThemedText>
@@ -94,18 +95,18 @@ const styles = StyleSheet.create({
   card: { minWidth: 0, gap: Spacing.two, backgroundColor: 'transparent' },
   productLink: { gap: 5 },
   imageArea: { position: 'relative', width: '100%' },
-  image: { width: '100%', aspectRatio: 0.76, borderRadius: 8, backgroundColor: '#e8e8ea' },
+  image: { width: '100%', aspectRatio: 0.76, borderRadius: 12, backgroundColor: '#e8e8ea' },
   badges: { position: 'absolute', left: 5, top: 5, zIndex: 10, alignItems: 'flex-start', gap: 4 },
   badge: { minHeight: 20, paddingHorizontal: 5, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
   newBadge: { backgroundColor: '#0a0a0a' },
   discountBadge: { backgroundColor: '#cf242c' },
   badgeText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
-  favoriteButton: { position: 'absolute', right: 5, top: 5, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  similarButton: { position: 'absolute', right: 8, bottom: 52, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
+  favoriteButton: { position: 'absolute', right: 2, top: 2, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  similarButton: { position: 'absolute', right: 5, bottom: 45, width: 35, height: 35, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
   name: { minHeight: 38, fontSize: 13, lineHeight: 18 },
   priceArea: { minHeight: 22, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   listPrice: { color: '#8a857f', fontSize: 11, textDecorationLine: 'line-through' },
   price: { fontSize: 14 },
-  addButton: { position: 'absolute', right: 8, bottom: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
+  addButton: { position: 'absolute', right: 5, bottom: 5, width: 35, height: 35, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
   disabledButton: { opacity: 0.5 },
 });

@@ -6,7 +6,7 @@ type SmartAiIconProps = {
   sparkle?: 'small' | 'medium' | 'large';
 };
 
-/** Native version of the three-sparkle Hope Resort AI mark used on the web. */
+/** Native version of the three-sparkle Hope AI mark used on the web. */
 export default function SmartAiIcon({ color = '#FFFFFF', size = 24, sparkle }: SmartAiIconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 45 45" fill="none">
