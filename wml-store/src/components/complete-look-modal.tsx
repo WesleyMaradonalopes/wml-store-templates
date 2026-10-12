@@ -235,8 +235,8 @@ export function CompleteLookModal({ products, visible, onClose, onAdded }: Compl
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <View style={[styles.header, { borderBottomColor: '#dddddd', boxShadow: '0px 7px 10px 1px rgba(0, 0, 0, 0.1)' }]}>
-            <ThemedText type="subtitle" style={styles.headerTitle}>COMPRE O LOOK</ThemedText>
-            <Pressable accessibilityRole="button" accessibilityLabel="Fechar compre o look" onPress={onClose} style={styles.closeButton}>
+            <ThemedText type="subtitle" style={styles.headerTitle}>Complete o look</ThemedText>
+            <Pressable accessibilityRole="button" accessibilityLabel="Fechar Complete o look" onPress={onClose} style={styles.closeButton}>
               <CloseIcon color={theme.text} size={22} />
             </Pressable>
           </View>

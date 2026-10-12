@@ -445,6 +445,7 @@ export default function ProductScreen() {
   const showFloatingButton = Boolean(product && scrollY > floatingButtonThreshold);
   const currentPrice = activeVariant?.price ?? product?.price ?? null;
   const completeLookRecommendations = product ? lookProducts.filter((item) => item.id !== product.id) : [];
+  const completeLookModalProducts = product ? [product, ...completeLookRecommendations] : [];
   const currentListPrice = activeVariant?.listPrice ?? product?.listPrice ?? null;
   const currentDiscountPercentage = discountPercentage(currentListPrice, currentPrice);
   const currentInstallment = getBestInstallment(priceVariant?.installments);
@@ -534,16 +535,16 @@ export default function ProductScreen() {
                       {COMPLETE_LOOK_MODAL_ENABLED && lookLoading && (
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel="Compre o look, carregando produtos"
+                          accessibilityLabel="Complete o look, carregando produtos"
                           accessibilityState={{ disabled: true }}
                           disabled
                           style={[styles.heroLookButton, styles.heroActionLoading]}>
-                          <ThemedText type="smallBold" style={styles.heroLookButtonText}>Compre o look</ThemedText>
+                          <ThemedText type="smallBold" style={styles.heroLookButtonText}>Complete o look</ThemedText>
                         </Pressable>
                       )}
                       {COMPLETE_LOOK_MODAL_ENABLED && !lookLoading && completeLookRecommendations.length > 0 && (
-                        <Pressable accessibilityRole="button" accessibilityLabel="Compre o look" onPress={() => setCompleteLookModalVisible(true)} style={styles.heroLookButton}>
-                          <ThemedText type="smallBold" style={styles.heroLookButtonText}>Compre o look</ThemedText>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Complete o look" onPress={() => setCompleteLookModalVisible(true)} style={styles.heroLookButton}>
+                          <ThemedText type="smallBold" style={styles.heroLookButtonText}>Complete o look</ThemedText>
                         </Pressable>
                       )}
                       {similarLoading ? (
@@ -754,7 +755,7 @@ export default function ProductScreen() {
           }}
         />}
         {COMPLETE_LOOK_MODAL_ENABLED && product && <CompleteLookModal
-          products={completeLookRecommendations}
+          products={completeLookModalProducts}
           visible={completeLookModalVisible}
           onClose={() => setCompleteLookModalVisible(false)}
           onAdded={(items) => {
