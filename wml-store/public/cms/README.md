@@ -45,6 +45,33 @@ fundo. Valores inválidos são descartados e não alteram o tema padrão.
 O tema é aplicado somente à página que o CMS configurou. Um documento sem tema
 ou com valor inválido continua usando `default`, sem alterar as demais telas.
 
+## Fundo das telas de categorias
+
+Adicione a seção `CategoryBackground` aos documentos `categories` e às páginas de
+categoria que usam o prefixo `categ-`. Ela mantém o gradiente atual quando não
+há imagem ativa e permite editar as três cores diretamente no Headless CMS:
+
+```json
+{
+  "enabled": true,
+  "backgroundImage": "https://.../categorias.jpg",
+  "surfaceColorStart": "#F4EFEC",
+  "surfaceColorMiddle": "#F4EFEC",
+  "surfaceColorEnd": "#F4EFEC",
+  "overlayColor": "#FFFFFF",
+  "overlayOpacity": 0.72,
+  "blurIntensity": 60,
+  "panelWidth": 70
+}
+```
+
+As três `surfaceColor*` continuam sendo o fallback da tela. Quando `enabled` é
+`true` e `backgroundImage` está preenchida, a imagem ocupa o fundo e o painel
+translúcido com blur passa a ter prioridade. `panelWidth` controla a largura
+horizontal do painel, em percentual, e aceita de 40 a 100; o padrão é 70%.
+Defina `enabled: false` para voltar ao gradiente, mesmo mantendo a imagem
+publicada no documento.
+
 ## Carrossel de produtos por coleção e cor na Home
 
 Adicione a seção `ProductCollectionCarousel` ao documento `home` para exibir os produtos informados no carrossel principal. Ao trocar o produto principal, o app consulta a mesma coleção e a mesma cor exata para montar o carrossel de miniaturas abaixo:

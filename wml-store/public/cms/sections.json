@@ -886,6 +886,94 @@
 		}
 	},
 	{
+		"name": "CategoryBackground",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Fundo da área de categorias",
+			"description": "Configure as três cores de fallback e, opcionalmente, uma imagem com painel translúcido e blur para as telas de categorias.",
+			"type": "object",
+			"properties": {
+				"enabled": {
+					"title": "Ativar imagem e background blur",
+					"description": "Quando ativo e houver uma imagem, ela tem prioridade sobre as três cores.",
+					"type": "boolean",
+					"default": true
+				},
+				"backgroundImage": {
+					"title": "Imagem de fundo",
+					"type": "string",
+					"widget": {
+						"ui:widget": "media-gallery"
+					}
+				},
+				"surfaceColorStart": {
+					"title": "Cor de fundo 1",
+					"description": "Primeira cor do gradiente usado quando a imagem não estiver ativa.",
+					"type": "string",
+					"default": "#F4EFEC",
+					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
+					"widget": {
+						"ui:widget": "color"
+					}
+				},
+				"surfaceColorMiddle": {
+					"title": "Cor de fundo 2",
+					"description": "Segunda cor do gradiente usado quando a imagem não estiver ativa.",
+					"type": "string",
+					"default": "#F4EFEC",
+					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
+					"widget": {
+						"ui:widget": "color"
+					}
+				},
+				"surfaceColorEnd": {
+					"title": "Cor de fundo 3",
+					"description": "Terceira cor do gradiente usado quando a imagem não estiver ativa.",
+					"type": "string",
+					"default": "#F4EFEC",
+					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
+					"widget": {
+						"ui:widget": "color"
+					}
+				},
+				"overlayColor": {
+					"title": "Cor do background blur",
+					"description": "Cor translúcida do painel sobre a imagem.",
+					"type": "string",
+					"default": "#FFFFFF",
+					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
+					"widget": {
+						"ui:widget": "color"
+					}
+				},
+				"overlayOpacity": {
+					"title": "Opacidade do background blur",
+					"description": "Valor entre 0 e 1. O padrão deixa a imagem visível por baixo do painel.",
+					"type": "number",
+					"minimum": 0,
+					"maximum": 1,
+					"default": 0.72
+				},
+				"blurIntensity": {
+					"title": "Intensidade do blur",
+					"description": "Valor entre 0 e 100.",
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 100,
+					"default": 60
+				},
+				"panelWidth": {
+					"title": "Largura do background blur (%)",
+					"description": "Largura horizontal do painel. O padrão ocupa 70% da tela.",
+					"type": "integer",
+					"minimum": 40,
+					"maximum": 100,
+					"default": 70
+				}
+			}
+		}
+	},
+	{
 		"name": "CategoryTree",
 		"requiredScopes": [],
 		"schema": {

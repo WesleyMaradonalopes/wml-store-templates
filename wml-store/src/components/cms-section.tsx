@@ -13,6 +13,13 @@ import { isFavorite } from '@/services/favorites';
 
 import { AnimatedPaginationDots } from './animated-pagination-dots';
 import { BottomSheetHandle } from './bottom-sheet-handle';
+import {
+  CategoryBackground,
+  CategoryBackgroundPanel,
+  categoryBackgroundIsActive,
+  categoryBackgroundDefaults,
+  type CategoryBackgroundConfig,
+} from './category-background';
 import { CmsRichText } from './cms-rich-text';
 import ArrowLeftIAIcon from './icons/ArrowLeftIAicon';
 import ArrowRightAIcon from './icons/ArrowRightAicon';
@@ -30,7 +37,14 @@ import { styles } from './cms-section.styles';
 import { usePageTheme } from '@/context/page-theme-context';
 import { useTheme } from '@/hooks/use-theme';
 
-type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean; isCategoryScreen?: boolean; searchPresentation?: boolean };
+type Props = {
+  section: CmsSection;
+  categoryPageSlug?: string;
+  isHome?: boolean;
+  isCategoryScreen?: boolean;
+  searchPresentation?: boolean;
+  categoryBackground?: CategoryBackgroundConfig;
+};
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -588,7 +602,7 @@ function CategorySwipeRow({ category, onPress, isLast }: { category: Record<stri
   );
 }
 
-function CategorySwipeSection({ data, router }: { data: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
+function CategorySwipeSection({ data, router, categoryBackground }: { data: Record<string, unknown>; router: ReturnType<typeof useRouter>; categoryBackground?: CategoryBackgroundConfig }) {
   const categories = categoryListItems(data).filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
   const [selectedCategory, setSelectedCategory] = useState<Record<string, unknown> | null>(null);
   const sectionTitle = text(data.title).trim();
@@ -631,58 +645,60 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
         visible={Boolean(selectedCategory)}
         animationType="slide"
         onRequestClose={() => setSelectedCategory(null)}>
-        <View style={styles.categoryModal}>
-          <BottomSheetHandle />
-          <View style={styles.categoryModalHeader}>
-            <Pressable
-              accessibilityLabel="Voltar para categorias"
-              onPress={() => setSelectedCategory(null)}
-              style={styles.categoryModalBack}>
-              <ArrowLeftIAIcon color="#0a0a0a" size={22} />
-            </Pressable>
-            <ThemedText style={styles.categoryModalTitle}>{selectedTitle}</ThemedText>
-            <View style={styles.categoryModalBack} />
-          </View>
-
-          <ScrollView contentContainerStyle={styles.categoryModalList}>
-            {!!selectedAction.value && (
+        <CategoryBackground config={categoryBackground ?? categoryBackgroundDefaults} style={styles.categoryModalRoot}>
+          <CategoryBackgroundPanel style={[styles.categoryModal, (!categoryBackground || !categoryBackgroundIsActive(categoryBackground)) && { backgroundColor: categoryBackground?.surfaceColors[0] ?? '#f4efec' }]}>
+            <BottomSheetHandle />
+            <View style={styles.categoryModalHeader}>
               <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  setSelectedCategory(null);
-                  openCmsAction(router, selectedCategory?.action, `Ver tudo em ${selectedTitle}`);
-                }}
-                style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
-                <ThemedText style={styles.categoryModalItemText}>Ver tudo em {selectedTitle}</ThemedText>
-								<ArrowRightAIcon color="#0a0a0a" size={18} />
+                accessibilityLabel="Voltar para categorias"
+                onPress={() => setSelectedCategory(null)}
+                style={styles.categoryModalBack}>
+                <ArrowLeftIAIcon color="#0a0a0a" size={22} />
               </Pressable>
-            )}
+              <ThemedText style={styles.categoryModalTitle}>{selectedTitle}</ThemedText>
+              <View style={styles.categoryModalBack} />
+            </View>
 
-            {selectedSubcategories.map((subcategory, index) => {
-              const subcategoryTitle = text(subcategory.title) || `Subcategoria ${index + 1}`;
-              const subcategoryFlag = text(subcategory.flag).trim();
-              const fallbackTarget = selectedActionTarget
-                ? `${selectedActionTarget}/${slugPart(subcategoryTitle)}`
-                : subcategoryTitle;
-              return (
+            <ScrollView contentContainerStyle={styles.categoryModalList}>
+              {!!selectedAction.value && (
                 <Pressable
-                  key={`${subcategoryTitle}-${index}`}
                   accessibilityRole="button"
                   onPress={() => {
                     setSelectedCategory(null);
-                    openCmsAction(router, subcategory.action, fallbackTarget);
+                    openCmsAction(router, selectedCategory?.action, `Ver tudo em ${selectedTitle}`);
                   }}
                   style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
-					<View style={styles.categoryModalItemContent}>
-						<ThemedText style={[styles.categoryModalItemText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
-						{!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
-					</View>
-									<ArrowRightAIcon color="#0a0a0a" size={18} />
+                  <ThemedText style={styles.categoryModalItemText}>Ver tudo em {selectedTitle}</ThemedText>
+                  <ArrowRightAIcon color="#0a0a0a" size={18} />
                 </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+              )}
+
+              {selectedSubcategories.map((subcategory, index) => {
+                const subcategoryTitle = text(subcategory.title) || `Subcategoria ${index + 1}`;
+                const subcategoryFlag = text(subcategory.flag).trim();
+                const fallbackTarget = selectedActionTarget
+                  ? `${selectedActionTarget}/${slugPart(subcategoryTitle)}`
+                  : subcategoryTitle;
+                return (
+                  <Pressable
+                    key={`${subcategoryTitle}-${index}`}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setSelectedCategory(null);
+                      openCmsAction(router, subcategory.action, fallbackTarget);
+                    }}
+                    style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
+                    <View style={styles.categoryModalItemContent}>
+                      <ThemedText style={[styles.categoryModalItemText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
+                      {!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
+                    </View>
+                    <ArrowRightAIcon color="#0a0a0a" size={18} />
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </CategoryBackgroundPanel>
+        </CategoryBackground>
       </Modal>
     </ThemedView>
   );
@@ -794,7 +810,7 @@ function CategoryGroup({
   );
 }
 
-export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCategoryScreen = false, searchPresentation = false }: Props) {
+export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCategoryScreen = false, searchPresentation = false, categoryBackground }: Props) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = useTheme();
@@ -802,6 +818,8 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
   const [heroIndex, setHeroIndex] = useState(0);
   const heroRef = useRef<ScrollView | null>(null);
   const data = section.data ?? {};
+
+  if (section.name === 'CategoryBackground') return null;
   const bannerImages = section.name === 'MultipleImageBanner' && Array.isArray(data.images) ? data.images : [];
   const bannerMode = bannerDisplayMode(data.mode);
   const isHeroBanner = section.name === 'MultipleImageBanner' && bannerMode === 'SliderHero';
@@ -1131,7 +1149,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
   }
 
   if (section.name === 'CategoryListSwipe') {
-    return <CategorySwipeSection data={data} router={router} />;
+    return <CategorySwipeSection data={data} router={router} categoryBackground={categoryBackground} />;
   }
 
   if (section.name === 'CategoryAccordeon' || section.name === 'CategoryTree') {

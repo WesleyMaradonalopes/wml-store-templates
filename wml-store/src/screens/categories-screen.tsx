@@ -1,19 +1,22 @@
 import { CmsSectionView } from '@/components/cms-section';
-import { categorySurfaceColors } from '@/components/cms-section.styles';
+import {
+  CategoryBackground,
+  CategoryBackgroundPanel,
+  getCategoryBackgroundConfig,
+  type CategoryBackgroundConfig,
+} from '@/components/category-background';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { isDarkThemeColor } from '@/constants/page-theme';
 import { PageThemeProvider, usePageTheme } from '@/context/page-theme-context';
-import { useTheme } from '@/hooks/use-theme';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
+import { useTheme } from '@/hooks/use-theme';
 import { CmsPage, getCmsPage } from '@/services/cms';
 import { resolvePageTheme, resolvePageThemeColors } from '@/services/cms-page-theme';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CategoriesScreen() {
   const [cmsPage, setCmsPage] = useState<CmsPage | null>(null);
@@ -38,58 +41,78 @@ export default function CategoriesScreen() {
 
   const pageTheme = resolvePageTheme(cmsPage);
   const customColors = resolvePageThemeColors(cmsPage);
+  const categoryBackground = getCategoryBackgroundConfig(cmsPage);
 
   return (
     <PageThemeProvider theme={pageTheme} customColors={customColors}>
-      <CategoriesScreenContent cmsPage={cmsPage} loading={loading} error={error} />
+      <CategoriesScreenContent
+        cmsPage={cmsPage}
+        loading={loading}
+        error={error}
+        categoryBackground={categoryBackground}
+      />
     </PageThemeProvider>
   );
 }
 
-function CategoriesScreenContent({ cmsPage, loading, error }: { cmsPage: CmsPage | null; loading: boolean; error: boolean }) {
+function CategoriesScreenContent({
+  cmsPage,
+  loading,
+  error,
+  categoryBackground,
+}: {
+  cmsPage: CmsPage | null;
+  loading: boolean;
+  error: boolean;
+  categoryBackground: CategoryBackgroundConfig;
+}) {
   const onScroll = useTabBarScroll();
-  const insets = useSafeAreaInsets();
   const pageTheme = usePageTheme();
   const theme = useTheme();
   const dark = pageTheme.isDark;
-  const categoriesPanelBackground = 'transparent';
 
   return (
-					<LinearGradient
-          colors={dark
-            ? [theme.background, theme.background, theme.background]
-            : categorySurfaceColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.container, styles.gradientFill]}>
-					<View style={styles.backgroundOverlay}>
-						<View pointerEvents="none" style={[styles.headerBackground, { height: insets.top + 58 }]} />
-						<SafeAreaView style={styles.safeArea}>
-							<View style={styles.headerSurface}>
-								<ScreenHeader back={false} />
-							</View>
-							<BlurView intensity={0} tint={isDarkThemeColor(theme.background) ? 'dark' : 'light'} style={[styles.glassPanel, { backgroundColor: categoriesPanelBackground }, dark && { borderColor: theme.border }]}>
-									<ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
-										{loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
-										{error && <ThemedText style={styles.errorText}>Nao foi possivel carregar as categorias.</ThemedText>}
-										{!loading && !error && cmsPage?.sections.length === 0 && (
-											<ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>
-										)}
-										{cmsPage?.sections.map((section, index) => (
-											<CmsSectionView key={`${section.name}-${index}`} section={section} isCategoryScreen />
-										))}
-									</ScrollView>
-							</BlurView>
-						</SafeAreaView>
-					</View>
-				</LinearGradient>
+    <LinearGradient
+      colors={dark
+        ? [theme.background, theme.background, theme.background]
+        : categoryBackground.surfaceColors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.container, styles.gradientFill]}>
+      <CategoryBackground config={categoryBackground} style={styles.backgroundRoot}>
+        <View style={styles.backgroundOverlay}>
+          <SafeAreaView style={styles.safeArea}>
+            <View style={styles.headerSurface}>
+              <ScreenHeader back={false} />
+            </View>
+            <CategoryBackgroundPanel style={[styles.glassPanel, dark && { borderColor: theme.border }]}>
+              <ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
+                {loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
+                {error && <ThemedText style={styles.errorText}>Nao foi possivel carregar as categorias.</ThemedText>}
+                {!loading && !error && cmsPage?.sections.length === 0 && (
+                  <ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>
+                )}
+                {cmsPage?.sections.map((section, index) => (
+                  <CmsSectionView
+                    key={`${section.name}-${index}`}
+                    section={section}
+                    isCategoryScreen
+                    categoryBackground={categoryBackground}
+                  />
+                ))}
+              </ScrollView>
+            </CategoryBackgroundPanel>
+          </SafeAreaView>
+        </View>
+      </CategoryBackground>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
+  backgroundRoot: { flex: 1 },
   backgroundOverlay: { flex: 1, backgroundColor: 'rgba(235, 235, 235, 0)' },
-  headerBackground: { position: 'absolute', top: 0, right: 0, left: 0, backgroundColor: 'transparent' },
   safeArea: { flex: 1, paddingHorizontal: 0, paddingVertical: 0 },
   headerSurface: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
   glassPanel: {
@@ -99,11 +122,9 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     marginTop: 10,
     marginHorizontal: 0,
-    borderColor: 'rgba(255, 255, 255, 1)',
-    boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0)',
     backgroundColor: 'transparent',
   },
   gradientFill: { flex: 1 },
-  content: { gap: Spacing.three, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 100, },
+  content: { gap: Spacing.three, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 100 },
   errorText: { color: '#ed6560' },
 });
