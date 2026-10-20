@@ -4,15 +4,16 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CmsSectionView } from '@/components/cms-section';
+import { categorySurfaceColors } from '@/components/cms-section.styles';
 import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { PageThemeProvider, usePageTheme } from '@/context/page-theme-context';
 import { CmsPage, getCmsPage } from '@/services/cms';
 import { resolvePageTheme, resolvePageThemeColors } from '@/services/cms-page-theme';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function CmsPageScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -53,9 +54,16 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage }: { page: 
   const pageTheme = usePageTheme();
   const theme = pageTheme.palette;
   const onScroll = useTabBarScroll();
+  const backgroundColors = isCategoryPage && !pageTheme.isDark
+    ? categorySurfaceColors
+    : [theme.background, theme.background, theme.background] as const;
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: theme.background }]}>
+    <LinearGradient
+      colors={backgroundColors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScreenHeader back={!isCategoryPage} />
         <Pressable onPress={() => router.back()} style={styles.hiddenBack}>
@@ -74,7 +82,7 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage }: { page: 
           ))}
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </LinearGradient>
   );
 }
 

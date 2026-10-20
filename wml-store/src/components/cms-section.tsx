@@ -552,14 +552,14 @@ function categoryListItems(data: Record<string, unknown>) {
   });
 }
 
-function CategorySwipeRow({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
+function CategorySwipeRow({ category, onPress, isLast }: { category: Record<string, unknown>; onPress: () => void; isLast: boolean }) {
   const title = text(category.title) || 'Categoria';
 
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.categorySwipeRow, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.categorySwipeRow, !isLast && styles.categorySwipeRowDivider, pressed && styles.pressed]}>
       <ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
 			<ArrowRightAIcon color="#0a0a0a" size={16} />
     </Pressable>
@@ -599,6 +599,7 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
           <CategorySwipeRow
             key={`${text(item.title) || 'categoria'}-${index}`}
             category={item}
+            isLast={index === categories.length - 1}
             onPress={() => openCategory(item)}
           />
         ))}
@@ -740,7 +741,11 @@ function CategoryGroup({
                     key={`${subcategoryTitle}-${index}`}
                     accessibilityRole="button"
                     onPress={() => openCmsAction(router, subcategoryAction, fallbackTarget)}
-                    style={({ pressed }) => [styles.subcategoryRow, pressed && styles.pressed]}>
+                    style={({ pressed }) => [
+                      styles.subcategoryRow,
+                      index < subcategories.length - 1 && styles.subcategoryRowDivider,
+                      pressed && styles.pressed,
+                    ]}>
                     <ThemedText style={styles.subcategoryText}>{subcategoryTitle}</ThemedText>
                   </Pressable>
                 );

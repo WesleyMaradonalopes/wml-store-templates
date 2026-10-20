@@ -1,4 +1,5 @@
 import { CmsSectionView } from '@/components/cms-section';
+import { categorySurfaceColors } from '@/components/cms-section.styles';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -51,10 +52,13 @@ function CategoriesScreenContent({ cmsPage, loading, error }: { cmsPage: CmsPage
   const pageTheme = usePageTheme();
   const theme = useTheme();
   const dark = pageTheme.isDark;
+  const categoriesPanelBackground = 'transparent';
 
   return (
-				<LinearGradient
-          colors={[theme.background, theme.background, theme.background]}
+					<LinearGradient
+          colors={dark
+            ? [theme.background, theme.background, theme.background]
+            : categorySurfaceColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.container, styles.gradientFill]}>
@@ -64,7 +68,7 @@ function CategoriesScreenContent({ cmsPage, loading, error }: { cmsPage: CmsPage
 							<View style={styles.headerSurface}>
 								<ScreenHeader back={false} />
 							</View>
-							<BlurView intensity={24} tint={isDarkThemeColor(theme.background) ? 'dark' : 'light'} style={[styles.glassPanel, { backgroundColor: theme.backgroundElement }, dark && { borderColor: theme.border }]}>
+							<BlurView intensity={0} tint={isDarkThemeColor(theme.background) ? 'dark' : 'light'} style={[styles.glassPanel, { backgroundColor: categoriesPanelBackground }, dark && { borderColor: theme.border }]}>
 									<ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.content}>
 										{loading && <ThemedText themeColor="textSecondary">Carregando categorias...</ThemedText>}
 										{error && <ThemedText style={styles.errorText}>Nao foi possivel carregar as categorias.</ThemedText>}
@@ -86,19 +90,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   backgroundOverlay: { flex: 1, backgroundColor: 'rgba(235, 235, 235, 0)' },
   headerBackground: { position: 'absolute', top: 0, right: 0, left: 0, backgroundColor: 'transparent' },
-  safeArea: { flex: 1, paddingHorizontal: 20, paddingVertical: 0 },
+  safeArea: { flex: 1, paddingHorizontal: 0, paddingVertical: 0 },
   headerSurface: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
   glassPanel: {
     flex: 1,
     overflow: 'hidden',
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 0,
+    borderWidth: 0,
     marginTop: 10,
     marginHorizontal: 0,
     borderColor: 'rgba(255, 255, 255, 1)',
-    boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0)',
+    backgroundColor: 'transparent',
   },
   gradientFill: { flex: 1 },
-  content: { gap: Spacing.three, paddingTop: 12, paddingHorizontal: 10, paddingBottom: 100 },
+  content: { gap: Spacing.three, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 100, },
   errorText: { color: '#ed6560' },
 });
