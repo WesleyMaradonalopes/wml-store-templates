@@ -318,7 +318,7 @@ export function ProductCollectionCarousel({ data }: ProductCollectionCarouselPro
                   {discountPercentage(product) > 0 && <View style={[styles.badge, styles.discountBadge]}><ThemedText style={styles.badgeText}>{discountPercentage(product)}%</ThemedText></View>}
                 </View>
               )}
-              <ProductFavoriteButton product={product} buttonStyle={styles.favoriteButton} />
+              <ProductFavoriteButton product={product} buttonStyle={styles.favoriteButton} unselectedColor="#0a0a0a" />
               <ProductQuickViewButton
                 product={product}
                 icon={<ShoppingBagIcon size={20} color={dark ? theme.text : '#0a0a0a'} />}

@@ -17,9 +17,10 @@ type ProductFavoriteButtonProps = {
   onFavoriteChange?: (favorite: boolean) => void;
   buttonStyle?: StyleProp<ViewStyle>;
   iconSize?: number;
+  unselectedColor?: string;
 };
 
-export function ProductFavoriteButton({ product, favorite: controlledFavorite, onFavoriteChange, buttonStyle, iconSize = 28 }: ProductFavoriteButtonProps) {
+export function ProductFavoriteButton({ product, favorite: controlledFavorite, onFavoriteChange, buttonStyle, iconSize = 28, unselectedColor }: ProductFavoriteButtonProps) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = useTheme();
@@ -136,7 +137,7 @@ export function ProductFavoriteButton({ product, favorite: controlledFavorite, o
         onPress={(event) => { event.stopPropagation(); void changeFavorite(); }}
         style={({ pressed }) => [styles.favoriteButton, buttonStyle, pressed && styles.pressed, favoriteLoading && styles.disabled]}
       >
-        <HeartIcon size={iconSize} color={isSaved ? '#C62828' : dark ? theme.text : '#0a0a0a'} filled={isSaved} />
+        <HeartIcon size={iconSize} color={isSaved ? '#C62828' : (unselectedColor ?? (dark ? theme.text : '#0a0a0a'))} filled={isSaved} />
       </Pressable>
       <LoginRequiredModal
         visible={loginModalVisible}

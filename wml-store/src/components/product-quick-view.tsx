@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { KitSelector, emptyKitSelection, type KitSelection } from '@/components/kit-selector';
 import { Spacing } from '@/constants/theme';
+import { usePageTheme } from '@/context/page-theme-context';
+import { useTheme } from '@/hooks/use-theme';
 import { addItemToCart, getOrderForm } from '@/services/cart';
 import { getProduct, type Product, type ProductKitGroup, type ProductVariant } from '@/services/catalog';
 import { buildVariationGroups } from '@/utils/product-variations';
@@ -71,6 +73,9 @@ function ProductQuickViewSkeleton() {
 
 export function ProductQuickView({ product, visible, onClose, onAdded, showAddedModal = true, viewCartLabel, kitSelection, onKitSelectionChange }: QuickViewProps) {
   const router = useRouter();
+  const pageTheme = usePageTheme();
+  const theme = useTheme();
+  const dark = pageTheme.isDark;
   const [details, setDetails] = useState(product);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -209,12 +214,12 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
       <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
         <View style={styles.backdrop}>
           <Pressable accessibilityLabel="Fechar visualização rápida" onPress={onClose} style={styles.dismissArea} />
-          <ThemedView style={styles.sheet}>
+          <ThemedView style={[styles.sheet, dark && { backgroundColor: theme.backgroundElement }]}>
             <BottomSheetHandle />
             <SafeAreaView edges={['bottom']} style={styles.safeArea}>
               <View style={styles.header}>
                 <Pressable accessibilityLabel="Fechar" onPress={onClose} style={styles.closeButton}>
-                  <ThemedText style={styles.closeText}>✕</ThemedText>
+                  <ThemedText style={[styles.closeText, dark && { color: theme.text }]}>✕</ThemedText>
                 </Pressable>
               </View>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -239,7 +244,7 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                       {isKit ? <ThemedText numberOfLines={2} style={styles.kitPrompt}>Tamanho: <ThemedText type="smallBold">Escolha um tamanho</ThemedText></ThemedText> : (selectedVariant?.price ?? details.price) !== null && (
                         <ThemedText style={styles.priceQuickView} type="subtitle">{money(selectedVariant?.price ?? details.price)}</ThemedText>
                       )}
-                      <ProductFavoriteButton product={details} buttonStyle={styles.favoriteButton} />
+                      <ProductFavoriteButton product={details} buttonStyle={[styles.favoriteButton, dark && { backgroundColor: theme.surface, borderColor: theme.border }]} />
                     </View>
                     {isKit ? (
                       <KitSelector groups={details.kitGroups} selection={currentKitSelection} onChange={updateKitSelection} showLabel={false} />
@@ -258,8 +263,8 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                                 disabled={!available}
                                 accessibilityState={{ disabled: !available, selected }}
                                 onPress={() => { setMessage(''); setSelectedOptions((current) => ({ ...current, [name]: value })); }}
-                                style={[styles.option, selected && styles.selectedOption, !available && styles.unavailableOption]}>
-                                <ThemedText style={[styles.optionText, selected && styles.selectedOptionText, !available && styles.unavailableText]}>{value}</ThemedText>
+                                style={[styles.option, dark && { backgroundColor: theme.surface, borderColor: theme.borderStrong }, selected && styles.selectedOption, dark && selected && { backgroundColor: theme.primary, borderColor: theme.primary }, !available && styles.unavailableOption, dark && !available && { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                                <ThemedText style={[styles.optionText, selected && styles.selectedOptionText, dark && selected && { color: theme.onPrimary }, !available && styles.unavailableText]}>{value}</ThemedText>
                               </Pressable>
                             );
                           })}
@@ -267,11 +272,11 @@ export function ProductQuickView({ product, visible, onClose, onAdded, showAdded
                       </View>
                     ))}
                     {!!message && !message.toLowerCase().includes('adicionad') && <ThemedText style={styles.messageText}>{message}</ThemedText>}
-                    {!isKit && <Pressable onPress={openProduct} style={styles.productButton}>
+                    {!isKit && <Pressable onPress={openProduct} style={[styles.productButton, dark && { backgroundColor: theme.backgroundElement, borderColor: theme.borderStrong }]}>
                       <ThemedText type="smallBold">Ir para o produto</ThemedText>
                     </Pressable>}
-                    <Pressable disabled={adding || (isKit && (loading || details.kitGroups.length === 0))} onPress={addSelectedProduct} style={styles.addButton}>
-                      {adding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.addButtonText}>Adicionar à sacola</ThemedText>}
+                    <Pressable disabled={adding || (isKit && (loading || details.kitGroups.length === 0))} onPress={addSelectedProduct} style={[styles.addButton, dark && { backgroundColor: theme.primary }]}>
+                      {adding ? <ActivityIndicator size="small" color={dark ? theme.onPrimary : '#FFFFFF'} /> : <ThemedText style={[styles.addButtonText, dark && { color: theme.onPrimary }]}>Adicionar à sacola</ThemedText>}
                     </Pressable>
                   </>
                 )}

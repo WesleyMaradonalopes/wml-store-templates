@@ -59,6 +59,7 @@ export function ProductCard({ product, style, productNameStyle, favorite: contro
             favorite={controlledFavorite}
             onFavoriteChange={onFavoriteChange}
             buttonStyle={styles.favoriteButton}
+            unselectedColor="#0a0a0a"
           />
           {onSimilar && (
             <Pressable
