@@ -76,7 +76,7 @@ function CategoriesScreenContent({ cmsPage, loading, error }: { cmsPage: CmsPage
 											<ThemedText themeColor="textSecondary">Nenhuma secao publicada foi encontrada.</ThemedText>
 										)}
 										{cmsPage?.sections.map((section, index) => (
-											<CmsSectionView key={`${section.name}-${index}`} section={section} />
+											<CmsSectionView key={`${section.name}-${index}`} section={section} isCategoryScreen />
 										))}
 									</ScrollView>
 							</BlurView>

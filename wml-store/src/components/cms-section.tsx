@@ -30,7 +30,7 @@ import { styles } from './cms-section.styles';
 import { usePageTheme } from '@/context/page-theme-context';
 import { useTheme } from '@/hooks/use-theme';
 
-type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean; searchPresentation?: boolean };
+type Props = { section: CmsSection; categoryPageSlug?: string; isHome?: boolean; isCategoryScreen?: boolean; searchPresentation?: boolean };
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -122,6 +122,24 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function mediaUrl(value: unknown) {
+  if (typeof value === 'string') return value.trim();
+
+  const source = record(value);
+  if (!source) return '';
+
+  for (const key of ['url', 'uri', 'src', 'imageUrl', 'iconUrl', 'previewUrl', 'thumbnailUrl']) {
+    const candidate = source[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+
+  return '';
+}
+
+function categoryIconUrl(category: Record<string, unknown>) {
+  return mediaUrl(category.icon) || mediaUrl(category.imageUrl);
 }
 
 function bannerColor(value: unknown, fallback: string) {
@@ -554,13 +572,17 @@ function categoryListItems(data: Record<string, unknown>) {
 
 function CategorySwipeRow({ category, onPress, isLast }: { category: Record<string, unknown>; onPress: () => void; isLast: boolean }) {
   const title = text(category.title) || 'Categoria';
+  const iconUrl = categoryIconUrl(category);
 
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.categorySwipeRow, !isLast && styles.categorySwipeRowDivider, pressed && styles.pressed]}>
-      <ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
+		<View style={styles.categorySwipeRowContent}>
+			{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.categorySwipeRowIcon} />}
+			<ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
+		</View>
 			<ArrowRightAIcon color="#0a0a0a" size={16} />
     </Pressable>
   );
@@ -638,6 +660,7 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
 
             {selectedSubcategories.map((subcategory, index) => {
               const subcategoryTitle = text(subcategory.title) || `Subcategoria ${index + 1}`;
+              const subcategoryFlag = text(subcategory.flag).trim();
               const fallbackTarget = selectedActionTarget
                 ? `${selectedActionTarget}/${slugPart(subcategoryTitle)}`
                 : subcategoryTitle;
@@ -650,7 +673,10 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
                     openCmsAction(router, subcategory.action, fallbackTarget);
                   }}
                   style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
-                  <ThemedText style={styles.categoryModalItemText}>{subcategoryTitle}</ThemedText>
+					<View style={styles.categoryModalItemContent}>
+						<ThemedText style={[styles.categoryModalItemText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
+						{!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
+					</View>
 									<ArrowRightAIcon color="#0a0a0a" size={18} />
                 </Pressable>
               );
@@ -664,12 +690,16 @@ function CategorySwipeSection({ data, router }: { data: Record<string, unknown>;
 
 function CategoryRow({ category, router }: { category: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
   const title = text(category.title) || 'Categoria';
+  const iconUrl = categoryIconUrl(category);
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => openCmsAction(router, category.action, title)}
       style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}>
-      <ThemedText style={styles.categoryRowTitle}>{title}</ThemedText>
+		<View style={styles.categoryRowContent}>
+			{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.categoryRowIcon} />}
+			<ThemedText style={styles.categoryRowTitle}>{title}</ThemedText>
+		</View>
 			<ArrowRightAIcon color="#0a0a0a" size={20} />
     </Pressable>
   );
@@ -732,6 +762,8 @@ function CategoryGroup({
             <View style={styles.subcategoryList}>
               {subcategories.map((subcategory, index) => {
                 const subcategoryTitle = text(subcategory.title) || `Modelo ${index + 1}`;
+                const subcategoryFlag = text(subcategory.flag).trim();
+                const iconUrl = categoryIconUrl(subcategory);
                 const subcategoryAction = readCmsAction(subcategory.action);
                 const fallbackTarget = action.value
                   ? `${action.value.replace(/\/$/, '')}/${slugPart(subcategoryTitle)}`
@@ -746,7 +778,11 @@ function CategoryGroup({
                       index < subcategories.length - 1 && styles.subcategoryRowDivider,
                       pressed && styles.pressed,
                     ]}>
-                    <ThemedText style={styles.subcategoryText}>{subcategoryTitle}</ThemedText>
+					<View style={styles.subcategoryRowContent}>
+						{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.subcategoryRowIcon} />}
+						<ThemedText style={[styles.subcategoryText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
+						{!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
+					</View>
                   </Pressable>
                 );
               })}
@@ -758,7 +794,7 @@ function CategoryGroup({
   );
 }
 
-export function CmsSectionView({ section, categoryPageSlug, isHome = false, searchPresentation = false }: Props) {
+export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCategoryScreen = false, searchPresentation = false }: Props) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = useTheme();
@@ -1064,8 +1100,10 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, sear
       );
     };
 
+    const bannerSectionStyle = isCategoryScreen ? styles.categoryBannerSection : styles.bannerSection;
+
     return (
-      <View style={[isFullScreenHero ? styles.heroSection : [styles.bannerSection, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle], dark && { backgroundColor: theme.background }]}>
+      <View style={[isFullScreenHero ? styles.heroSection : [bannerSectionStyle, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle], dark && { backgroundColor: theme.background }]}>
         {!!text(data.mainTitle) && <ThemedText type="subtitle" style={[styles.bannerSectionTitle, isHome && homeBannerTitleStyle, searchPresentation && styles.searchBannerSectionTitle, dark && { color: theme.text }]}>{text(data.mainTitle)}</ThemedText>}
         {renderModeContent()}
       </View>
