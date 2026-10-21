@@ -890,12 +890,12 @@
 		"requiredScopes": [],
 		"schema": {
 			"title": "Fundo da área de categorias",
-			"description": "Configure as três cores de fallback e, opcionalmente, uma imagem com painel translúcido e blur para as telas de categorias.",
+			"description": "Configure uma imagem de fundo em tela inteira e escolha entre gradiente horizontal ou blur. O conteúdo de categorias continua ocupando toda a largura.",
 			"type": "object",
 			"properties": {
 				"enabled": {
-					"title": "Ativar imagem e background blur",
-					"description": "Quando ativo e houver uma imagem, ela tem prioridade sobre as três cores.",
+					"title": "Ativar imagem de fundo",
+					"description": "Quando ativo e houver uma imagem, ela tem prioridade sobre as três cores de fallback.",
 					"type": "boolean",
 					"default": true
 				},
@@ -905,6 +905,14 @@
 					"widget": {
 						"ui:widget": "media-gallery"
 					}
+				},
+				"overlayMode": {
+					"title": "Efeito sobre a imagem",
+					"description": "O efeito cobre toda a tela na horizontal, sem reduzir a largura das categorias.",
+					"type": "string",
+					"enum": ["gradient", "blur"],
+					"enumNames": ["Gradiente horizontal (estilo PDP)", "Blur translúcido"],
+					"default": "gradient"
 				},
 				"surfaceColorStart": {
 					"title": "Cor de fundo 1",
@@ -961,14 +969,6 @@
 					"minimum": 0,
 					"maximum": 100,
 					"default": 60
-				},
-				"panelWidth": {
-					"title": "Largura do background blur (%)",
-					"description": "Largura horizontal do painel. O padrão ocupa 70% da tela.",
-					"type": "integer",
-					"minimum": 40,
-					"maximum": 100,
-					"default": 70
 				}
 			}
 		}

@@ -23,6 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function CmsPageScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const [page, setPage] = useState<CmsPage | null>(null);
+  const [categoriesPage, setCategoriesPage] = useState<CmsPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const isCategoryPage = typeof slug === 'string' && /^categ-/i.test(slug);
@@ -39,6 +40,16 @@ export default function CmsPageScreen() {
       .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
 
+    if (/^categ-/i.test(slug)) {
+      getCmsPage('categories', 'categorias', {
+        onRefresh: (nextPage) => {
+          if (active) setCategoriesPage(nextPage);
+        },
+      })
+        .then((nextPage) => { if (active) setCategoriesPage(nextPage); })
+        .catch(() => undefined);
+    }
+
     return () => {
       active = false;
     };
@@ -46,7 +57,7 @@ export default function CmsPageScreen() {
 
   const pageTheme = resolvePageTheme(page);
   const customColors = resolvePageThemeColors(page);
-  const categoryBackground = getCategoryBackgroundConfig(page);
+  const categoryBackground = getCategoryBackgroundConfig(page, isCategoryPage ? categoriesPage : undefined);
 
   return (
     <PageThemeProvider theme={pageTheme} customColors={customColors}>

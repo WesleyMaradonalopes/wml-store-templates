@@ -1,6 +1,7 @@
 import { BlurTargetView, BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { createContext, useContext, useRef, type PropsWithChildren, type RefObject } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRef, type PropsWithChildren } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { categorySurfaceColors } from './cms-section.styles';
@@ -10,20 +11,22 @@ export type CategoryBackgroundConfig = {
   enabled: boolean;
   backgroundImage: string;
   surfaceColors: [string, string, string];
+  overlayMode: 'gradient' | 'blur';
+  gradientColors: [string, string, string];
   overlayColor: string;
   overlayOpacity: number;
   blurIntensity: number;
-  panelWidth: number;
 };
 
 const defaultCategoryBackgroundConfig: CategoryBackgroundConfig = {
   enabled: true,
   backgroundImage: '',
   surfaceColors: [...categorySurfaceColors],
+  overlayMode: 'gradient',
+  gradientColors: ['rgba(0, 0, 0, 0.7)', 'rgba(0, 0, 0, 0.5)', 'rgba(0, 0, 0, 0)'],
   overlayColor: '#FFFFFF',
   overlayOpacity: 0.72,
   blurIntensity: 60,
-  panelWidth: 70,
 };
 
 const hexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -124,9 +127,12 @@ function sourceFromPage(page: Pick<CmsPage, 'sections' | 'settings'> | null | un
     'surfaceColorStart' in section.data ||
     'surfaceColorMiddle' in section.data ||
     'surfaceColorEnd' in section.data ||
+    'overlayMode' in section.data ||
+    'gradientStartColor' in section.data ||
+    'gradientMiddleColor' in section.data ||
+    'gradientEndColor' in section.data ||
     'overlayColor' in section.data ||
-    'blurIntensity' in section.data ||
-    'panelWidth' in section.data
+    'blurIntensity' in section.data
   )));
   return categorySection?.data;
 }
@@ -143,10 +149,15 @@ export function readCategoryBackgroundConfig(value: unknown): CategoryBackground
       validColor(nested?.surfaceColorMiddle ?? nested?.colorMiddle, defaultCategoryBackgroundConfig.surfaceColors[1]),
       validColor(nested?.surfaceColorEnd ?? nested?.colorEnd, defaultCategoryBackgroundConfig.surfaceColors[2]),
     ],
+    overlayMode: nested?.overlayMode === 'blur' ? 'blur' : 'gradient',
+    gradientColors: [
+      validColor(nested?.gradientStartColor, defaultCategoryBackgroundConfig.gradientColors[0]),
+      validColor(nested?.gradientMiddleColor, defaultCategoryBackgroundConfig.gradientColors[1]),
+      validColor(nested?.gradientEndColor, defaultCategoryBackgroundConfig.gradientColors[2]),
+    ],
     overlayColor: validColor(nested?.overlayColor, defaultCategoryBackgroundConfig.overlayColor),
     overlayOpacity: boundedNumber(nested?.overlayOpacity, defaultCategoryBackgroundConfig.overlayOpacity, 0, 1),
     blurIntensity: boundedNumber(nested?.blurIntensity, defaultCategoryBackgroundConfig.blurIntensity, 0, 100, true),
-    panelWidth: boundedNumber(nested?.panelWidth, defaultCategoryBackgroundConfig.panelWidth, 40, 100, true),
   };
 }
 
@@ -154,16 +165,19 @@ export function categoryBackgroundIsActive(config: CategoryBackgroundConfig) {
   return config.enabled && Boolean(config.backgroundImage);
 }
 
-export function getCategoryBackgroundConfig(page: Pick<CmsPage, 'sections' | 'settings'> | null | undefined) {
-  return readCategoryBackgroundConfig(sourceFromPage(page));
+function configFields(value: unknown) {
+  const source = record(value);
+  return source ? record(source.categoryBackground) ?? source : null;
 }
 
-type CategoryBackgroundContextValue = {
-  config: CategoryBackgroundConfig;
-  targetRef: RefObject<View | null>;
-};
-
-const CategoryBackgroundContext = createContext<CategoryBackgroundContextValue | null>(null);
+export function getCategoryBackgroundConfig(
+  page: Pick<CmsPage, 'sections' | 'settings'> | null | undefined,
+  fallbackPage?: Pick<CmsPage, 'sections' | 'settings'> | null,
+) {
+  const inherited = configFields(sourceFromPage(fallbackPage));
+  const overrides = configFields(sourceFromPage(page));
+  return readCategoryBackgroundConfig({ ...inherited, ...overrides });
+}
 
 type CategoryBackgroundProps = PropsWithChildren<{
   config: CategoryBackgroundConfig;
@@ -173,34 +187,41 @@ type CategoryBackgroundProps = PropsWithChildren<{
 export function CategoryBackground({ config, style, children }: CategoryBackgroundProps) {
   const targetRef = useRef<View | null>(null);
   const hasImage = categoryBackgroundIsActive(config);
-  const panelWidth = hasImage ? config.panelWidth : 100;
   const panelBackground = withOpacity(config.overlayColor, config.overlayOpacity);
 
   return (
-    <CategoryBackgroundContext.Provider value={{ config, targetRef }}>
-      <View style={[styles.root, style]}>
-        <BlurTargetView ref={targetRef} style={styles.backgroundTarget}>
-          {hasImage && (
-            <Image
-              source={{ uri: config.backgroundImage }}
-              contentFit="cover"
-              style={styles.backgroundImage}
-            />
-          )}
-        </BlurTargetView>
+    <View style={[styles.root, style]}>
+      <BlurTargetView ref={targetRef} style={styles.backgroundTarget}>
         {hasImage && (
-          <BlurView
-            pointerEvents="none"
-            blurTarget={targetRef}
-            blurMethod="dimezisBlurViewSdk31Plus"
-            intensity={config.blurIntensity}
-            tint="light"
-            style={[styles.blurPanel, { width: `${panelWidth}%`, backgroundColor: panelBackground }]}
+          <Image
+            source={{ uri: config.backgroundImage }}
+            contentFit="cover"
+            style={styles.backgroundImage}
           />
         )}
-        {children}
-      </View>
-    </CategoryBackgroundContext.Provider>
+      </BlurTargetView>
+      {hasImage && config.overlayMode === 'blur' && (
+        <BlurView
+          pointerEvents="none"
+          blurTarget={targetRef}
+          blurMethod="dimezisBlurViewSdk31Plus"
+          intensity={config.blurIntensity}
+          tint="light"
+          style={[styles.fullOverlay, { backgroundColor: panelBackground }]}
+        />
+      )}
+      {hasImage && config.overlayMode === 'gradient' && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={config.gradientColors}
+          locations={[0, 0.46, 1]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.fullOverlay}
+        />
+      )}
+      {children}
+    </View>
   );
 }
 
@@ -209,10 +230,7 @@ type CategoryBackgroundPanelProps = PropsWithChildren<{
 }>;
 
 export function CategoryBackgroundPanel({ style, children }: CategoryBackgroundPanelProps) {
-  const context = useContext(CategoryBackgroundContext);
-  const panelWidth = context && categoryBackgroundIsActive(context.config) ? context.config.panelWidth : 100;
-
-  return <View style={[styles.panelContent, { width: `${panelWidth}%` }, style]}>{children}</View>;
+  return <View style={[styles.panelContent, style]}>{children}</View>;
 }
 
 export const categoryBackgroundDefaults = defaultCategoryBackgroundConfig;
@@ -221,6 +239,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
   backgroundTarget: { ...StyleSheet.absoluteFill },
   backgroundImage: { ...StyleSheet.absoluteFill },
-  blurPanel: { position: 'absolute', top: 0, bottom: 0, left: 0 },
-  panelContent: { flex: 1, alignSelf: 'flex-start' },
+  fullOverlay: { ...StyleSheet.absoluteFill },
+  panelContent: { flex: 1, width: '100%', alignSelf: 'stretch' },
 });

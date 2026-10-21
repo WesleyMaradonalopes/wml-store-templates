@@ -47,30 +47,32 @@ ou com valor inválido continua usando `default`, sem alterar as demais telas.
 
 ## Fundo das telas de categorias
 
-Adicione a seção `CategoryBackground` aos documentos `categories` e às páginas de
-categoria que usam o prefixo `categ-`. Ela mantém o gradiente atual quando não
-há imagem ativa e permite editar as três cores diretamente no Headless CMS:
+Adicione a seção `CategoryBackground` ao documento `categories`. As páginas de
+categoria com prefixo `categ-` herdam essa configuração automaticamente; uma
+seção `CategoryBackground` na própria página pode substituir os valores herdados.
+Sem imagem ativa, a tela mantém as três cores de fallback:
 
 ```json
 {
   "enabled": true,
   "backgroundImage": "https://.../categorias.jpg",
+  "overlayMode": "gradient",
   "surfaceColorStart": "#F4EFEC",
   "surfaceColorMiddle": "#F4EFEC",
   "surfaceColorEnd": "#F4EFEC",
   "overlayColor": "#FFFFFF",
   "overlayOpacity": 0.72,
-  "blurIntensity": 60,
-  "panelWidth": 70
+  "blurIntensity": 60
 }
 ```
 
 As três `surfaceColor*` continuam sendo o fallback da tela. Quando `enabled` é
-`true` e `backgroundImage` está preenchida, a imagem ocupa o fundo e o painel
-translúcido com blur passa a ter prioridade. `panelWidth` controla a largura
-horizontal do painel, em percentual, e aceita de 40 a 100; o padrão é 70%.
-Defina `enabled: false` para voltar ao gradiente, mesmo mantendo a imagem
-publicada no documento.
+`true` e `backgroundImage` está preenchida, a imagem ocupa a tela inteira e os
+blocos continuam com largura total. `overlayMode` escolhe o efeito sobre a
+imagem: `gradient` aplica o gradiente horizontal estilo PDP (transparente,
+preto a 40% e preto a 70%); `blur` aplica blur translúcido na tela inteira e usa
+`overlayColor`, `overlayOpacity` e `blurIntensity`. Defina `enabled: false` para
+voltar às cores de fallback, mesmo mantendo a imagem publicada no documento.
 
 ## Carrossel de produtos por coleção e cor na Home
 
