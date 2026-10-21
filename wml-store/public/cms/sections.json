@@ -911,7 +911,7 @@
 					"description": "O efeito cobre toda a tela na horizontal, sem reduzir a largura das categorias.",
 					"type": "string",
 					"enum": ["gradient", "blur"],
-					"enumNames": ["Gradiente horizontal (estilo PDP)", "Blur translúcido"],
+					"enumNames": ["Gradiente horizontal", "Blur translúcido"],
 					"default": "gradient"
 				},
 				"surfaceColorStart": {

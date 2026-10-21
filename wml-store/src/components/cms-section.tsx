@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Dimensions, FlatList, Modal, Pressable, ScrollView, View, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import Animated, { FadeInDown, FadeOutUp, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { subscribeAccountSession } from '@/services/auth';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
@@ -44,7 +45,12 @@ type Props = {
   isCategoryScreen?: boolean;
   searchPresentation?: boolean;
   categoryBackground?: CategoryBackgroundConfig;
+  showCategoryParentHeader?: boolean;
 };
+
+const CATEGORY_ACCORDION_LAYOUT = LinearTransition.duration(240).reduceMotion(ReduceMotion.System);
+const CATEGORY_SUBCATEGORIES_ENTERING = FadeInDown.duration(180).reduceMotion(ReduceMotion.System);
+const CATEGORY_SUBCATEGORIES_EXITING = FadeOutUp.duration(140).reduceMotion(ReduceMotion.System);
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -584,7 +590,7 @@ function categoryListItems(data: Record<string, unknown>) {
   });
 }
 
-function CategorySwipeRow({ category, onPress, isLast }: { category: Record<string, unknown>; onPress: () => void; isLast: boolean }) {
+function CategorySwipeRow({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
   const title = text(category.title) || 'Categoria';
   const iconUrl = categoryIconUrl(category);
 
@@ -592,7 +598,7 @@ function CategorySwipeRow({ category, onPress, isLast }: { category: Record<stri
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.categorySwipeRow, !isLast && styles.categorySwipeRowDivider, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.categorySwipeRow, pressed && styles.pressed]}>
 		<View style={styles.categorySwipeRowContent}>
 			{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.categorySwipeRowIcon} />}
 			<ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
@@ -602,10 +608,9 @@ function CategorySwipeRow({ category, onPress, isLast }: { category: Record<stri
   );
 }
 
-function CategorySwipeSection({ data, router, categoryBackground }: { data: Record<string, unknown>; router: ReturnType<typeof useRouter>; categoryBackground?: CategoryBackgroundConfig }) {
+function CategorySwipeSection({ data, router, categoryBackground, categoryPageSlug }: { data: Record<string, unknown>; router: ReturnType<typeof useRouter>; categoryBackground?: CategoryBackgroundConfig; categoryPageSlug?: string }) {
   const categories = categoryListItems(data).filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
   const [selectedCategory, setSelectedCategory] = useState<Record<string, unknown> | null>(null);
-  const sectionTitle = text(data.title).trim();
 
   if (categories.length === 0) return null;
 
@@ -628,14 +633,12 @@ function CategorySwipeSection({ data, router, categoryBackground }: { data: Reco
     : '';
 
   return (
-    <ThemedView style={styles.categoryMenuSection}>
-      <ThemedText style={styles.sectionTitleCateg} type="subtitle">{sectionTitle || 'Todas categorias'}</ThemedText>
+    <ThemedView style={[styles.categoryMenuSection, !!categoryPageSlug && styles.categoryMenuSectionCategoryPage]}>
       <View style={styles.categorySwipePanel}>
         {categories.map((item, index) => (
           <CategorySwipeRow
             key={`${text(item.title) || 'categoria'}-${index}`}
             category={item}
-            isLast={index === categories.length - 1}
             onPress={() => openCategory(item)}
           />
         ))}
@@ -727,12 +730,18 @@ function CategoryGroup({
   initiallyExpanded,
   subcategoryHeading,
   showBack,
+  showParentHeader = true,
+  categoryPageHeader = false,
+  isCategoryPage = false,
 }: {
   category: Record<string, unknown>;
   router: ReturnType<typeof useRouter>;
   initiallyExpanded: boolean;
   subcategoryHeading?: string;
   showBack?: boolean;
+  showParentHeader?: boolean;
+  categoryPageHeader?: boolean;
+  isCategoryPage?: boolean;
 }) {
   const title = text(category.title) || 'Categoria';
   const action = readCmsAction(category.action);
@@ -742,32 +751,49 @@ function CategoryGroup({
   const [expanded, setExpanded] = useState(initiallyExpanded);
 
   return (
-    <ThemedView style={styles.categoryGroup}>
-      <View style={styles.categoryGroupHeader}>
-        {showBack && (
+    <ThemedView style={[
+      styles.categoryGroup,
+      !showParentHeader && styles.categoryGroupCompact,
+      categoryPageHeader && styles.categoryGroupCategoryPageHeader,
+      isCategoryPage && styles.categoryGroupCategoryPage,
+    ]}>
+      {showParentHeader && (
+        <View style={styles.categoryGroupHeader}>
+          {showBack && (
+            <Pressable
+              accessibilityLabel="Voltar para categorias"
+              onPress={() => router.back()}
+              style={styles.categoryGroupBack}>
+              <ArrowLeftIAIcon color="#0a0a0a" size={20} />
+            </Pressable>
+          )}
+          <ThemedText style={styles.categoryGroupTitle}>{title}</ThemedText>
           <Pressable
-            accessibilityLabel="Voltar para categorias"
-            onPress={() => router.back()}
-            style={styles.categoryGroupBack}>
-            <ArrowLeftIAIcon color="#0a0a0a" size={20} />
+            accessibilityRole="button"
+            onPress={() => openCmsAction(router, action, title)}
+            style={styles.seeAllButton}>
+            <ThemedText style={styles.seeAllButtonText}>Ver tudo</ThemedText>
           </Pressable>
-        )}
-        <ThemedText style={styles.categoryGroupTitle}>{title}</ThemedText>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => openCmsAction(router, action, title)}
-          style={styles.seeAllButton}>
-          <ThemedText style={styles.seeAllButtonText}>Ver tudo</ThemedText>
-        </Pressable>
-      </View>
+        </View>
+      )}
       {subcategories.length > 0 && (
-        <View style={styles.subcategoryBlock}>
+        <Animated.View layout={CATEGORY_ACCORDION_LAYOUT} style={[
+          styles.subcategoryBlock,
+          !showParentHeader && styles.subcategoryBlockCompact,
+          categoryPageHeader && !expanded && styles.subcategoryBlockCategoryPageHeader,
+          !!subcategoryHeading && expanded && styles.subcategoryBlockExpanded,
+        ]}>
           {!!subcategoryHeading && (
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded }}
               onPress={() => setExpanded((current) => !current)}
-              style={styles.subcategoryHeader}>
+              style={[
+                styles.subcategoryHeader,
+                expanded && styles.subcategoryHeaderExpanded,
+                !showParentHeader && styles.subcategoryHeaderCompact,
+                categoryPageHeader && styles.subcategoryHeaderCategoryPageHeader,
+              ]}>
               <ThemedText style={styles.subcategoryHeading}>{subcategoryHeading}</ThemedText>
               <View style={[styles.subcategoryChevron, expanded && styles.subcategoryChevronExpanded]}>
                 <ChevronRightIcon color="#0a0a0a" size={18} />
@@ -775,42 +801,46 @@ function CategoryGroup({
             </Pressable>
           )}
           {expanded && (
-            <View style={styles.subcategoryList}>
-              {subcategories.map((subcategory, index) => {
-                const subcategoryTitle = text(subcategory.title) || `Modelo ${index + 1}`;
-                const subcategoryFlag = text(subcategory.flag).trim();
-                const iconUrl = categoryIconUrl(subcategory);
-                const subcategoryAction = readCmsAction(subcategory.action);
-                const fallbackTarget = action.value
-                  ? `${action.value.replace(/\/$/, '')}/${slugPart(subcategoryTitle)}`
-                  : subcategoryTitle;
-                return (
-                  <Pressable
-                    key={`${subcategoryTitle}-${index}`}
-                    accessibilityRole="button"
-                    onPress={() => openCmsAction(router, subcategoryAction, fallbackTarget)}
-                    style={({ pressed }) => [
-                      styles.subcategoryRow,
-                      index < subcategories.length - 1 && styles.subcategoryRowDivider,
-                      pressed && styles.pressed,
-                    ]}>
-					<View style={styles.subcategoryRowContent}>
-						{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.subcategoryRowIcon} />}
-						<ThemedText style={[styles.subcategoryText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
-						{!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
-					</View>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Animated.View
+              entering={CATEGORY_SUBCATEGORIES_ENTERING}
+              exiting={CATEGORY_SUBCATEGORIES_EXITING}>
+              <View style={styles.subcategoryList}>
+                {subcategories.map((subcategory, index) => {
+                  const subcategoryTitle = text(subcategory.title) || `Modelo ${index + 1}`;
+                  const subcategoryFlag = text(subcategory.flag).trim();
+                  const iconUrl = categoryIconUrl(subcategory);
+                  const subcategoryAction = readCmsAction(subcategory.action);
+                  const fallbackTarget = action.value
+                    ? `${action.value.replace(/\/$/, '')}/${slugPart(subcategoryTitle)}`
+                    : subcategoryTitle;
+                  return (
+                    <Pressable
+                      key={`${subcategoryTitle}-${index}`}
+                      accessibilityRole="button"
+                      onPress={() => openCmsAction(router, subcategoryAction, fallbackTarget)}
+                      style={({ pressed }) => [
+                        styles.subcategoryRow,
+                        index < subcategories.length - 1 && styles.subcategoryRowDivider,
+                        pressed && styles.pressed,
+                      ]}>
+						<View style={styles.subcategoryRowContent}>
+							{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.subcategoryRowIcon} />}
+							<ThemedText style={[styles.subcategoryText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
+							{!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
+						</View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Animated.View>
           )}
-        </View>
+        </Animated.View>
       )}
     </ThemedView>
   );
 }
 
-export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCategoryScreen = false, searchPresentation = false, categoryBackground }: Props) {
+export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCategoryScreen = false, searchPresentation = false, categoryBackground, showCategoryParentHeader = true }: Props) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = useTheme();
@@ -1149,7 +1179,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
   }
 
   if (section.name === 'CategoryListSwipe') {
-    return <CategorySwipeSection data={data} router={router} categoryBackground={categoryBackground} />;
+    return <CategorySwipeSection data={data} router={router} categoryBackground={categoryBackground} categoryPageSlug={categoryPageSlug} />;
   }
 
   if (section.name === 'CategoryAccordeon' || section.name === 'CategoryTree') {
@@ -1180,13 +1210,14 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
       ? sectionTitle
       : text(data.subcategoryTitle);
     const sectionHeading = !isDetailSection && section.name === 'CategoryTree' ? sectionTitle : '';
+    const categoryPageHeader = Boolean(categoryPageSlug && showCategoryParentHeader);
 
     return (
-      <ThemedView style={styles.categoryMenuSection}>
+      <ThemedView style={[styles.categoryMenuSection, !!categoryPageSlug && styles.categoryMenuSectionCategoryPage]}>
         {!!sectionHeading && <ThemedText type="subtitle">{sectionHeading}</ThemedText>}
         <View style={[styles.categoryList, (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon') && styles.categoryGroupsList]}>
           {displayedCategories.map((category, index) => (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon')
-            ? <CategoryGroup key={`${text(category.title)}-${index}`} category={category} router={router} initiallyExpanded={initiallyExpanded} subcategoryHeading={configuredSubcategoryHeading} showBack={Boolean(categoryPageSlug && isDetailSection)} />
+            ? <CategoryGroup key={`${text(category.title)}-${index}`} category={category} router={router} initiallyExpanded={initiallyExpanded} subcategoryHeading={configuredSubcategoryHeading} showBack={Boolean(categoryPageSlug && isDetailSection)} showParentHeader={showCategoryParentHeader} categoryPageHeader={categoryPageHeader} isCategoryPage={Boolean(categoryPageSlug)} />
             : <CategoryRow key={`${text(category.title)}-${index}`} category={category} router={router} />)}
         </View>
       </ThemedView>

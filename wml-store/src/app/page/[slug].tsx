@@ -73,6 +73,29 @@ export default function CmsPageScreen() {
   );
 }
 
+function isCategoryGroupSection(section: CmsPage['sections'][number]) {
+  if (section.name !== 'CategoryAccordeon' && section.name !== 'CategoryTree') return false;
+
+  const data = section.data ?? {};
+  const directItems = Array.isArray(data.content) ? data.content : [];
+  const shelves = Array.isArray(data.shelves) ? data.shelves : [];
+  const items = directItems.length > 0
+    ? directItems
+    : shelves.flatMap((shelf) => {
+        if (!shelf || typeof shelf !== 'object' || Array.isArray(shelf)) return [];
+        const content = (shelf as Record<string, unknown>).content;
+        return Array.isArray(content) ? content : [];
+      });
+  const categories = items.filter((item): item is Record<string, unknown> => (
+    Boolean(item && typeof item === 'object' && !Array.isArray(item))
+  ));
+  const hasSubcategories = categories.some((category) => (
+    Array.isArray(category.subcategories) && category.subcategories.length > 0
+  ));
+
+  return categories.length > 0 && (section.name === 'CategoryAccordeon' || hasSubcategories);
+}
+
 function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBackground }: { page: CmsPage | null; slug?: string; loading: boolean; error: boolean; isCategoryPage: boolean; categoryBackground: CategoryBackgroundConfig }) {
   const router = useRouter();
   const pageTheme = usePageTheme();
@@ -134,6 +157,9 @@ function CategoryPageContent({ page, slug, loading, error, onScroll, router, the
   categoryBackground: CategoryBackgroundConfig;
 }) {
   const isCategoryPage = typeof slug === 'string' && /^categ-/i.test(slug);
+  const firstCategoryGroupIndex = isCategoryPage
+    ? page?.sections.findIndex(isCategoryGroupSection) ?? -1
+    : -1;
 
   return (
     <CategoryBackgroundPanel style={styles.pagePanel}>
@@ -154,6 +180,7 @@ function CategoryPageContent({ page, slug, loading, error, onScroll, router, the
             section={section}
             categoryPageSlug={isCategoryPage ? slug : undefined}
             categoryBackground={categoryBackground}
+            showCategoryParentHeader={!isCategoryPage || index === firstCategoryGroupIndex}
           />
         ))}
       </ScrollView>

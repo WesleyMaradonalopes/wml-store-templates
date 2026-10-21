@@ -23,7 +23,7 @@ const defaultCategoryBackgroundConfig: CategoryBackgroundConfig = {
   backgroundImage: '',
   surfaceColors: [...categorySurfaceColors],
   overlayMode: 'gradient',
-  gradientColors: ['rgba(0, 0, 0, 0.7)', 'rgba(0, 0, 0, 0.5)', 'rgba(0, 0, 0, 0)'],
+  gradientColors: ['rgba(221, 221, 221, 1)', 'rgba(221, 221, 221, 1)', 'rgba(221, 221, 221, 0.6)'],
   overlayColor: '#FFFFFF',
   overlayOpacity: 0.72,
   blurIntensity: 60,
