@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Dimensions, FlatList, Modal, Pressable, ScrollView, View, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
-import Animated, { FadeInDown, FadeOutUp, LinearTransition, ReduceMotion } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { subscribeAccountSession } from '@/services/auth';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
@@ -48,9 +48,12 @@ type Props = {
   showCategoryParentHeader?: boolean;
 };
 
-const CATEGORY_ACCORDION_LAYOUT = LinearTransition.duration(240).reduceMotion(ReduceMotion.System);
-const CATEGORY_SUBCATEGORIES_ENTERING = FadeInDown.duration(180).reduceMotion(ReduceMotion.System);
-const CATEGORY_SUBCATEGORIES_EXITING = FadeOutUp.duration(140).reduceMotion(ReduceMotion.System);
+const CATEGORY_ACCORDION_LAYOUT = LinearTransition
+  .duration(260)
+  .easing(Easing.inOut(Easing.cubic))
+  .reduceMotion(ReduceMotion.System);
+const CATEGORY_SUBCATEGORIES_ENTERING = FadeIn.duration(140).reduceMotion(ReduceMotion.System);
+const CATEGORY_SUBCATEGORIES_EXITING = FadeOut.duration(110).reduceMotion(ReduceMotion.System);
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -779,8 +782,7 @@ function CategoryGroup({
       {subcategories.length > 0 && (
         <Animated.View layout={CATEGORY_ACCORDION_LAYOUT} style={[
           styles.subcategoryBlock,
-          !showParentHeader && styles.subcategoryBlockCompact,
-          categoryPageHeader && !expanded && styles.subcategoryBlockCategoryPageHeader,
+          (!showParentHeader || (categoryPageHeader && !expanded)) && styles.subcategoryBlockCompact,
           !!subcategoryHeading && expanded && styles.subcategoryBlockExpanded,
         ]}>
           {!!subcategoryHeading && (
@@ -791,8 +793,7 @@ function CategoryGroup({
               style={[
                 styles.subcategoryHeader,
                 expanded && styles.subcategoryHeaderExpanded,
-                !showParentHeader && styles.subcategoryHeaderCompact,
-                categoryPageHeader && styles.subcategoryHeaderCategoryPageHeader,
+                (!showParentHeader || categoryPageHeader) && styles.subcategoryHeaderCompact,
               ]}>
               <ThemedText style={styles.subcategoryHeading}>{subcategoryHeading}</ThemedText>
               <View style={[styles.subcategoryChevron, expanded && styles.subcategoryChevronExpanded]}>
@@ -893,9 +894,10 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
   if (section.name === 'BottomTabSettings') return null;
 
   if (section.name === 'RichText') {
+    const isCategoriesCmsHeading = text(data.title).trim().toLowerCase() === 'todas categorias';
     return (
       <ThemedView style={[styles.section, styles.richTextSection]}>
-        <CmsRichText data={data} />
+        <CmsRichText data={data} titleStyle={isCategoriesCmsHeading ? styles.richTextCategoryHeadingDebug : undefined} />
       </ThemedView>
     );
   }
