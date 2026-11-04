@@ -593,7 +593,7 @@ function categoryListItems(data: Record<string, unknown>) {
   });
 }
 
-function CategorySwipeRow({ category, onPress }: { category: Record<string, unknown>; onPress: () => void }) {
+function CategorySwipeRow({ category, onPress, classicStyle }: { category: Record<string, unknown>; onPress: () => void; classicStyle: boolean }) {
   const title = text(category.title) || 'Categoria';
   const iconUrl = categoryIconUrl(category);
 
@@ -601,10 +601,10 @@ function CategorySwipeRow({ category, onPress }: { category: Record<string, unkn
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.categorySwipeRow, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.categorySwipeRow, classicStyle && styles.categorySwipeRowClassic, pressed && styles.pressed]}>
 		<View style={styles.categorySwipeRowContent}>
 			{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.categorySwipeRowIcon} />}
-			<ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
+          <ThemedText style={styles.categorySwipeRowTitle} numberOfLines={1}>{title}</ThemedText>
 		</View>
 			<ArrowRightAIcon color="#0a0a0a" size={16} />
     </Pressable>
@@ -614,6 +614,7 @@ function CategorySwipeRow({ category, onPress }: { category: Record<string, unkn
 function CategorySwipeSection({ data, router, categoryBackground, categoryPageSlug }: { data: Record<string, unknown>; router: ReturnType<typeof useRouter>; categoryBackground?: CategoryBackgroundConfig; categoryPageSlug?: string }) {
   const categories = categoryListItems(data).filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
   const [selectedCategory, setSelectedCategory] = useState<Record<string, unknown> | null>(null);
+  const classicStyle = categoryBackground?.categoryMenuStyle === 'classic';
 
   if (categories.length === 0) return null;
 
@@ -636,12 +637,16 @@ function CategorySwipeSection({ data, router, categoryBackground, categoryPageSl
     : '';
 
   return (
-    <ThemedView style={[styles.categoryMenuSection, !!categoryPageSlug && styles.categoryMenuSectionCategoryPage]}>
-      <View style={styles.categorySwipePanel}>
+    <ThemedView style={[
+      styles.categoryMenuSection,
+      classicStyle ? styles.categoryMenuSectionClassic : !!categoryPageSlug && styles.categoryMenuSectionCategoryPage,
+    ]}>
+      <View style={[styles.categorySwipePanel, classicStyle && styles.categorySwipePanelClassic]}>
         {categories.map((item, index) => (
           <CategorySwipeRow
             key={`${text(item.title) || 'categoria'}-${index}`}
             category={item}
+            classicStyle={classicStyle}
             onPress={() => openCategory(item)}
           />
         ))}
@@ -651,10 +656,14 @@ function CategorySwipeSection({ data, router, categoryBackground, categoryPageSl
         visible={Boolean(selectedCategory)}
         animationType="slide"
         onRequestClose={() => setSelectedCategory(null)}>
-        <CategoryBackground config={categoryBackground ?? categoryBackgroundDefaults} style={styles.categoryModalRoot}>
-          <CategoryBackgroundPanel style={[styles.categoryModal, (!categoryBackground || !categoryBackgroundIsActive(categoryBackground)) && { backgroundColor: categoryBackground?.surfaceColors[0] ?? '#f4efec' }]}>
+        <CategoryBackground config={categoryBackground ?? categoryBackgroundDefaults} style={[styles.categoryModalRoot, classicStyle && styles.categoryModalRootClassic]}>
+          <CategoryBackgroundPanel style={[
+            styles.categoryModal,
+            classicStyle && styles.categoryModalClassic,
+            !classicStyle && (!categoryBackground || !categoryBackgroundIsActive(categoryBackground)) && { backgroundColor: categoryBackground?.surfaceColors[0] ?? '#f4efec' },
+          ]}>
             <BottomSheetHandle />
-            <View style={styles.categoryModalHeader}>
+            <View style={[styles.categoryModalHeader, classicStyle && styles.categoryModalHeaderClassic]}>
               <Pressable
                 accessibilityLabel="Voltar para categorias"
                 onPress={() => setSelectedCategory(null)}
@@ -673,8 +682,8 @@ function CategorySwipeSection({ data, router, categoryBackground, categoryPageSl
                     setSelectedCategory(null);
                     openCmsAction(router, selectedCategory?.action, `Ver tudo em ${selectedTitle}`);
                   }}
-                  style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
-                  <ThemedText style={styles.categoryModalItemText}>Ver tudo em {selectedTitle}</ThemedText>
+                  style={({ pressed }) => [styles.categoryModalItem, classicStyle && styles.categoryModalItemClassic, pressed && styles.pressed]}>
+                  <ThemedText style={[styles.categoryModalItemText, classicStyle && styles.categoryModalItemTextClassic]}>Ver tudo em {selectedTitle}</ThemedText>
                   <ArrowRightAIcon color="#0a0a0a" size={18} />
                 </Pressable>
               )}
@@ -693,9 +702,9 @@ function CategorySwipeSection({ data, router, categoryBackground, categoryPageSl
                       setSelectedCategory(null);
                       openCmsAction(router, subcategory.action, fallbackTarget);
                     }}
-                    style={({ pressed }) => [styles.categoryModalItem, pressed && styles.pressed]}>
+                    style={({ pressed }) => [styles.categoryModalItem, classicStyle && styles.categoryModalItemClassic, pressed && styles.pressed]}>
                     <View style={styles.categoryModalItemContent}>
-                      <ThemedText style={[styles.categoryModalItemText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
+                      <ThemedText style={[styles.categoryModalItemText, classicStyle && styles.categoryModalItemTextClassic, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
                       {!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
                     </View>
                     <ArrowRightAIcon color="#0a0a0a" size={18} />
@@ -710,17 +719,17 @@ function CategorySwipeSection({ data, router, categoryBackground, categoryPageSl
   );
 }
 
-function CategoryRow({ category, router }: { category: Record<string, unknown>; router: ReturnType<typeof useRouter> }) {
+function CategoryRow({ category, router, classicStyle }: { category: Record<string, unknown>; router: ReturnType<typeof useRouter>; classicStyle: boolean }) {
   const title = text(category.title) || 'Categoria';
   const iconUrl = categoryIconUrl(category);
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => openCmsAction(router, category.action, title)}
-      style={({ pressed }) => [styles.categoryRow, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.categoryRow, classicStyle && styles.categoryRowClassic, pressed && styles.pressed]}>
 		<View style={styles.categoryRowContent}>
 			{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.categoryRowIcon} />}
-			<ThemedText style={styles.categoryRowTitle}>{title}</ThemedText>
+			<ThemedText style={[styles.categoryRowTitle, classicStyle && styles.categoryRowTitleClassic]}>{title}</ThemedText>
 		</View>
 			<ArrowRightAIcon color="#0a0a0a" size={20} />
     </Pressable>
@@ -736,6 +745,7 @@ function CategoryGroup({
   showParentHeader = true,
   categoryPageHeader = false,
   isCategoryPage = false,
+  classicStyle = false,
 }: {
   category: Record<string, unknown>;
   router: ReturnType<typeof useRouter>;
@@ -745,6 +755,7 @@ function CategoryGroup({
   showParentHeader?: boolean;
   categoryPageHeader?: boolean;
   isCategoryPage?: boolean;
+  classicStyle?: boolean;
 }) {
   const title = text(category.title) || 'Categoria';
   const action = readCmsAction(category.action);
@@ -756,9 +767,10 @@ function CategoryGroup({
   return (
     <ThemedView style={[
       styles.categoryGroup,
-      !showParentHeader && styles.categoryGroupCompact,
-      categoryPageHeader && styles.categoryGroupCategoryPageHeader,
-      isCategoryPage && styles.categoryGroupCategoryPage,
+      !classicStyle && !showParentHeader && styles.categoryGroupCompact,
+      !classicStyle && categoryPageHeader && styles.categoryGroupCategoryPageHeader,
+      !classicStyle && isCategoryPage && styles.categoryGroupCategoryPage,
+      classicStyle && styles.categoryGroupClassic,
     ]}>
       {showParentHeader && (
         <View style={styles.categoryGroupHeader}>
@@ -770,20 +782,21 @@ function CategoryGroup({
               <ArrowLeftIAIcon color="#0a0a0a" size={20} />
             </Pressable>
           )}
-          <ThemedText style={styles.categoryGroupTitle}>{title}</ThemedText>
+          <ThemedText style={[styles.categoryGroupTitle, classicStyle && styles.categoryGroupTitleClassic]}>{title}</ThemedText>
           <Pressable
             accessibilityRole="button"
             onPress={() => openCmsAction(router, action, title)}
-            style={styles.seeAllButton}>
-            <ThemedText style={styles.seeAllButtonText}>Ver tudo</ThemedText>
+            style={[styles.seeAllButton, classicStyle && styles.seeAllButtonClassic]}>
+            <ThemedText style={[styles.seeAllButtonText, classicStyle && styles.seeAllButtonTextClassic]}>Ver tudo</ThemedText>
           </Pressable>
         </View>
       )}
       {subcategories.length > 0 && (
         <Animated.View layout={CATEGORY_ACCORDION_LAYOUT} style={[
           styles.subcategoryBlock,
-          (!showParentHeader || (categoryPageHeader && !expanded)) && styles.subcategoryBlockCompact,
-          !!subcategoryHeading && expanded && styles.subcategoryBlockExpanded,
+          classicStyle && styles.subcategoryBlockClassic,
+          !classicStyle && (!showParentHeader || (categoryPageHeader && !expanded)) && styles.subcategoryBlockCompact,
+          !classicStyle && !!subcategoryHeading && expanded && styles.subcategoryBlockExpanded,
         ]}>
           {!!subcategoryHeading && (
             <Pressable
@@ -792,10 +805,11 @@ function CategoryGroup({
               onPress={() => setExpanded((current) => !current)}
               style={[
                 styles.subcategoryHeader,
-                expanded && styles.subcategoryHeaderExpanded,
-                (!showParentHeader || categoryPageHeader) && styles.subcategoryHeaderCompact,
+                !classicStyle && expanded && styles.subcategoryHeaderExpanded,
+                !classicStyle && (!showParentHeader || categoryPageHeader) && styles.subcategoryHeaderCompact,
+                classicStyle && styles.subcategoryHeaderClassic,
               ]}>
-              <ThemedText style={styles.subcategoryHeading}>{subcategoryHeading}</ThemedText>
+              <ThemedText style={[styles.subcategoryHeading, classicStyle && styles.subcategoryHeadingClassic]}>{subcategoryHeading}</ThemedText>
               <View style={[styles.subcategoryChevron, expanded && styles.subcategoryChevronExpanded]}>
                 <ChevronRightIcon color="#0a0a0a" size={18} />
               </View>
@@ -805,7 +819,7 @@ function CategoryGroup({
             <Animated.View
               entering={CATEGORY_SUBCATEGORIES_ENTERING}
               exiting={CATEGORY_SUBCATEGORIES_EXITING}>
-              <View style={styles.subcategoryList}>
+              <View style={[styles.subcategoryList, classicStyle && styles.subcategoryListClassic]}>
                 {subcategories.map((subcategory, index) => {
                   const subcategoryTitle = text(subcategory.title) || `Modelo ${index + 1}`;
                   const subcategoryFlag = text(subcategory.flag).trim();
@@ -821,12 +835,13 @@ function CategoryGroup({
                       onPress={() => openCmsAction(router, subcategoryAction, fallbackTarget)}
                       style={({ pressed }) => [
                         styles.subcategoryRow,
-                        index < subcategories.length - 1 && styles.subcategoryRowDivider,
+                        classicStyle && styles.subcategoryRowClassic,
+                        !classicStyle && index < subcategories.length - 1 && styles.subcategoryRowDivider,
                         pressed && styles.pressed,
                       ]}>
 						<View style={styles.subcategoryRowContent}>
 							{!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.subcategoryRowIcon} />}
-							<ThemedText style={[styles.subcategoryText, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
+							<ThemedText style={[styles.subcategoryText, classicStyle && styles.subcategoryTextClassic, !!subcategoryFlag && styles.subcategoryTextFlag]}>{subcategoryTitle}</ThemedText>
 							{!!subcategoryFlag && <View style={styles.subcategoryFlag}><ThemedText style={styles.subcategoryFlagText}>{subcategoryFlag}</ThemedText></View>}
 						</View>
                     </Pressable>
@@ -1213,14 +1228,22 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
       : text(data.subcategoryTitle);
     const sectionHeading = !isDetailSection && section.name === 'CategoryTree' ? sectionTitle : '';
     const categoryPageHeader = Boolean(categoryPageSlug && showCategoryParentHeader);
+    const classicStyle = categoryBackground?.categoryMenuStyle === 'classic';
 
     return (
-      <ThemedView style={[styles.categoryMenuSection, !!categoryPageSlug && styles.categoryMenuSectionCategoryPage]}>
+      <ThemedView style={[
+        styles.categoryMenuSection,
+        classicStyle ? styles.categoryMenuSectionClassic : !!categoryPageSlug && styles.categoryMenuSectionCategoryPage,
+      ]}>
         {!!sectionHeading && <ThemedText type="subtitle">{sectionHeading}</ThemedText>}
-        <View style={[styles.categoryList, (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon') && styles.categoryGroupsList]}>
+        <View style={[
+          styles.categoryList,
+          classicStyle && styles.categoryListClassic,
+          (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon') && styles.categoryGroupsList,
+        ]}>
           {displayedCategories.map((category, index) => (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon')
-            ? <CategoryGroup key={`${text(category.title)}-${index}`} category={category} router={router} initiallyExpanded={initiallyExpanded} subcategoryHeading={configuredSubcategoryHeading} showBack={Boolean(categoryPageSlug && isDetailSection)} showParentHeader={showCategoryParentHeader} categoryPageHeader={categoryPageHeader} isCategoryPage={Boolean(categoryPageSlug)} />
-            : <CategoryRow key={`${text(category.title)}-${index}`} category={category} router={router} />)}
+            ? <CategoryGroup key={`${text(category.title)}-${index}`} category={category} router={router} initiallyExpanded={initiallyExpanded} subcategoryHeading={configuredSubcategoryHeading} showBack={Boolean(categoryPageSlug && isDetailSection)} showParentHeader={showCategoryParentHeader} categoryPageHeader={categoryPageHeader} isCategoryPage={Boolean(categoryPageSlug)} classicStyle={classicStyle} />
+            : <CategoryRow key={`${text(category.title)}-${index}`} category={category} router={router} classicStyle={classicStyle} />)}
         </View>
       </ThemedView>
     );

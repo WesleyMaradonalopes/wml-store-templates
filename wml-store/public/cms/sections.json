@@ -890,12 +890,20 @@
 		"requiredScopes": [],
 		"schema": {
 			"title": "Fundo da área de categorias",
-			"description": "Configure uma imagem de fundo em tela inteira e escolha entre gradiente horizontal ou blur. O conteúdo de categorias continua ocupando toda a largura.",
+			"description": "Escolha o layout padrão anterior ou o layout atual com imagem de fundo; no layout atual, configure também gradiente ou blur.",
 			"type": "object",
 			"properties": {
+				"categoryMenuStyle": {
+					"title": "Estilo do menu de categorias",
+					"description": "Escolha o layout padrão anterior ou o layout atual com imagem de fundo.",
+					"type": "string",
+					"enum": ["classic", "imageBackground"],
+					"enumNames": ["Padrão do app (layout anterior)", "Imagem de fundo (layout atual)"],
+					"default": "imageBackground"
+				},
 				"enabled": {
 					"title": "Ativar imagem de fundo",
-					"description": "Quando ativo e houver uma imagem, ela tem prioridade sobre as três cores de fallback.",
+					"description": "Usado no layout com imagem de fundo. Quando ativo e houver imagem, ela tem prioridade sobre as três cores de fallback.",
 					"type": "boolean",
 					"default": true
 				},

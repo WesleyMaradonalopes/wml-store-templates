@@ -8,6 +8,7 @@ import { categorySurfaceColors } from './cms-section.styles';
 import type { CmsPage } from '@/services/cms';
 
 export type CategoryBackgroundConfig = {
+  categoryMenuStyle: 'classic' | 'imageBackground';
   enabled: boolean;
   backgroundImage: string;
   surfaceColors: [string, string, string];
@@ -19,6 +20,7 @@ export type CategoryBackgroundConfig = {
 };
 
 const defaultCategoryBackgroundConfig: CategoryBackgroundConfig = {
+  categoryMenuStyle: 'imageBackground',
   enabled: true,
   backgroundImage: '',
   surfaceColors: [...categorySurfaceColors],
@@ -132,6 +134,7 @@ function sourceFromPage(page: Pick<CmsPage, 'sections' | 'settings'> | null | un
     'gradientMiddleColor' in section.data ||
     'gradientEndColor' in section.data ||
     'overlayColor' in section.data ||
+    'categoryMenuStyle' in section.data ||
     'blurIntensity' in section.data
   )));
   return categorySection?.data;
@@ -142,6 +145,7 @@ export function readCategoryBackgroundConfig(value: unknown): CategoryBackground
   const nested = source ? record(source.categoryBackground) ?? source : null;
 
   return {
+    categoryMenuStyle: nested?.categoryMenuStyle === 'classic' ? 'classic' : 'imageBackground',
     enabled: nested?.enabled !== false,
     backgroundImage: mediaUrl(nested?.backgroundImage) || mediaUrl(nested?.image) || mediaUrl(nested?.imageUrl),
     surfaceColors: [
@@ -162,7 +166,7 @@ export function readCategoryBackgroundConfig(value: unknown): CategoryBackground
 }
 
 export function categoryBackgroundIsActive(config: CategoryBackgroundConfig) {
-  return config.enabled && Boolean(config.backgroundImage);
+  return config.categoryMenuStyle !== 'classic' && config.enabled && Boolean(config.backgroundImage);
 }
 
 function configFields(value: unknown) {
