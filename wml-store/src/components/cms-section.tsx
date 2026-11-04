@@ -660,7 +660,7 @@ function CategorySwipeSection({ data, router, categoryBackground, categoryPageSl
           <CategoryBackgroundPanel style={[
             styles.categoryModal,
             classicStyle && styles.categoryModalClassic,
-            !classicStyle && (!categoryBackground || !categoryBackgroundIsActive(categoryBackground)) && { backgroundColor: categoryBackground?.surfaceColors[0] ?? '#f4efec' },
+            !classicStyle && (!categoryBackground || !categoryBackgroundIsActive(categoryBackground)) && { backgroundColor: categoryBackground?.surfaceColors[0] ?? '#ffffff' },
           ]}>
             <BottomSheetHandle />
             <View style={[styles.categoryModalHeader, classicStyle && styles.categoryModalHeaderClassic]}>

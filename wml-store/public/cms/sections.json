@@ -895,10 +895,10 @@
 			"properties": {
 				"categoryMenuStyle": {
 					"title": "Estilo do menu de categorias",
-					"description": "Escolha o layout padrão anterior ou o layout atual com imagem de fundo.",
+					"description": "Escolha o layout padrão ou o layout com imagem de fundo.",
 					"type": "string",
 					"enum": ["classic", "imageBackground"],
-					"enumNames": ["Padrão do app (layout anterior)", "Imagem de fundo (layout atual)"],
+					"enumNames": ["Layout padrão", "Layout imagem de fundo"],
 					"default": "imageBackground"
 				},
 				"enabled": {
@@ -926,7 +926,7 @@
 					"title": "Cor de fundo 1",
 					"description": "Primeira cor do gradiente usado quando a imagem não estiver ativa.",
 					"type": "string",
-					"default": "#F4EFEC",
+					"default": "#FFFFFF",
 					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
 					"widget": {
 						"ui:widget": "color"
@@ -936,7 +936,7 @@
 					"title": "Cor de fundo 2",
 					"description": "Segunda cor do gradiente usado quando a imagem não estiver ativa.",
 					"type": "string",
-					"default": "#F4EFEC",
+					"default": "#FFFFFF",
 					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
 					"widget": {
 						"ui:widget": "color"
@@ -946,7 +946,7 @@
 					"title": "Cor de fundo 3",
 					"description": "Terceira cor do gradiente usado quando a imagem não estiver ativa.",
 					"type": "string",
-					"default": "#F4EFEC",
+					"default": "#FFFFFF",
 					"pattern": "^(?:#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|rgb\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*\\)|rgba\\(\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*[0-9]{1,3}\\s*,\\s*(?:0|1|0?\\.[0-9]+)\\s*\\))$",
 					"widget": {
 						"ui:widget": "color"

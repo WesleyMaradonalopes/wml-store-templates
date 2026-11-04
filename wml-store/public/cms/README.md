@@ -57,9 +57,9 @@ Sem imagem ativa, a tela mantém as três cores de fallback:
   "enabled": true,
   "backgroundImage": "https://.../categorias.jpg",
   "overlayMode": "gradient",
-  "surfaceColorStart": "#F4EFEC",
-  "surfaceColorMiddle": "#F4EFEC",
-  "surfaceColorEnd": "#F4EFEC",
+  "surfaceColorStart": "#FFFFFF",
+  "surfaceColorMiddle": "#FFFFFF",
+  "surfaceColorEnd": "#FFFFFF",
   "overlayColor": "#FFFFFF",
   "overlayOpacity": 0.72,
   "blurIntensity": 60

@@ -1,7 +1,7 @@
 import { Dimensions, StyleSheet } from 'react-native';
 import { Fonts, Spacing } from '@/constants/theme';
 
-export const categorySurfaceColors = ['#f4efec', '#f4efec', '#f4efec'] as const;
+export const categorySurfaceColors = ['#ffffff', '#ffffff', '#ffffff'] as const;
 
 export const styles = StyleSheet.create({
   section: { borderRadius: 16, backgroundColor: 'transparent' },
@@ -88,7 +88,7 @@ export const styles = StyleSheet.create({
   categorySwipeRowContent: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   categorySwipeRowIcon: { width: 34, height: 34, flexShrink: 0 },
   categorySwipeRowTitle: { flex: 1, fontSize: 15, lineHeight: 22, color: '#0a0a0a', fontWeight: '500', textTransform: 'none' },
-  categoryModalRoot: { flex: 1, backgroundColor: '#f4efec' },
+  categoryModalRoot: { flex: 1, backgroundColor: '#ffffff' },
   categoryModalRootClassic: { backgroundColor: '#f0f1f5' },
   categoryModal: { flex: 1, padding: 16, backgroundColor: 'transparent' },
   categoryModalClassic: { backgroundColor: '#f0f1f5' },
