@@ -4,6 +4,7 @@ import { Alert, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { DEFAULT_BOTTOM_TAB_SETTINGS } from '@/config/bottom-tab';
 import { ThemePreferenceProvider, useAppTheme } from '@/context/theme-context';
+import { CategoryMenuStyleProvider } from '@/context/category-menu-style-context';
 import { TabBarContext } from '@/context/tab-bar-context';
 import { getAccountSession, getVtexUserToken, subscribeAccountSessionExpired } from '@/services/auth';
 import { getBottomTabSettings } from '@/services/bottom-tab-settings';
@@ -15,7 +16,7 @@ import GlobalTabBar from '@/components/global-tab-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function TabLayout() {
-  return <ThemePreferenceProvider><AppLayout /></ThemePreferenceProvider>;
+  return <ThemePreferenceProvider><CategoryMenuStyleProvider><AppLayout /></CategoryMenuStyleProvider></ThemePreferenceProvider>;
 }
 
 function AppLayout() {

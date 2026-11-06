@@ -6,10 +6,12 @@ import {
   type CategoryBackgroundConfig,
 } from '@/components/category-background';
 import { BlurView } from 'expo-blur';
+import { CategoryMenuStyleToggle } from '@/components/category-menu-style-toggle';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { PageThemeProvider, usePageTheme } from '@/context/page-theme-context';
+import { useCategoryMenuStyleOverride } from '@/context/category-menu-style-context';
 import { useTabBarScroll } from '@/hooks/use-tab-bar-scroll';
 import { useTheme } from '@/hooks/use-theme';
 import { CmsPage, getCmsPage } from '@/services/cms';
@@ -42,7 +44,15 @@ export default function CategoriesScreen() {
 
   const pageTheme = resolvePageTheme(cmsPage);
   const customColors = resolvePageThemeColors(cmsPage);
-  const categoryBackground = getCategoryBackgroundConfig(cmsPage);
+  const cmsCategoryBackground = getCategoryBackgroundConfig(cmsPage);
+  const { temporaryCategoryMenuStyle, setTemporaryCategoryMenuStyle } = useCategoryMenuStyleOverride();
+  const effectiveMenuStyle = temporaryCategoryMenuStyle ?? cmsCategoryBackground.categoryMenuStyle;
+  const categoryBackground = effectiveMenuStyle === cmsCategoryBackground.categoryMenuStyle
+    ? cmsCategoryBackground
+    : { ...cmsCategoryBackground, categoryMenuStyle: effectiveMenuStyle };
+  const toggleCategoryMenuStyle = () => {
+    setTemporaryCategoryMenuStyle(effectiveMenuStyle === 'classic' ? 'imageBackground' : 'classic');
+  };
 
   return (
     <PageThemeProvider theme={pageTheme} customColors={customColors}>
@@ -51,6 +61,7 @@ export default function CategoriesScreen() {
         loading={loading}
         error={error}
         categoryBackground={categoryBackground}
+        onToggleMenuStyle={toggleCategoryMenuStyle}
       />
     </PageThemeProvider>
   );
@@ -61,11 +72,13 @@ function CategoriesScreenContent({
   loading,
   error,
   categoryBackground,
+  onToggleMenuStyle,
 }: {
   cmsPage: CmsPage | null;
   loading: boolean;
   error: boolean;
   categoryBackground: CategoryBackgroundConfig;
+  onToggleMenuStyle: () => void;
 }) {
   const onScroll = useTabBarScroll();
   const pageTheme = usePageTheme();
@@ -106,7 +119,15 @@ function CategoriesScreenContent({
         <View style={styles.backgroundOverlay}>
           <SafeAreaView style={[styles.safeArea, classicStyle && styles.safeAreaClassic]}>
             <View style={styles.headerSurface}>
-              <ScreenHeader back={false} />
+              <ScreenHeader
+                back={false}
+                leftAccessory={(
+                  <CategoryMenuStyleToggle
+                    value={categoryBackground.categoryMenuStyle}
+                    onToggle={onToggleMenuStyle}
+                  />
+                )}
+              />
             </View>
             {classicStyle ? (
               <BlurView
@@ -155,6 +176,6 @@ const styles = StyleSheet.create({
   },
   gradientFill: { flex: 1 },
   content: { gap: Spacing.three, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 100 },
-  contentClassic: { gap: Spacing.three, paddingTop: 12, paddingHorizontal: 10, paddingBottom: 100 },
+  contentClassic: { gap: Spacing.three, paddingTop: 12, paddingHorizontal: 0, paddingBottom: 100 },
   errorText: { color: '#ed6560' },
 });

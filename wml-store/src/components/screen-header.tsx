@@ -1,4 +1,5 @@
 import { usePathname, useRouter } from 'expo-router';
+import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleProp, StyleSheet, TextStyle, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,6 +25,7 @@ type ScreenHeaderProps = {
   showShare?: boolean;
   showCart?: boolean;
   showAssistant?: boolean;
+  leftAccessory?: ReactNode;
   titleStyle?: StyleProp<TextStyle>;
   logoWidth?: number;
   logoHeight?: number;
@@ -31,7 +33,7 @@ type ScreenHeaderProps = {
   variant?: 'default' | 'checkout';
 };
 
-export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, onSearch, onShare, shareLoading = false, showSearch = true, showShare = false, showCart = true, showAssistant = true, titleStyle, logoWidth = 76, logoHeight = 20, logoOffsetY = 0, variant = 'default' }: ScreenHeaderProps) {
+export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, onSearch, onShare, shareLoading = false, showSearch = true, showShare = false, showCart = true, showAssistant = true, leftAccessory, titleStyle, logoWidth = 76, logoHeight = 20, logoOffsetY = 0, variant = 'default' }: ScreenHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const theme = useTheme();
@@ -43,7 +45,7 @@ export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack
     .some((route) => pathname === route || pathname.startsWith(`${route}/`));
   return (
     <View style={[styles.header, checkoutVariant && styles.checkoutHeader, checkoutVariant && { marginTop: -(Spacing.four + insets.top), paddingTop: Spacing.four + insets.top, minHeight: 66 + insets.top }]}>
-      {back ? <Pressable onPress={goBack} style={[styles.side, checkoutVariant && styles.checkoutBackButton]}><ArrowLeftIAIcon color={headerColor} size={21} /></Pressable> : title && titleAlign === 'left' ? null : <View style={styles.side} />}
+      {leftAccessory ? <View style={styles.leadingAccessory}>{leftAccessory}</View> : back ? <Pressable onPress={goBack} style={[styles.side, checkoutVariant && styles.checkoutBackButton]}><ArrowLeftIAIcon color={headerColor} size={21} /></Pressable> : title && titleAlign === 'left' ? null : <View style={styles.side} />}
       <View pointerEvents="box-none" style={[titleAlign === 'left' && title ? styles.leftTitle : styles.center, checkoutVariant && titleAlign !== 'left' && { top: Spacing.four + insets.top, height: 42 }]}>{title ? <ThemedTitle style={[checkoutVariant && styles.checkoutTitle, titleStyle]}>{title}</ThemedTitle> : <Pressable accessibilityLabel="Ir para o início" onPress={() => router.replace('/')} style={[styles.logoButton, logoOffsetY !== 0 && { transform: [{ translateY: logoOffsetY }] }]}><HopeLogoIcon color={headerColor} width={logoWidth} height={logoHeight} /></Pressable>}</View>
       <View style={[styles.actions, checkoutVariant && styles.checkoutActions]}>
         {showAssistant && !assistantHidden && <AssistantHeaderButton color="#FFFFFF" size={22} style={styles.action} />}
@@ -63,6 +65,7 @@ const styles = StyleSheet.create({
   header: { minHeight: 42, position: 'relative', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 },
   checkoutHeader: { minHeight: 66, marginTop: -Spacing.four, marginHorizontal: -Spacing.four, paddingHorizontal: Spacing.three, paddingTop: Spacing.four, paddingBottom: 0, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#dedbd5' },
   side: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  leadingAccessory: { minWidth: 62, height: 34, alignItems: 'flex-start', justifyContent: 'center' },
   checkoutBackButton: { width: 35, height: 35, borderRadius: 21, borderWidth: 0, backgroundColor: 'transparent' },
   center: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'flex-end' },
   leftTitle: { flex: 1, minHeight: 42, alignItems: 'flex-start', justifyContent: 'center' },

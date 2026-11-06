@@ -14,6 +14,7 @@ import ArrowLeftIAIcon from '@/components/icons/ArrowLeftIAicon';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { PageThemeProvider, usePageTheme } from '@/context/page-theme-context';
+import { useCategoryMenuStyleOverride } from '@/context/category-menu-style-context';
 import { CmsPage, getCmsPage } from '@/services/cms';
 import { resolvePageTheme, resolvePageThemeColors } from '@/services/cms-page-theme';
 import { ScreenHeader } from '@/components/screen-header';
@@ -57,7 +58,11 @@ export default function CmsPageScreen() {
 
   const pageTheme = resolvePageTheme(page);
   const customColors = resolvePageThemeColors(page);
-  const categoryBackground = getCategoryBackgroundConfig(page, isCategoryPage ? categoriesPage : undefined);
+  const cmsCategoryBackground = getCategoryBackgroundConfig(page, isCategoryPage ? categoriesPage : undefined);
+  const { temporaryCategoryMenuStyle } = useCategoryMenuStyleOverride();
+  const categoryBackground = isCategoryPage && temporaryCategoryMenuStyle
+    ? { ...cmsCategoryBackground, categoryMenuStyle: temporaryCategoryMenuStyle }
+    : cmsCategoryBackground;
 
   return (
     <PageThemeProvider theme={pageTheme} customColors={customColors}>
