@@ -911,7 +911,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
   if (section.name === 'RichText') {
     const isCategoriesCmsHeading = text(data.title).trim().toLowerCase() === 'todas categorias';
     return (
-      <ThemedView style={[styles.section, styles.richTextSection]}>
+      <ThemedView style={[styles.section, styles.richTextSection, isCategoriesCmsHeading && styles.richTextCategoryHeadingSection]}>
         <CmsRichText data={data} titleStyle={isCategoriesCmsHeading ? styles.richTextCategoryHeadingDebug : undefined} />
       </ThemedView>
     );
@@ -1168,7 +1168,11 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
     const bannerSectionStyle = isCategoryScreen ? styles.categoryBannerSection : styles.bannerSection;
 
     return (
-      <View style={[isFullScreenHero ? styles.heroSection : [bannerSectionStyle, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle], dark && { backgroundColor: theme.background }]}>
+      <View style={[
+        isFullScreenHero ? styles.heroSection : [bannerSectionStyle, isHome && styles.homeBannerSection, isHome && homeBannerSectionStyle],
+        dark && { backgroundColor: theme.background },
+        isCategoryScreen && categoryBackground?.categoryMenuStyle === 'classic' && styles.categoryBannerSectionClassic,
+      ]}>
         {!!text(data.mainTitle) && <ThemedText type="subtitle" style={[styles.bannerSectionTitle, isHome && homeBannerTitleStyle, searchPresentation && styles.searchBannerSectionTitle, dark && { color: theme.text }]}>{text(data.mainTitle)}</ThemedText>}
         {renderModeContent()}
       </View>

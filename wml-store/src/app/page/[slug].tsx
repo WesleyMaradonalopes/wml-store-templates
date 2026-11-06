@@ -106,6 +106,7 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBa
   const pageTheme = usePageTheme();
   const theme = pageTheme.palette;
   const onScroll = useTabBarScroll();
+  const classicCategoryPage = isCategoryPage && categoryBackground.categoryMenuStyle === 'classic';
   const backgroundColors = isCategoryPage && !pageTheme.isDark
     ? categoryBackground.surfaceColors
     : [theme.background, theme.background, theme.background] as const;
@@ -129,6 +130,7 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBa
               router={router}
               theme={theme}
               categoryBackground={categoryBackground}
+              classicCategoryPage={classicCategoryPage}
             />
           </SafeAreaView>
         </CategoryBackground>
@@ -151,7 +153,7 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBa
   );
 }
 
-function CategoryPageContent({ page, slug, loading, error, onScroll, router, theme, categoryBackground }: {
+function CategoryPageContent({ page, slug, loading, error, onScroll, router, theme, categoryBackground, classicCategoryPage = false }: {
   page: CmsPage | null;
   slug?: string;
   loading: boolean;
@@ -160,6 +162,7 @@ function CategoryPageContent({ page, slug, loading, error, onScroll, router, the
   router: ReturnType<typeof useRouter>;
   theme: ReturnType<typeof usePageTheme>['palette'];
   categoryBackground: CategoryBackgroundConfig;
+  classicCategoryPage?: boolean;
 }) {
   const isCategoryPage = typeof slug === 'string' && /^categ-/i.test(slug);
   const firstCategoryGroupIndex = isCategoryPage
@@ -167,7 +170,7 @@ function CategoryPageContent({ page, slug, loading, error, onScroll, router, the
     : -1;
 
   return (
-    <CategoryBackgroundPanel style={styles.pagePanel}>
+    <CategoryBackgroundPanel style={[styles.pagePanel, classicCategoryPage && styles.pagePanelClassic]}>
       <Pressable onPress={() => router.back()} style={styles.hiddenBack}>
         <ArrowLeftIAIcon color={theme.text} size={16} />
         <ThemedText type="link">Voltar</ThemedText>
@@ -198,6 +201,7 @@ const styles = StyleSheet.create({
   backgroundRoot: { flex: 1 },
   safeArea: { flex: 1, padding: Spacing.four },
   pagePanel: { flex: 1 },
+  pagePanelClassic: { marginHorizontal: -Spacing.four },
   content: { gap: Spacing.three, paddingVertical: Spacing.three },
   hiddenBack: { display: 'none' },
   errorText: { color: '#ed6560' },

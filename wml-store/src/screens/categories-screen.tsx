@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   backgroundRoot: { flex: 1 },
   backgroundOverlay: { flex: 1, backgroundColor: 'rgba(235, 235, 235, 0)' },
   safeArea: { flex: 1, paddingHorizontal: 0, paddingVertical: 0 },
-  safeAreaClassic: { paddingHorizontal: 20, paddingVertical: 0 },
+  safeAreaClassic: { paddingHorizontal: 0, paddingVertical: 0 },
   headerSurface: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
   glassPanel: {
     flex: 1,
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginHorizontal: 0,
     borderColor: 'rgba(255, 255, 255, 1)',
-    boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 0px 10px 1px rgba(0, 0, 0, 0)',
   },
   gradientFill: { flex: 1 },
   content: { gap: Spacing.three, paddingTop: 0, paddingHorizontal: 0, paddingBottom: 100 },
