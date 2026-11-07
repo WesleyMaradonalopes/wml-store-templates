@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   backgroundRoot: { flex: 1 },
   safeArea: { flex: 1, padding: Spacing.four },
   pagePanel: { flex: 1 },
-  pagePanelClassic: { marginHorizontal: -Spacing.four },
+  pagePanelClassic: { marginHorizontal: -10, width: 'auto' },
   content: { gap: Spacing.three, paddingVertical: Spacing.three },
   hiddenBack: { display: 'none' },
   errorText: { color: '#ed6560' },

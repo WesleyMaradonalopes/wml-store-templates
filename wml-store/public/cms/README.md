@@ -4,6 +4,17 @@
 
 O app lê o conteúdo publicado do projeto definido por `EXPO_PUBLIC_VTEX_CMS_PROJECT_ID` no VTEX Headless CMS. Portanto, editar este arquivo local não publica nem altera o CMS; ele serve como contrato das seções que o app sabe renderizar.
 
+## Localizador de lojas no app
+
+Para cadastrar as lojas exibidas no card `Nossas lojas` da tela de conta:
+
+1. Crie uma Landing Page no projeto do app com o ID `find-a-store` (ou informe outro ID em `EXPO_PUBLIC_STORES_CMS_PAGE_ID`).
+2. Adicione a seção `FindaStore` nessa página.
+3. Preencha cada item de `Lojas`, incluindo nome, endereço, telefone, WhatsApp, horário e, quando possível, latitude e longitude.
+4. Publique a página. Ao tocar em `Nossas lojas`, o aplicativo busca essa página e mostra filtros por estado/cidade, busca, marcas, distância, mapa, contatos e rota.
+
+A seção usa o mesmo contrato de dados do app web `find-a-store`. Se a página ainda não existir, o app mantém temporariamente a leitura legada do registro `OS` para evitar uma tela vazia durante a publicação do CMS.
+
 ## Tema individual por página
 
 Cada tipo de página (`home`, `categories`, `landingPage` e `search`) expõe o grupo

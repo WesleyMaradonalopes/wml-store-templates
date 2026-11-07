@@ -79,6 +79,12 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permita que o LoJahr encontre lojas próximas de você."
+        }
+      ],
       "expo-image",
       [
         "expo-image-picker",

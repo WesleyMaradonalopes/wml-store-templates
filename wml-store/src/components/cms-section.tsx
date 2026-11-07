@@ -54,6 +54,7 @@ const CATEGORY_ACCORDION_LAYOUT = LinearTransition
   .reduceMotion(ReduceMotion.System);
 const CATEGORY_SUBCATEGORIES_ENTERING = FadeIn.duration(140).reduceMotion(ReduceMotion.System);
 const CATEGORY_SUBCATEGORIES_EXITING = FadeOut.duration(110).reduceMotion(ReduceMotion.System);
+const CATEGORY_HERO_BANNER_ASPECT_RATIO = 3;
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : '';
@@ -921,9 +922,13 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
     const images = bannerImages;
     if (images.length === 0) return null;
 
-    const configuredAspectRatio = bannerRatio(data.aspectRatio, 4 / 3);
+    const stableCategoryHeroRatio = isCategoryScreen && bannerMode === 'SliderHero';
+    const hasConfiguredAspectRatio = Boolean(text(data.aspectRatio).trim());
+    const configuredAspectRatio = bannerRatio(data.aspectRatio, stableCategoryHeroRatio ? CATEGORY_HERO_BANNER_ASPECT_RATIO : 4 / 3);
     const configuredBorderRadius = searchPresentation ? 16 : bannerDimension(data.borderRadius, 5);
-    const ratioFor = (key: string, fallback: number) => bannerAspectRatios[key] ?? bannerRatio(data.aspectRatio, fallback);
+    const ratioFor = (key: string, fallback: number) => stableCategoryHeroRatio
+      ? bannerRatio(data.aspectRatio, fallback)
+      : bannerAspectRatios[key] ?? bannerRatio(data.aspectRatio, fallback);
     const homeBannerSectionStyle = !isHome
       ? undefined
       : bannerMode === 'GridList'
@@ -977,13 +982,13 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
       const button = bannerButtonConfig(image.button);
       const bannerKey = `${imageUrl}-${index}`;
       const blurTarget = getBannerBlurTarget(bannerKey);
-      const loadedAspectRatio = options.aspectRatioKey ? bannerAspectRatios[options.aspectRatioKey] : undefined;
+      const loadedAspectRatio = options.aspectRatioKey && !stableCategoryHeroRatio ? bannerAspectRatios[options.aspectRatioKey] : undefined;
       return (
         <Pressable key={bannerKey} onPress={openBanner} style={[styles.banner, options.containerStyle, isFullScreenHero && styles.heroBanner]}>
           <BlurTargetView ref={blurTarget} style={styles.bannerTarget}>
             <Image
               source={{ uri: imageUrl }}
-              onLoad={options.aspectRatioKey ? (event) => rememberBannerAspectRatio(options.aspectRatioKey!, event) : undefined}
+              onLoad={options.aspectRatioKey && !stableCategoryHeroRatio ? (event) => rememberBannerAspectRatio(options.aspectRatioKey!, event) : undefined}
               style={[styles.bannerImage, options.imageStyle, loadedAspectRatio ? { aspectRatio: loadedAspectRatio } : undefined, isFullScreenHero && styles.heroImage]}
               contentFit={options.contentFit ?? (isFullScreenHero ? 'cover' : 'contain')}
             />
@@ -1057,7 +1062,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
             return renderBanner(item, index, {
               containerStyle: { width: Dimensions.get('window').width, minHeight: 0 },
               imageStyle: { width: '100%', aspectRatio: ratioFor(key, configuredAspectRatio) },
-              contentFit: 'contain',
+              contentFit: stableCategoryHeroRatio && !hasConfiguredAspectRatio ? 'cover' : 'contain',
               aspectRatioKey: key,
             });
           })}

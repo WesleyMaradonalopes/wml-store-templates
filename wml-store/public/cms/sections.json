@@ -1755,6 +1755,63 @@
 		}
 	},
 	{
+		"name": "FindaStore",
+		"requiredScopes": [],
+		"schema": {
+			"title": "Localizador de lojas",
+			"description": "Cadastre as lojas exibidas na tela Nossas lojas do app mobile.",
+			"type": "object",
+			"properties": {
+				"title": {
+					"title": "Título",
+					"type": "string",
+					"default": "Nossas lojas"
+				},
+				"subtitle": {
+					"title": "Subtítulo",
+					"type": "string",
+					"default": "Encontre a loja Hope Resort mais próxima de você."
+				},
+				"stores": {
+					"title": "Lojas",
+					"type": "array",
+					"items": {
+						"title": "Loja",
+						"type": "object",
+						"properties": {
+							"__editorItemTitle": { "title": "Nome do item no editor", "type": "string", "default": "Nova loja" },
+							"id": { "title": "Identificador", "type": "string", "description": "Código interno único da loja." },
+							"name": { "title": "Nome", "type": "string", "default": "Nova loja" },
+							"brand": { "title": "Marca", "type": "string", "description": "Ex.: HOPE ou HOPE Resort." },
+							"address": { "title": "Rua", "type": "string" },
+							"number": { "title": "Número", "type": "string" },
+							"complement": { "title": "Complemento", "type": "string" },
+							"neighborhood": { "title": "Bairro", "type": "string" },
+							"city": { "title": "Cidade", "type": "string" },
+							"state": { "title": "Estado", "type": "string" },
+							"postalCode": { "title": "CEP", "type": "string" },
+							"country": { "title": "País", "type": "string", "default": "Brasil" },
+							"phone": { "title": "Telefone", "type": "string" },
+							"whatsapp": { "title": "WhatsApp", "type": "string", "description": "Número com DDD ou link https://wa.me/." },
+							"hours": {
+								"title": "Horário de funcionamento",
+								"type": "object",
+								"properties": {
+									"week": { "title": "Dias", "type": "string", "description": "Separe os dias por |. Ex.: Segunda | Domingo | Feriados" },
+									"schedule": { "title": "Horários", "type": "string", "description": "Use a mesma ordem dos dias e separe por |." },
+									"layout": { "title": "Formato", "type": "string", "enum": ["stacked", "inline"], "enumNames": ["Um abaixo do outro", "Todos na mesma linha"], "default": "stacked" }
+								}
+							},
+							"latitude": { "title": "Latitude", "type": "number", "description": "Coordenada para o mapa e cálculo de distância." },
+							"longitude": { "title": "Longitude", "type": "number", "description": "Coordenada para o mapa e cálculo de distância." },
+							"mapsUrl": { "title": "Link do mapa", "type": "string", "description": "Link opcional do Google Maps. Se ficar vazio, será gerado pelo endereço." }
+						}
+					}
+				}
+			}
+		}
+	},
+	{
 		"name": "BottomTabSettings",
 		"requiredScopes": [],
 		"schema": {
