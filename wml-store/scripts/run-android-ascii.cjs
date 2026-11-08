@@ -37,13 +37,23 @@ function removeGeneratedNativeCaches() {
   }
 }
 
+function syncLocalAndroidDebugKeystore() {
+  const source = path.join(os.homedir(), '.android', 'debug.keystore');
+  const target = path.join(projectRoot, 'android', 'app', 'debug.keystore');
+
+  if (fs.existsSync(source) && fs.existsSync(path.dirname(target))) {
+    fs.copyFileSync(source, target);
+  }
+}
+
 if (process.platform !== 'win32') {
   const result = spawnSync('npx', expoArgs, { cwd: projectRoot, env: process.env, stdio: 'inherit' });
   process.exitCode = result.status ?? 1;
 } else {
   removeGeneratedNativeCaches();
-  const tempRoot = getShortWindowsPath(os.tmpdir());
-  const alias = path.join(tempRoot, `wml-${process.pid}-${Date.now()}`);
+  syncLocalAndroidDebugKeystore();
+  const shortHome = getShortWindowsPath(os.homedir());
+  const alias = path.join(shortHome, `wml-${process.pid}-${Date.now()}`);
   const nodeOptions = [process.env.NODE_OPTIONS, '--preserve-symlinks']
     .filter(Boolean)
     .join(' ');

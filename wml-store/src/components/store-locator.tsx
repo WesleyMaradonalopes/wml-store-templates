@@ -1,4 +1,3 @@
-import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -176,6 +175,7 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
     setLocationError('');
 
     try {
+      const Location = await import('expo-location');
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== Location.PermissionStatus.GRANTED) {
         setLocationStatus('error');
@@ -193,7 +193,7 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
       setLocationStatus('success');
     } catch {
       setLocationStatus('error');
-      setLocationError('Não foi possível acessar sua localização.');
+      setLocationError('A localização não está disponível nesta versão do aplicativo. Atualize ou reinstale o app e tente novamente.');
     }
   }
 
