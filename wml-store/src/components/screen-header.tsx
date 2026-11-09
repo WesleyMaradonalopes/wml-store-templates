@@ -26,6 +26,7 @@ type ScreenHeaderProps = {
   showCart?: boolean;
   showAssistant?: boolean;
   leftAccessory?: ReactNode;
+  cartRightInset?: boolean;
   titleStyle?: StyleProp<TextStyle>;
   logoWidth?: number;
   logoHeight?: number;
@@ -33,7 +34,7 @@ type ScreenHeaderProps = {
   variant?: 'default' | 'checkout';
 };
 
-export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, onSearch, onShare, shareLoading = false, showSearch = true, showShare = false, showCart = true, showAssistant = true, leftAccessory, titleStyle, logoWidth = 76, logoHeight = 20, logoOffsetY = 0, variant = 'default' }: ScreenHeaderProps) {
+export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack, onSearch, onShare, shareLoading = false, showSearch = true, showShare = false, showCart = true, showAssistant = true, leftAccessory, cartRightInset = false, titleStyle, logoWidth = 76, logoHeight = 20, logoOffsetY = 0, variant = 'default' }: ScreenHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const theme = useTheme();
@@ -51,7 +52,7 @@ export function ScreenHeader({ back = true, title, titleAlign = 'center', onBack
         {showAssistant && !assistantHidden && <AssistantHeaderButton color="#FFFFFF" size={22} style={styles.action} />}
         {showSearch && <Pressable accessibilityLabel="Buscar" onPress={onSearch ?? (() => router.push('/search'))} style={styles.action}><SearchIcon size={20} color={headerColor} /></Pressable>}
         {showShare && onShare && <Pressable accessibilityLabel={shareLoading ? 'Gerando link dos favoritos' : 'Compartilhar favoritos'} accessibilityState={{ busy: shareLoading, disabled: shareLoading }} disabled={shareLoading} onPress={onShare} style={styles.action}>{shareLoading ? <ActivityIndicator size="small" color={headerColor} /> : <ShareIcon size={21} color={headerColor} />}</Pressable>}
-        {showCart && <CartIconButton color={headerColor} style={styles.action} />}
+        {showCart && <CartIconButton color={headerColor} style={[styles.action, cartRightInset && styles.cartRightInset]} />}
       </View>
     </View>
   );
@@ -73,6 +74,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' },
   checkoutActions: { minWidth: 42, justifyContent: 'flex-end' },
   action: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  cartRightInset: { marginRight: 10 },
   title: { fontFamily: Fonts.bold, fontSize: 16, fontWeight: '700' },
   checkoutTitle: { color: '#0a0a0a', fontFamily: Fonts.medium, fontSize: 18, lineHeight: 24, fontWeight: '500' },
 });

@@ -121,6 +121,7 @@ function CategoriesScreenContent({
             <View style={styles.headerSurface}>
               <ScreenHeader
                 back={false}
+                cartRightInset
                 leftAccessory={(
                   <CategoryMenuStyleToggle
                     value={categoryBackground.categoryMenuStyle}
