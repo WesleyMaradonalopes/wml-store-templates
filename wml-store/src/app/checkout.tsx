@@ -19,7 +19,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTabBar } from '@/context/tab-bar-context';
-import { getAccountSession } from '@/services/auth';
+import { getAccountSession, getVtexUserToken } from '@/services/auth';
 import { addCouponToCart, addGiftCardToCart, addItemOffering, checkGiftCardAvailability, clearCart, createFreshOrderForm, getCustomerGiftCards, getOrderForm, getPaymentInstallments, identifyExistingCustomerByEmail, OrderForm, removeCouponFromCart, removeGiftCardFromCart, removeItemOffering, selectPaymentMethod, selectShippingOption, subscribeToCartChanges, updateCartItem, updateClientProfile, updateShippingAddress, type CartItem, type GiftCard, type InstallmentChoice } from '@/services/cart';
 import { getCustomerAddressesFromMasterData, getCustomerProfileFromMasterData, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '@/services/customer';
 import { CheckoutOrderError, getTransactionStatus, placeOrder, type CheckoutOrderResult } from '@/services/orders';
@@ -172,6 +172,8 @@ export default function CheckoutScreen() {
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<CartItem | null>(null);
   const [customerExists, setCustomerExists] = useState(false);
+  const [checkoutStartedAuthenticated, setCheckoutStartedAuthenticated] = useState(false);
+  const [customerEditReturnStep, setCustomerEditReturnStep] = useState<Step | null>(null);
   const [editingCustomer, setEditingCustomer] = useState(false);
   const [editingAddress, setEditingAddress] = useState(false);
   const [giftWrap, setGiftWrap] = useState(false);
@@ -264,7 +266,9 @@ export default function CheckoutScreen() {
     });
   }
 
-  function beginCheckout() {
+  async function beginCheckout() {
+    if (saving) return;
+    setCustomerEditReturnStep(null);
     if (orderForm && orderForm.items.length > 0) {
       void trackEvent({
         name: 'begin_checkout',
@@ -273,7 +277,74 @@ export default function CheckoutScreen() {
         items: trackingItems(orderForm.items),
       });
     }
-    setStep('email');
+    setSaving(true);
+    setMessage('');
+    try {
+      const [session, token] = await Promise.all([getAccountSession(), getVtexUserToken()]);
+      const accountEmail = session?.email?.trim().toLowerCase() ?? '';
+      if (!accountEmail || !token) {
+        setCheckoutStartedAuthenticated(false);
+        if (accountEmail) setEmail(accountEmail);
+        setStep('email');
+        return;
+      }
+
+      setEmail(accountEmail);
+      setCheckoutStartedAuthenticated(true);
+      const { customerOrderForm, profile, addresses } = await resolveCustomerByEmail(accountEmail);
+      const [currentSession, currentToken] = await Promise.all([getAccountSession(), getVtexUserToken()]);
+      const currentEmail = currentSession?.email?.trim().toLowerCase() ?? '';
+      if (currentEmail !== accountEmail || !currentToken) {
+        setCheckoutStartedAuthenticated(false);
+        setMessage('Sua sessão expirou. Informe seu e-mail para continuar.');
+        setStep('email');
+        return;
+      }
+
+      const hydratedProfile = profile?.existsInMasterData === true
+        ? mergeCustomerProfiles(profile, customerOrderForm?.clientProfileData ?? null)
+        : null;
+      if (!hydratedProfile) {
+        resetNewCustomerForm();
+        setEmail(accountEmail);
+        setStep('customer');
+        return;
+      }
+
+      setCustomerExists(true);
+      setEditingCustomer(false);
+      applyProfile(hydratedProfile, accountEmail);
+      setCustomerAddresses(addresses);
+      const preferred = addresses.find((item) => item.postalCode && item.street);
+      if (preferred) {
+        applyAddress(preferred);
+        setReceiverName(String(preferred.receiverName || '').trim()
+          || [hydratedProfile.firstName, hydratedProfile.lastName].map((value) => value?.trim()).filter(Boolean).join(' '));
+      } else {
+        resetCustomerAddressState();
+        setCustomerAddresses(addresses);
+        setReceiverName([hydratedProfile.firstName, hydratedProfile.lastName].map((value) => value?.trim()).filter(Boolean).join(' '));
+      }
+
+      const customerDataIsComplete = Boolean(
+        hydratedProfile.firstName?.trim()
+        && hydratedProfile.lastName?.trim()
+        && validPhone(formatPhone(hydratedProfile.phone || hydratedProfile.homePhone || ''))
+        && validCpf(hydratedProfile.document || ''),
+      );
+      if (!customerDataIsComplete || !customerOrderForm?.userProfileId) {
+        setStep('customer');
+        return;
+      }
+
+      setStep('address');
+    } catch {
+      setCheckoutStartedAuthenticated(false);
+      setMessage('Não foi possível carregar os dados da sua conta. Informe seu e-mail para continuar.');
+      setStep('email');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function loadCustomerData(customerEmail: string) {
@@ -448,6 +519,16 @@ export default function CheckoutScreen() {
   }, [orderForm?.orderFormId, orderResult?.orderGroup, orderResult?.status, orderResult?.transactionId]);
 
   function back() {
+    if (step === 'customer' && customerEditReturnStep) {
+      setStep(customerEditReturnStep);
+      setCustomerEditReturnStep(null);
+      return;
+    }
+    if (checkoutStartedAuthenticated && (step === 'customer' || step === 'address')) {
+      setCheckoutStartedAuthenticated(false);
+      setStep('cart');
+      return;
+    }
     const previous: Record<Step, Step | null> = { cart: null, email: 'cart', customer: 'email', address: 'customer', shipping: 'address', payment: 'shipping', card: 'payment', installments: 'card', review: 'payment' };
     const target = previous[step];
     if (target) setStep(target); else router.back();
@@ -583,6 +664,8 @@ export default function CheckoutScreen() {
       // essencial para vales-presentes restritos ao CPF do proprietário.
       if (customerExists && !editingCustomer && orderForm.userProfileId) {
         ensureReceiverName();
+        setCheckoutStartedAuthenticated(false);
+        setCustomerEditReturnStep(null);
         setStep('address');
         return;
       }
@@ -611,6 +694,8 @@ export default function CheckoutScreen() {
       setCustomerExists(true);
       setEditingCustomer(false);
       ensureReceiverName();
+      setCheckoutStartedAuthenticated(false);
+      setCustomerEditReturnStep(null);
       setStep('address');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível salvar os dados.');
@@ -1838,7 +1923,7 @@ export default function CheckoutScreen() {
 
   return <ThemedView style={styles.container}><SafeAreaView style={styles.safeArea}><ScreenHeader title={title[step]} onBack={back} showSearch={false} showCart />{recaptchaSiteKey && (step === 'payment' || step === 'card' || step === 'review') && <Recaptcha ref={recaptchaRef} siteKey={recaptchaSiteKey} />}<ScrollView ref={checkoutScrollRef} contentContainerStyle={styles.content}>
      {step === 'cart' && <><ThemedView style={styles.productsCard}>{orderForm.items.map((item, position) => <View key={item.id + '-' + item.index} style={[styles.productBlock, position > 0 && styles.productDivider]}><View style={styles.itemRow}><Pressable accessibilityRole="link" accessibilityLabel={'Abrir ' + item.name} onPress={() => router.push(`/product/${item.productId || item.id}`)} style={styles.itemImageButton}><CheckoutProductImage imageUrl={item.imageUrl} label={item.name} style={styles.itemImage} /></Pressable><View style={styles.itemDetails}><View style={styles.itemTopRow}><ThemedText accessibilityRole="link" numberOfLines={3} onPress={() => router.push(`/product/${item.productId || item.id}`)} style={styles.itemName}>{item.name}</ThemedText><Pressable accessibilityLabel={'Remover ' + item.name} disabled={Boolean(updatingItem)} onPress={() => setPendingRemoval(item)} style={styles.removeButton}><TrashIcon size={20} color="#0a0a0a" /></Pressable></View><View style={styles.itemBottomRow}><View style={styles.quantityControl}><Pressable disabled={Boolean(updatingItem) || item.quantity <= 1} onPress={() => changeItemQuantity(item.index, item.id, item.quantity - 1)} style={styles.quantityButton}><ThemedText>−</ThemedText></Pressable><View style={styles.quantityValue}>{updatingItem === item.id ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.quantityCount}>{item.quantity}</ThemedText>}</View><Pressable disabled={Boolean(updatingItem)} onPress={() => changeItemQuantity(item.index, item.id, item.quantity + 1)} style={styles.quantityButton}><ThemedText>+</ThemedText></Pressable></View><ThemedText style={styles.itemPrice}>{money(item.price)}</ThemedText></View></View></View></View>)}{giftWrappingAvailable && <Pressable disabled={giftWrapLoading || saving} onPress={toggleGiftWrapping} style={styles.giftRow}><View style={[styles.giftCheckbox, giftWrap && styles.giftCheckboxSelected]}>{giftWrap && <ThemedText style={styles.giftCheck}>✓</ThemedText>}</View><ThemedText style={styles.giftText}>Incluir uma embalagem de presente para o pedido</ThemedText></Pressable>}</ThemedView>{giftWrap && <View style={styles.giftMessage}><ThemedText style={styles.giftMessageText}>Todos os itens selecionados como presente serão entregues em uma única embalagem. Caso precise de mais unidades, entre em contato com o nosso SAC.</ThemedText></View>}<ThemedView style={styles.card}><ThemedText style={styles.cardTitle}>Cupom de desconto</ThemedText><View style={styles.inline}><TextInput value={coupon} onChangeText={(text) => { setCoupon(text); if (couponMessage) clearCouponMessage(); }} autoCapitalize="characters" autoCorrect={false} editable={!couponApplied} placeholder="Insira o código" style={[styles.input, styles.flex, couponApplied && styles.appliedCouponInput]} />{couponApplied ? <Pressable accessibilityLabel="Remover cupom" disabled={saving || couponLoading} onPress={removeCoupon} style={styles.couponRemoveButton}>{couponLoading ? <ActivityIndicator size="small" color="#0a0a0a" /> : <TrashIcon size={21} color="#0a0a0a" />}</Pressable> : <Pressable disabled={saving || couponLoading} onPress={applyCoupon} style={styles.smallButton}>{couponLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.buttonText}>Adicionar</ThemedText>}</Pressable>}</View>{!!couponMessage && <ThemedText style={couponMessageType === 'success' ? styles.couponSuccess : styles.couponError}>{couponMessage}</ThemedText>}</ThemedView><FreeShippingProgress value={orderForm.value} /><Summary orderForm={orderForm} /><ProductShelf data={CART_BEST_SELLING_PRODUCTS_SHELF} titleStyle={styles.checkoutShelfTitle} onAdded={showCheckoutAddFeedback} showAddedModal={false} /></>}
-     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} trailingAction={<Pressable accessibilityRole="button" accessibilityLabel="Continuar com o e-mail" disabled={saving} onPress={continueWithEmail} style={[styles.emailVerifyButton, saving && styles.emailVerifyButtonDisabled]}>{saving ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.emailVerifyButtonText}>OK</ThemedText>}</Pressable>} /></Card>}
+     {step === 'email' && <Card><ThemedText style={styles.cardTitle}>Informe seu e-mail para continuar</ThemedText><ThemedText style={styles.bodyText} themeColor="textSecondary">Vamos verificar se você já fez alguma compra com a gente.</ThemedText><Field label="E-mail" value={email} setValue={setEmail} required placeholder="Digite seu email" keyboardType="email-address" error={emailValidationAttempted && !validEmail(email) ? 'E-mail inválido' : ''} trailingAction={<Pressable accessibilityRole="button" accessibilityLabel="Continuar com o e-mail" disabled={saving} onPress={continueWithEmail} style={[styles.emailVerifyButton, saving && styles.emailVerifyButtonDisabled]}>{saving ? <ActivityIndicator size="small" color="#0a0a0a" /> : <ThemedText style={styles.emailVerifyButtonText}>OK</ThemedText>}</Pressable>} />{!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}</Card>}
     {step === 'customer' && <>
       {customerExists && !editingCustomer
         ? <CustomerDataSummary email={email} firstName={firstName} lastName={lastName} phone={phone} birthDate={birthDate} document={document} gender={gender} onEdit={() => setEditingCustomer(true)} />
@@ -1911,7 +1996,7 @@ export default function CheckoutScreen() {
        <Card>
          <ReviewHeader icon="user" title="DADOS PESSOAIS" />
          <CustomerReviewData email={email} firstName={firstName} lastName={lastName} phone={phone} document={document} />
-         <Pressable onPress={() => { setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable>
+         <Pressable onPress={() => { setCustomerEditReturnStep('review'); setEditingCustomer(true); setStep('customer'); }}><ThemedText style={styles.link}>ALTERAR</ThemedText></Pressable>
        </Card>
        <Card>
          <View style={styles.reviewDeliveryTop}><ReviewHeader icon="truck" title="ENTREGA" /><ThemedText style={styles.freeText}>{selectedShipping?.price === 0 ? 'Grátis' : money(selectedShipping?.price || 0)}</ThemedText></View>
@@ -1937,5 +2022,5 @@ export default function CheckoutScreen() {
        </Card>
        {!!message && <ThemedText style={styles.errorText}>{message}</ThemedText>}
      </>}
-  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><Pressable accessibilityLabel="Fechar confirmação de remoção" onPress={() => setPendingRemoval(null)} style={StyleSheet.absoluteFill} /><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover <ThemedText style={styles.modalTitleProduct}>{pendingRemoval?.name}</ThemedText> do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><GiftCardIdentityModal visible={giftCardIdentityVisible} checkoutEmail={email} onClose={() => setGiftCardIdentityVisible(false)} onAuthenticated={completeGiftCardIdentity} /><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" onPress={beginCheckout} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'payment' && <Primary title={saving ? 'Continuando...' : 'Continuar'} onPress={continueWithSelectedPayment} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
+  </ScrollView><AddToCartFeedback key={cartAddFeedbackKey} message={step === 'cart' ? cartAddMessage : null} /><Modal visible={Boolean(pendingRemoval)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPendingRemoval(null)}><View style={styles.modalOverlay}><Pressable accessibilityLabel="Fechar confirmação de remoção" onPress={() => setPendingRemoval(null)} style={StyleSheet.absoluteFill} /><ThemedView style={styles.modalCard}><ThemedText style={styles.modalTitle}>Deseja remover <ThemedText style={styles.modalTitleProduct}>{pendingRemoval?.name}</ThemedText> do carrinho?</ThemedText><Pressable disabled={Boolean(updatingItem)} onPress={confirmItemRemoval} style={styles.modalDeleteButton}><ThemedText style={styles.buttonText}>Excluir</ThemedText></Pressable><Pressable onPress={() => setPendingRemoval(null)} style={styles.modalCancelButton}><ThemedText style={styles.dataLabel}>Cancelar</ThemedText></Pressable></ThemedView></View></Modal><GiftCardIdentityModal visible={giftCardIdentityVisible} checkoutEmail={email} onClose={() => setGiftCardIdentityVisible(false)} onAuthenticated={completeGiftCardIdentity} /><View style={styles.fixedFooter}>{step === 'cart' && <Primary title="Finalizar compra" loading={saving} onPress={beginCheckout} />}{step === 'email' && <Primary title={saving ? 'Consultando...' : 'Continuar'} onPress={continueWithEmail} />}{step === 'customer' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={customerExists && !editingCustomer ? continueCustomer : saveCustomer} />}{step === 'address' && <Primary title={saving ? 'Calculando...' : 'Continuar'} onPress={addressSaved && !editingAddress ? continueWithSavedAddress : saveAddress} />}{step === 'payment' && <Primary title={saving ? 'Continuando...' : 'Continuar'} onPress={continueWithSelectedPayment} />}{step === 'card' && <Primary title={saving ? 'Salvando...' : 'Continuar'} onPress={continueWithCard} />}{step === 'review' && <Primary title={saving ? 'Enviando...' : 'Finalizar Compra'} onPress={finishOrder} />}</View></SafeAreaView></ThemedView>;
 }
