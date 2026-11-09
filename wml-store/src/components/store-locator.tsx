@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -72,8 +71,10 @@ function uniqueSorted(values: string[]) {
 
 export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitle = DEFAULT_SUBTITLE }: StoreLocatorProps) {
   const theme = useTheme();
+  const scrollViewRef = useRef<ScrollView | null>(null);
   const [stateFilter, setStateFilter] = useState('');
   const [cityFilter, setCityFilter] = useState('');
+  const [openFilter, setOpenFilter] = useState<'state' | 'city' | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeBrands, setActiveBrands] = useState<string[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(
@@ -82,6 +83,7 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
   const [userCoordinates, setUserCoordinates] = useState<StoreCoordinates | null>(null);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
   const [locationError, setLocationError] = useState('');
+  const [mapOffset, setMapOffset] = useState(0);
 
   const normalizedStores = useMemo<StoreWithDistance[]>(
     () => stores.map((store, index) => ({
@@ -200,9 +202,11 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
   function handleStateChange(value: string) {
     setStateFilter(value);
     setCityFilter('');
+    setOpenFilter(null);
   }
 
   function toggleBrand(brand: string) {
+    setOpenFilter(null);
     setActiveBrands((current) => current.includes(brand)
       ? current.filter((item) => item !== brand)
       : [...current, brand]);
@@ -210,10 +214,15 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
 
   function selectStore(storeId: string) {
     setSelectedStoreId(storeId);
+    setOpenFilter(null);
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: Math.max(mapOffset - Spacing.two, 0), animated: true });
+    });
   }
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       onScroll={onScroll}
       scrollEventThrottle={16}
       contentContainerStyle={styles.content}>
@@ -230,13 +239,16 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
         <ThemedText themeColor="textSecondary" style={styles.summarySecondary}>Total de lojas: {normalizedStores.length}</ThemedText>
       </View>
 
-      <ThemedView style={[styles.filtersCard, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-        <View style={styles.filterRow}>
+      <ThemedView style={[styles.filtersCard, { borderColor: theme.border, backgroundColor: '#ffffff' }, openFilter && styles.filtersCardExpanded]}>
+        <View style={[styles.filterRow, openFilter && styles.filterRowExpanded]}>
           <FilterPicker
             label="Estado"
             placeholder="Selecione"
             value={stateFilter}
             options={availableStates}
+            expanded={openFilter === 'state'}
+            onToggle={() => setOpenFilter((current) => current === 'state' ? null : 'state')}
+            onClose={() => setOpenFilter(null)}
             onChange={handleStateChange}
           />
           <FilterPicker
@@ -245,7 +257,10 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
             value={cityFilter}
             options={availableCities}
             disabled={!availableCities.length}
-            onChange={setCityFilter}
+            expanded={openFilter === 'city'}
+            onToggle={() => setOpenFilter((current) => current === 'city' ? null : 'city')}
+            onClose={() => setOpenFilter(null)}
+            onChange={(value) => { setCityFilter(value); setOpenFilter(null); }}
           />
         </View>
 
@@ -258,6 +273,7 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
             placeholderTextColor={theme.textSecondary}
             style={[styles.searchInput, { color: theme.text, borderColor: theme.border }]}
             accessibilityLabel="Buscar loja por nome, cidade ou endereço"
+            onFocus={() => setOpenFilter(null)}
           />
         </View>
 
@@ -266,7 +282,7 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
           <Pressable
             accessibilityRole="button"
             disabled={locationStatus === 'loading'}
-            onPress={() => { void requestUserLocation(); }}
+            onPress={() => { setOpenFilter(null); void requestUserLocation(); }}
             style={[styles.locationButton, { borderColor: theme.text }, locationStatus === 'loading' && styles.disabled]}>
             {locationStatus === 'loading' ? <ActivityIndicator size="small" color={theme.text} /> : <ThemedText style={styles.locationGlyph}>⌖</ThemedText>}
             <ThemedText style={styles.locationButtonText}>
@@ -315,59 +331,68 @@ export function StoreLocator({ stores, onScroll, title = 'Nossas lojas', subtitl
         )}
       </View>
 
-      <StoreMap store={selectedStore} />
+      <View onLayout={(event) => setMapOffset(event.nativeEvent.layout.y)}>
+        <StoreMap store={selectedStore} />
+      </View>
       {selectedStore && <StoreDetails store={selectedStore} />}
     </ScrollView>
   );
 }
 
-function FilterPicker({ label, placeholder, value, options, disabled = false, onChange }: {
+function FilterPicker({ label, placeholder, value, options, disabled = false, expanded, onToggle, onClose, onChange }: {
   label: string;
   placeholder: string;
   value: string;
   options: string[];
   disabled?: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onClose: () => void;
   onChange: (value: string) => void;
 }) {
   const theme = useTheme();
-  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (disabled) setVisible(false);
-  }, [disabled]);
+    if (disabled && expanded) onClose();
+  }, [disabled, expanded, onClose]);
 
   return (
-    <View style={styles.filterField}>
+    <View style={[styles.filterField, expanded && styles.filterFieldExpanded]}>
       <ThemedText style={styles.fieldLabel}>{label}</ThemedText>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled }}
-        disabled={disabled}
-        onPress={() => setVisible(true)}
-        style={[styles.filterButton, { borderColor: theme.border, backgroundColor: theme.background }, disabled && styles.disabled]}>
-        <ThemedText numberOfLines={1} themeColor={value ? 'text' : 'textSecondary'} style={styles.filterButtonText}>{value || placeholder}</ThemedText>
-        <ChevronRightIcon color={theme.textSecondary} size={15} />
-      </Pressable>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setVisible(false)}>
-          <Pressable style={[styles.pickerSheet, { backgroundColor: theme.surface }]} onPress={(event) => event.stopPropagation()}>
-            <View style={styles.pickerHeader}>
-              <ThemedText style={styles.pickerTitle}>{label}</ThemedText>
-              <Pressable accessibilityLabel={`Fechar seleção de ${label}`} onPress={() => setVisible(false)}><ThemedText style={styles.pickerClose}>Fechar</ThemedText></Pressable>
-            </View>
-            <ScrollView style={styles.pickerOptions}>
+      <View style={styles.filterControl}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled, expanded }}
+          accessibilityLabel={`${label}: ${value || placeholder}`}
+          accessibilityHint="Abre uma lista de opções."
+          disabled={disabled}
+          onPress={onToggle}
+          style={[styles.filterButton, { borderColor: theme.border, backgroundColor: theme.background }, disabled && styles.disabled]}>
+          <ThemedText numberOfLines={1} themeColor={value ? 'text' : 'textSecondary'} style={styles.filterButtonText}>{value || placeholder}</ThemedText>
+          <View style={[styles.dropdownChevron, expanded && styles.dropdownChevronExpanded]}>
+            <ChevronRightIcon color={theme.textSecondary} size={15} />
+          </View>
+        </Pressable>
+        {expanded && (
+          <View style={[styles.dropdownMenu, { borderColor: theme.border }]}>
+            <ScrollView
+              style={styles.pickerOptions}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled">
               {[{ label: placeholder, value: '' }, ...options.map((option) => ({ label: option, value: option }))].map((option) => (
                 <Pressable
                   key={option.value || 'empty'}
-                  onPress={() => { onChange(option.value); setVisible(false); }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: option.value === value }}
+                  onPress={() => { onChange(option.value); onClose(); }}
                   style={[styles.pickerOption, option.value === value && { backgroundColor: theme.background }]}>
                   <ThemedText style={option.value === value && styles.pickerOptionSelected}>{option.label}</ThemedText>
                 </Pressable>
               ))}
             </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -381,9 +406,10 @@ function StoreCard({ store, selected, onPress }: { store: StoreWithDistance; sel
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityHint="Seleciona esta loja e mostra sua localização no mapa."
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[styles.storeCard, { borderColor: selected ? theme.text : theme.border, backgroundColor: theme.surface }, selected && styles.storeCardSelected]}>
+      style={[styles.storeCard, { borderColor: selected ? theme.text : theme.border, backgroundColor: '#ffffff' }, selected && styles.storeCardSelected]}>
       <View style={styles.storeCardHeader}>
         <View style={styles.storeCardTitle}>
           <StoreIcon color={theme.text} size={19} />
@@ -396,8 +422,8 @@ function StoreCard({ store, selected, onPress }: { store: StoreWithDistance; sel
       {!!store.phone && <ThemedText themeColor="textSecondary" style={styles.contactLine}>{store.phone}</ThemedText>}
       {!!distance && <ThemedText themeColor="textSecondary" style={styles.distanceLine}>{distance} de distância</ThemedText>}
       <View style={styles.cardActions}>
-        {!!whatsappUrl && <Pressable onPress={() => { void openCmsExternalLink(whatsappUrl); }}><ThemedText style={styles.whatsappAction}>WhatsApp</ThemedText></Pressable>}
-        <Pressable onPress={() => { void openCmsExternalLink(getMapsUrl(store)); }} style={styles.mapAction}><ThemedText style={styles.mapActionText}>Como chegar</ThemedText><ChevronRightIcon color={theme.text} size={14} /></Pressable>
+        {!!whatsappUrl && <Pressable onPress={(event) => { event.stopPropagation(); void openCmsExternalLink(whatsappUrl); }}><ThemedText style={styles.whatsappAction}>WhatsApp</ThemedText></Pressable>}
+        <Pressable onPress={(event) => { event.stopPropagation(); void openCmsExternalLink(getMapsUrl(store)); }} style={styles.mapAction}><ThemedText style={styles.mapActionText}>Como chegar</ThemedText><ChevronRightIcon color={theme.text} size={14} /></Pressable>
       </View>
     </Pressable>
   );
@@ -406,7 +432,7 @@ function StoreCard({ store, selected, onPress }: { store: StoreWithDistance; sel
 function EmptyState({ hasStores }: { hasStores: boolean }) {
   const theme = useTheme();
   return (
-    <ThemedView style={[styles.emptyState, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+    <ThemedView style={[styles.emptyState, { borderColor: theme.border, backgroundColor: '#ffffff' }]}>
       <StoreIcon color={theme.textSecondary} size={28} />
       <ThemedText style={styles.emptyTitle}>{hasStores ? 'Nenhuma loja encontrada' : 'Nenhuma loja cadastrada'}</ThemedText>
       <ThemedText themeColor="textSecondary" style={styles.emptyDescription}>
@@ -421,7 +447,7 @@ function StoreMap({ store }: { store: StoreWithDistance | null }) {
   const mapUrl = getMapEmbedUrl(store);
 
   return (
-    <ThemedView style={[styles.mapCard, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+    <ThemedView style={[styles.mapCard, { borderColor: theme.border, backgroundColor: '#ffffff' }]}>
       <View style={styles.mapHeader}>
         <ThemedText style={styles.sectionTitle}>Mapa das lojas</ThemedText>
         {store && <ThemedText themeColor="textSecondary" numberOfLines={1} style={styles.mapStoreName}>{getStoreName(store)}</ThemedText>}
@@ -468,7 +494,7 @@ function StoreDetails({ store }: { store: StoreWithDistance }) {
   }
 
   return (
-    <ThemedView style={[styles.detailsCard, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+    <ThemedView style={[styles.detailsCard, { borderColor: theme.border, backgroundColor: '#ffffff' }]}>
       <ThemedText style={styles.eyebrow}>LOJA SELECIONADA</ThemedText>
       <ThemedText style={styles.detailsTitle}>{getStoreName(store)}</ThemedText>
       {!!store.brand && <ThemedText themeColor="textSecondary" style={styles.detailsBrand}>{store.brand}</ThemedText>}
@@ -512,18 +538,28 @@ function StoreDetails({ store }: { store: StoreWithDistance }) {
 const styles = StyleSheet.create({
   content: { gap: Spacing.three, paddingBottom: 96 },
   header: { gap: 6, paddingTop: 8 },
-  eyebrow: { fontSize: 11, lineHeight: 16, letterSpacing: 1.5, fontWeight: '700' },
+  eyebrow: { fontSize: 11, lineHeight: 16, letterSpacing: 1.5, fontWeight: '700', display: 'none' },
   title: { fontSize: 30, lineHeight: 38 },
   subtitle: { fontSize: 14, lineHeight: 21 },
   summary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   summaryPrimary: { fontSize: 13, fontWeight: '700' },
   summarySecondary: { fontSize: 12 },
   filtersCard: { gap: 16, padding: 14, borderRadius: 16, borderWidth: 1 },
-  filterRow: { flexDirection: 'row', gap: 10 },
+  filtersCardExpanded: { zIndex: 2, elevation: 2, overflow: 'visible' },
+  filterRow: { flexDirection: 'row', gap: 10, overflow: 'visible' },
+  filterRowExpanded: { zIndex: 3, elevation: 3, overflow: 'visible' },
   filterField: { flex: 1, gap: 6, minWidth: 0 },
+  filterFieldExpanded: { zIndex: 4, elevation: 4 },
+  filterControl: { position: 'relative' },
   fieldLabel: { fontSize: 12, lineHeight: 17, fontWeight: '700' },
   filterButton: { minHeight: 44, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
   filterButtonText: { flex: 1, fontSize: 12 },
+  dropdownChevron: { transform: [{ rotate: '90deg' }] },
+  dropdownChevronExpanded: { transform: [{ rotate: '-90deg' }] },
+  dropdownMenu: { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 5, elevation: 5, marginTop: 4, maxHeight: 228, borderWidth: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: '#ffffff' },
+  pickerOptions: { maxHeight: 226 },
+  pickerOption: { minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
+  pickerOptionSelected: { fontWeight: '700' },
   searchField: { gap: 6 },
   searchInput: { minHeight: 44, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, fontSize: 14 },
   locationBlock: { gap: 7 },
@@ -533,7 +569,7 @@ const styles = StyleSheet.create({
   locationButtonText: { fontSize: 13, fontWeight: '700' },
   locationSuccess: { fontSize: 11 },
   locationError: { color: '#ed6560', fontSize: 11, lineHeight: 16 },
-  brandFilters: { gap: 8 },
+  brandFilters: { gap: 8, display: 'none' },
   brandOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   brandOption: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
@@ -575,13 +611,5 @@ const styles = StyleSheet.create({
   emptyState: { minHeight: 170, padding: 24, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
   emptyDescription: { fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  modalBackdrop: { flex: 1, padding: 18, backgroundColor: 'rgba(0, 0, 0, 0.42)', justifyContent: 'flex-end' },
-  pickerSheet: { maxHeight: '78%', borderRadius: 18, overflow: 'hidden' },
-  pickerHeader: { minHeight: 56, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#e6e2dc', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pickerTitle: { fontSize: 16, fontWeight: '700' },
-  pickerClose: { fontSize: 13, textDecorationLine: 'underline' },
-  pickerOptions: { paddingVertical: 6 },
-  pickerOption: { minHeight: 48, paddingHorizontal: 16, justifyContent: 'center' },
-  pickerOptionSelected: { fontWeight: '700' },
   disabled: { opacity: 0.5 },
 });
