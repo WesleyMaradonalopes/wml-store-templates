@@ -120,6 +120,7 @@ export const styles = StyleSheet.create({
   categoryGroupCategoryPage: { paddingHorizontal: 0 },
   categoryGroupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   categoryGroupBack: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
+  categoryGroupIcon: { width: 28, height: 28, flexShrink: 0 },
   categoryGroupTitle: { flex: 1, fontSize: 17, lineHeight: 24, color: '#0a0a0a', fontWeight: '600' },
   categoryGroupTitleClassic: { fontSize: 18, lineHeight: 20, color: '#0a0a0a', fontWeight: '500' },
   seeAllButton: { minHeight: 30, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: '#0a0a0a', backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },

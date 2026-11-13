@@ -7,7 +7,7 @@ import Animated, { Easing, FadeIn, FadeOut, LinearTransition, ReduceMotion } fro
 
 import { subscribeAccountSession } from '@/services/auth';
 import { getProductFacets, Product, searchProductListing, searchProducts, type CatalogFacet, type SelectedFacet } from '@/services/catalog';
-import { CmsSection } from '@/services/cms';
+import { type CmsPage, type CmsSection } from '@/services/cms';
 import { buildCmsActionRoute, readCmsAction, type CmsAction } from '@/services/cms-actions';
 import { cmsInternalRoute, openCmsExternalLink } from '@/services/cms-links';
 import { isFavorite } from '@/services/favorites';
@@ -41,6 +41,7 @@ import { useTheme } from '@/hooks/use-theme';
 type Props = {
   section: CmsSection;
   categoryPageSlug?: string;
+  categoryPageIconUrl?: string;
   isHome?: boolean;
   isCategoryScreen?: boolean;
   searchPresentation?: boolean;
@@ -594,6 +595,36 @@ function categoryListItems(data: Record<string, unknown>) {
   });
 }
 
+export function getCategoryIconForPage(page: CmsPage | null, slug?: string) {
+  if (!page || !slug) return '';
+
+  const pageSlug = slugPart(slug.replace(/^categ-/i, ''));
+  const sections = page.sections.filter((section) => (
+    section.name === 'CategoryListSwipe' || section.name === 'CategoryAccordeon' || section.name === 'CategoryTree'
+  ));
+
+  for (const section of sections) {
+    const categories = categoryListItems(section.data ?? {}).filter((item): item is Record<string, unknown> => (
+      Boolean(item && typeof item === 'object' && !Array.isArray(item))
+    ));
+
+    const category = categories.find((item) => {
+      if (slugPart(text(item.title)) === pageSlug) return true;
+
+      const actionTarget = (readCmsAction(item.action).value ?? '').split(/[?#]/, 1)[0] ?? ''
+        .split('/')
+        .filter(Boolean)
+        .pop() ?? '';
+      return slugPart(actionTarget.replace(/^categ-/i, '')) === pageSlug;
+    });
+
+    const iconUrl = category ? categoryIconUrl(category) : '';
+    if (iconUrl) return iconUrl;
+  }
+
+  return '';
+}
+
 function CategorySwipeRow({ category, onPress, classicStyle }: { category: Record<string, unknown>; onPress: () => void; classicStyle: boolean }) {
   const title = text(category.title) || 'Categoria';
   const iconUrl = categoryIconUrl(category);
@@ -739,6 +770,7 @@ function CategoryRow({ category, router, classicStyle }: { category: Record<stri
 
 function CategoryGroup({
   category,
+  categoryPageIconUrl,
   router,
   initiallyExpanded,
   subcategoryHeading,
@@ -749,6 +781,7 @@ function CategoryGroup({
   classicStyle = false,
 }: {
   category: Record<string, unknown>;
+  categoryPageIconUrl?: string;
   router: ReturnType<typeof useRouter>;
   initiallyExpanded: boolean;
   subcategoryHeading?: string;
@@ -759,6 +792,7 @@ function CategoryGroup({
   classicStyle?: boolean;
 }) {
   const title = text(category.title) || 'Categoria';
+  const iconUrl = categoryIconUrl(category) || categoryPageIconUrl || '';
   const action = readCmsAction(category.action);
   const subcategories = Array.isArray(category.subcategories)
     ? category.subcategories.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
@@ -783,6 +817,7 @@ function CategoryGroup({
               <ArrowLeftIAIcon color="#0a0a0a" size={20} />
             </Pressable>
           )}
+          {!!iconUrl && <Image source={{ uri: iconUrl }} contentFit="contain" style={styles.categoryGroupIcon} />}
           <ThemedText style={[styles.categoryGroupTitle, classicStyle && styles.categoryGroupTitleClassic]}>{title}</ThemedText>
           <Pressable
             accessibilityRole="button"
@@ -857,7 +892,7 @@ function CategoryGroup({
   );
 }
 
-export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCategoryScreen = false, searchPresentation = false, categoryBackground, showCategoryParentHeader = true }: Props) {
+export function CmsSectionView({ section, categoryPageSlug, categoryPageIconUrl, isHome = false, isCategoryScreen = false, searchPresentation = false, categoryBackground, showCategoryParentHeader = true }: Props) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = useTheme();
@@ -1251,7 +1286,7 @@ export function CmsSectionView({ section, categoryPageSlug, isHome = false, isCa
           (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon') && styles.categoryGroupsList,
         ]}>
           {displayedCategories.map((category, index) => (hasSubcategories || isDetailSection || section.name === 'CategoryAccordeon')
-            ? <CategoryGroup key={`${text(category.title)}-${index}`} category={category} router={router} initiallyExpanded={initiallyExpanded} subcategoryHeading={configuredSubcategoryHeading} showBack={Boolean(categoryPageSlug && isDetailSection)} showParentHeader={showCategoryParentHeader} categoryPageHeader={categoryPageHeader} isCategoryPage={Boolean(categoryPageSlug)} classicStyle={classicStyle} />
+            ? <CategoryGroup key={`${text(category.title)}-${index}`} category={category} categoryPageIconUrl={categoryPageHeader ? categoryPageIconUrl : undefined} router={router} initiallyExpanded={initiallyExpanded} subcategoryHeading={configuredSubcategoryHeading} showBack={Boolean(categoryPageSlug && isDetailSection)} showParentHeader={showCategoryParentHeader} categoryPageHeader={categoryPageHeader} isCategoryPage={Boolean(categoryPageSlug)} classicStyle={classicStyle} />
             : <CategoryRow key={`${text(category.title)}-${index}`} category={category} router={router} classicStyle={classicStyle} />)}
         </View>
       </ThemedView>

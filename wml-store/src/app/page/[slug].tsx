@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CmsSectionView } from '@/components/cms-section';
+import { CmsSectionView, getCategoryIconForPage } from '@/components/cms-section';
 import {
   CategoryBackground,
   CategoryBackgroundPanel,
@@ -63,6 +63,7 @@ export default function CmsPageScreen() {
   const categoryBackground = isCategoryPage && temporaryCategoryMenuStyle
     ? { ...cmsCategoryBackground, categoryMenuStyle: temporaryCategoryMenuStyle }
     : cmsCategoryBackground;
+  const categoryPageIconUrl = isCategoryPage ? getCategoryIconForPage(categoriesPage, slug) : '';
 
   return (
     <PageThemeProvider theme={pageTheme} customColors={customColors}>
@@ -73,6 +74,7 @@ export default function CmsPageScreen() {
         error={error}
         isCategoryPage={isCategoryPage}
         categoryBackground={categoryBackground}
+        categoryPageIconUrl={categoryPageIconUrl}
       />
     </PageThemeProvider>
   );
@@ -101,7 +103,7 @@ function isCategoryGroupSection(section: CmsPage['sections'][number]) {
   return categories.length > 0 && (section.name === 'CategoryAccordeon' || hasSubcategories);
 }
 
-function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBackground }: { page: CmsPage | null; slug?: string; loading: boolean; error: boolean; isCategoryPage: boolean; categoryBackground: CategoryBackgroundConfig }) {
+function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBackground, categoryPageIconUrl }: { page: CmsPage | null; slug?: string; loading: boolean; error: boolean; isCategoryPage: boolean; categoryBackground: CategoryBackgroundConfig; categoryPageIconUrl: string }) {
   const router = useRouter();
   const pageTheme = usePageTheme();
   const theme = pageTheme.palette;
@@ -130,6 +132,7 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBa
               router={router}
               theme={theme}
               categoryBackground={categoryBackground}
+              categoryPageIconUrl={categoryPageIconUrl}
               classicCategoryPage={classicCategoryPage}
             />
           </SafeAreaView>
@@ -146,6 +149,7 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBa
             router={router}
             theme={theme}
             categoryBackground={categoryBackground}
+            categoryPageIconUrl={categoryPageIconUrl}
           />
         </SafeAreaView>
       )}
@@ -153,7 +157,7 @@ function CmsPageContent({ page, slug, loading, error, isCategoryPage, categoryBa
   );
 }
 
-function CategoryPageContent({ page, slug, loading, error, onScroll, router, theme, categoryBackground, classicCategoryPage = false }: {
+function CategoryPageContent({ page, slug, loading, error, onScroll, router, theme, categoryBackground, categoryPageIconUrl, classicCategoryPage = false }: {
   page: CmsPage | null;
   slug?: string;
   loading: boolean;
@@ -162,6 +166,7 @@ function CategoryPageContent({ page, slug, loading, error, onScroll, router, the
   router: ReturnType<typeof useRouter>;
   theme: ReturnType<typeof usePageTheme>['palette'];
   categoryBackground: CategoryBackgroundConfig;
+  categoryPageIconUrl: string;
   classicCategoryPage?: boolean;
 }) {
   const isCategoryPage = typeof slug === 'string' && /^categ-/i.test(slug);
@@ -187,6 +192,7 @@ function CategoryPageContent({ page, slug, loading, error, onScroll, router, the
             key={`${section.name}-${index}`}
             section={section}
             categoryPageSlug={isCategoryPage ? slug : undefined}
+            categoryPageIconUrl={categoryPageIconUrl}
             categoryBackground={categoryBackground}
             showCategoryParentHeader={!isCategoryPage || index === firstCategoryGroupIndex}
           />
