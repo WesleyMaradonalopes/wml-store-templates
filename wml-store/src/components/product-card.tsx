@@ -70,22 +70,24 @@ export function ProductCard({ product, style, productNameStyle, favorite: contro
               <SimilarAiIcon color={dark ? theme.text : '#0a0a0a'} size={21} />
             </Pressable>
           )}
+        </View>
+        <ThemedText numberOfLines={2} style={[styles.name, productNameStyle]}>{product.name}</ThemedText>
+        <View style={styles.priceRow}>
+          <View style={styles.priceArea}>
+            {product.listPrice !== null && product.price !== null && product.listPrice > product.price && (
+              <ThemedText style={styles.listPrice}>{money(product.listPrice)}</ThemedText>
+            )}
+            {product.price !== null && <ThemedText type="smallBold" style={styles.price}>{money(product.price)}</ThemedText>}
+          </View>
           <ProductQuickViewButton
             product={product}
-            icon={<ShoppingBagIcon size={20} color={dark ? theme.text : '#0a0a0a'} />}
+            icon={<ShoppingBagIcon size={16} color={dark ? theme.text : '#0a0a0a'} />}
             accessibilityLabel="Adicionar à sacola"
             disabled={!product.itemId}
-            buttonStyle={[styles.addButton, dark && { backgroundColor: theme.background, borderColor: theme.border }]}
+            buttonStyle={styles.addButton}
             onAdded={() => onAdded?.(product)}
             showAddedModal={showAddedModal}
           />
-        </View>
-        <ThemedText numberOfLines={2} style={[styles.name, productNameStyle]}>{product.name}</ThemedText>
-        <View style={styles.priceArea}>
-          {product.listPrice !== null && product.price !== null && product.listPrice > product.price && (
-            <ThemedText style={styles.listPrice}>{money(product.listPrice)}</ThemedText>
-          )}
-          {product.price !== null && <ThemedText type="smallBold" style={styles.price}>{money(product.price)}</ThemedText>}
         </View>
       </Pressable>
     </ThemedView>
@@ -105,9 +107,10 @@ const styles = StyleSheet.create({
   favoriteButton: { position: 'absolute', right: 2, top: 2, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   similarButton: { position: 'absolute', right: 5, bottom: 45, width: 35, height: 35, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
   name: { minHeight: 38, fontSize: 13, lineHeight: 18 },
-  priceArea: { minHeight: 22, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  priceRow: { minHeight: 26, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  priceArea: { flex: 1, minWidth: 0, minHeight: 22, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   listPrice: { color: '#8a857f', fontSize: 11, textDecorationLine: 'line-through' },
   price: { fontSize: 14 },
-  addButton: { position: 'absolute', right: 5, bottom: 5, width: 35, height: 35, borderRadius: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#c9c5c0' },
+  addButton: { width: 28, height: 28, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   disabledButton: { opacity: 0.5 },
 });
