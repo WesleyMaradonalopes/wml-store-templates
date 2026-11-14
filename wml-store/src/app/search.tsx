@@ -25,6 +25,7 @@ import { getCmsPage, type CmsPage } from '@/services/cms';
 import { resolvePageTheme, resolvePageThemeColors } from '@/services/cms-page-theme';
 import { EMPTY_CART_RECENT_PRODUCTS_SHELF } from '@/utils/checkout';
 import { isFavorite } from '@/services/favorites';
+import { clearRecentSearches as clearStoredRecentSearches, getRecentSearches, removeRecentSearch, saveRecentSearch } from '@/services/recent-searches';
 import { trackEvent } from '@/services/telemetry';
 import { abortSpeechRecognition, isSpeechRecognitionAvailable, isSpeechRecognitionModuleInstalled, requestSpeechRecognitionPermissions, startSpeechRecognition, stopSpeechRecognition, subscribeSpeechRecognitionEvent, type VoiceRecognitionErrorEvent, type VoiceRecognitionResultEvent } from '@/services/speech-recognition';
 
@@ -107,6 +108,8 @@ export default function SearchScreen() {
   const initialTitle = configuredTitle;
   const initialHasListingContext = Boolean(initialQuery || initialFacets.length > 0 || initialTitle);
   const [term, setTerm] = useState(initialQuery);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [searchFieldFocused, setSearchFieldFocused] = useState(false);
   const [activeQuery, setActiveQuery] = useState(initialQuery);
   const [searchOpen, setSearchOpen] = useState(!initialHasListingContext);
   const [products, setProducts] = useState<Product[]>([]);
@@ -135,10 +138,29 @@ export default function SearchScreen() {
   const showSearchCms = searchOpen && !activeQuery && activeFacets.length === 0;
   const isCollectionListing = activeFacets.some((facet) => facet.key.trim().toLowerCase() === 'productclusterids');
   const displayListingTitle = listingTitle || activeQuery || (isCollectionListing && loading ? '' : 'Produtos');
+  const showRecentSearches = searchOpen && searchFieldFocused && !term.trim() && recentSearches.length > 0;
   const handleFavoriteChange = useCallback((product: Product, favorite: boolean) => {
     setFavoriteIds((current) => favorite
       ? Array.from(new Set([...current, product.id]))
       : current.filter((id) => id !== product.id));
+  }, []);
+  const handleScrollBeginDrag = useCallback(() => {
+    setSearchFieldFocused(false);
+  }, []);
+  const rememberSearchTerm = useCallback((value: string) => {
+    void saveRecentSearch(value).then(setRecentSearches).catch(() => undefined);
+  }, []);
+  const clearSearchHistory = useCallback(() => {
+    void clearStoredRecentSearches().then(() => setRecentSearches([])).catch(() => undefined);
+  }, []);
+  const removeSearchHistoryTerm = useCallback((value: string) => {
+    void removeRecentSearch(value).then(setRecentSearches).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    getRecentSearches().then((searches) => { if (active) setRecentSearches(searches); });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -154,7 +176,9 @@ export default function SearchScreen() {
     const nextTitle = paramText(collectionCatalogTitleParam).trim() || paramText(titleParam).trim();
     setTerm(nextQuery);
     setActiveQuery(nextQuery);
-    setSearchOpen(!(nextQuery || nextFacets.length > 0 || nextTitle));
+    const nextSearchOpen = !(nextQuery || nextFacets.length > 0 || nextTitle);
+    setSearchOpen(nextSearchOpen);
+    setSearchFieldFocused(false);
     setContextFacets(nextFacets);
     setSelectedFacets([]);
     setSort(paramText(sortParam) || (nextQuery ? DEFAULT_SEARCH_SORT : 'score:desc'));
@@ -309,6 +333,7 @@ export default function SearchScreen() {
       clearSearch();
       return;
     }
+    rememberSearchTerm(value);
     void trackEvent({ name: 'search', search_length: value.length });
     setContextFacets([]);
     setSelectedFacets([]);
@@ -318,6 +343,7 @@ export default function SearchScreen() {
     setSuggestions([]);
     setListingResolution(null);
     setSearchOpen(false);
+    setSearchFieldFocused(false);
   }
 
   function search() {
@@ -379,6 +405,7 @@ export default function SearchScreen() {
   }
 
   function openPopular(value: string) {
+    rememberSearchTerm(value);
     setTerm(value);
     setContextFacets([]);
     setSelectedFacets([]);
@@ -388,9 +415,11 @@ export default function SearchScreen() {
     setSuggestions([]);
     setListingResolution(null);
     setSearchOpen(false);
+    setSearchFieldFocused(false);
   }
 
   function selectSuggestion(value: string) {
+    rememberSearchTerm(value);
     setTerm(value);
     setContextFacets([]);
     setSelectedFacets([]);
@@ -400,6 +429,7 @@ export default function SearchScreen() {
     setSuggestions([]);
     setListingResolution(null);
     setSearchOpen(false);
+    setSearchFieldFocused(false);
   }
 
   const loadMore = useCallback(async () => {
@@ -445,7 +475,7 @@ export default function SearchScreen() {
             </Pressable>
             <View style={[styles.searchInputWrap, hasCustomPageTheme && { backgroundColor: pagePalette.inputBackground }]}>
               <SearchIcon size={17} color={hasCustomPageTheme ? pagePalette.textSecondary : '#8b8782'} />
-              <TextInput value={term} onChangeText={setTerm} onSubmitEditing={search} placeholder={isListening ? 'Ouvindo...' : 'O que você procura?'} placeholderTextColor={pagePalette.textSecondary} returnKeyType="search" style={[styles.searchInput, hasCustomPageTheme && { color: pagePalette.text }]} />
+              <TextInput value={term} onChangeText={setTerm} onFocus={() => setSearchFieldFocused(true)} onBlur={() => setSearchFieldFocused(false)} onSubmitEditing={search} placeholder={isListening ? 'Ouvindo...' : 'O que você procura?'} placeholderTextColor={pagePalette.textSecondary} returnKeyType="search" style={[styles.searchInput, hasCustomPageTheme && { color: pagePalette.text }]} />
               {!!term && <Pressable accessibilityLabel="Limpar busca" onPress={clearSearch} style={styles.clearButton}><ThemedText style={styles.clearText}>✕</ThemedText></Pressable>}
             </View>
             <Pressable
@@ -483,12 +513,34 @@ export default function SearchScreen() {
             })}
           </View>
         )}
+        {showRecentSearches && (
+          <View style={[styles.suggestionsPanel, hasCustomPageTheme && { backgroundColor: pagePalette.backgroundElement, borderColor: pagePalette.border }]}>
+            <View style={styles.recentSearchHeader}>
+              <ThemedText type="smallBold" style={hasCustomPageTheme && { color: pagePalette.text }}>Buscas recentes</ThemedText>
+              <Pressable accessibilityLabel="Limpar histórico de buscas" onPress={clearSearchHistory} style={styles.clearHistoryButton}>
+                <ThemedText themeColor="textSecondary" style={styles.clearHistoryText}>Limpar</ThemedText>
+              </Pressable>
+            </View>
+            {recentSearches.map((recentSearch) => (
+              <View key={recentSearch} style={styles.recentSearchRow}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Pesquisar ${recentSearch}`} onPress={() => selectSuggestion(recentSearch)} style={styles.recentSearchItem}>
+                  <SearchIcon size={15} color={hasCustomPageTheme ? pagePalette.textSecondary : '#8b8782'} />
+                  <ThemedText numberOfLines={1} style={[styles.suggestionText, styles.recentSearchText]}>{recentSearch}</ThemedText>
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Remover ${recentSearch} do histórico`} onPress={() => removeSearchHistoryTerm(recentSearch)} style={styles.removeRecentSearchButton}>
+                  <ThemedText style={[styles.removeRecentSearchText, hasCustomPageTheme && { color: pagePalette.textSecondary }]}>✕</ThemedText>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
         <FlatList<ProductGridRow>
           style={styles.body}
           data={loading ? [] : productRows}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.list}
           onScroll={onScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.4}
           initialNumToRender={6}
@@ -580,7 +632,15 @@ const styles = StyleSheet.create({
   voiceButtonActive: { backgroundColor: '#fff1f0' },
   closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 24, lineHeight: 28, color: '#0a0a0a', fontWeight: '400' },
-  suggestionsPanel: { marginHorizontal: Spacing.three, borderBottomLeftRadius: 14, borderBottomRightRadius: 14, borderWidth: 1, borderTopWidth: 0, borderColor: '#e7e3de', backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  suggestionsPanel: { marginHorizontal: Spacing.three, marginBottom: 5, borderBottomLeftRadius: 14, borderBottomRightRadius: 14, borderWidth: 1, borderTopWidth: 0, borderColor: '#e7e3de', backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  recentSearchHeader: { minHeight: 30, paddingHorizontal: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  clearHistoryButton: { minHeight: 30, paddingHorizontal: Spacing.two, alignItems: 'center', justifyContent: 'center' },
+  clearHistoryText: { fontSize: 12 },
+  recentSearchRow: { minHeight: 20, paddingVertical: Spacing.two, paddingLeft: Spacing.three, paddingRight: Spacing.two, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f0ede9' },
+  recentSearchItem: { flex: 1, minWidth: 0, minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  recentSearchText: { flex: 1, minWidth: 0 },
+  removeRecentSearchButton: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  removeRecentSearchText: { fontSize: 12, lineHeight: 16, color: '#625d57' },
   suggestionRow: { minHeight: 52, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderTopWidth: 1, borderTopColor: '#f0ede9' },
   suggestionCopy: { flex: 1, gap: 2 },
   suggestionText: { fontSize: 14 },
